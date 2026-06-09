@@ -1,0 +1,125 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Enums\FeedbackReason;
+use App\Enums\FeedbackStatus;
+use App\Enums\UserRole;
+use App\Models\ClientDashboard;
+use App\Models\Company;
+use App\Models\FeedbackSubmission;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Tests\TestCase;
+
+class FeedbackSubmissionTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_authenticated_user_can_submit_feedback_with_attachment(): void
+    {
+        Storage::fake('local');
+
+        $company = Company::query()->create(['name' => 'Acme', 'slug' => 'acme']);
+        $dashboard = ClientDashboard::query()->create([
+            'company_id' => $company->id,
+            'name' => 'Main',
+            'slug' => 'main',
+        ]);
+        $client = User::factory()->create(['role' => UserRole::Client]);
+        $client->companies()->attach($company->id);
+        $dashboard->users()->attach($client->id);
+
+        $response = $this->actingAs($client)
+            ->post(route('feedback.store'), [
+                'reason' => FeedbackReason::DataWrong->value,
+                'message' => 'Revenue on the dashboard does not match Shopify.',
+                'page_url' => '/main',
+                'client_dashboard_id' => $dashboard->id,
+                'attachments' => [
+                    UploadedFile::fake()->image('screenshot.png'),
+                ],
+            ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('message', 'Thanks — your feedback was sent to the team.');
+
+        $submission = FeedbackSubmission::query()->first();
+
+        $this->assertNotNull($submission);
+        $this->assertSame($client->id, $submission->user_id);
+        $this->assertSame($dashboard->id, $submission->client_dashboard_id);
+        $this->assertSame(FeedbackReason::DataWrong, $submission->reason);
+        $this->assertSame(FeedbackStatus::Pending, $submission->status);
+        $this->assertCount(1, $submission->attachments);
+    }
+
+    public function test_guest_cannot_submit_feedback(): void
+    {
+        $this->post(route('feedback.store'), [
+            'reason' => FeedbackReason::Other->value,
+            'message' => 'Something happened here today.',
+        ])->assertRedirect(route('login'));
+    }
+
+    public function test_admin_can_review_feedback_and_download_attachment(): void
+    {
+        Storage::fake('local');
+
+        $admin = User::factory()->create(['role' => UserRole::Admin]);
+        $user = User::factory()->create(['role' => UserRole::Client]);
+
+        $submission = FeedbackSubmission::query()->create([
+            'user_id' => $user->id,
+            'reason' => FeedbackReason::Confused->value,
+            'message' => 'I do not understand the ROAS widget.',
+            'status' => FeedbackStatus::Pending,
+        ]);
+
+        $path = 'feedback/'.$submission->id.'/note.txt';
+        Storage::disk('local')->put($path, 'helpful context');
+
+        $attachment = $submission->attachments()->create([
+            'original_filename' => 'note.txt',
+            'storage_path' => $path,
+            'mime_type' => 'text/plain',
+            'size_bytes' => 17,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.feedback.index'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Admin/Feedback/Index')
+                ->where('pending_count', 1)
+            );
+
+        $this->actingAs($admin)
+            ->post(route('admin.feedback.update', $submission), [
+                'admin_notes' => 'Follow up with client on ROAS definition.',
+                'mark_reviewed' => true,
+            ])
+            ->assertRedirect(route('admin.feedback.show', $submission));
+
+        $submission->refresh();
+
+        $this->assertSame(FeedbackStatus::Reviewed, $submission->status);
+        $this->assertSame($admin->id, $submission->reviewed_by_user_id);
+        $this->assertNotNull($submission->reviewed_at);
+
+        $this->actingAs($admin)
+            ->get(route('admin.feedback.attachments.download', $attachment))
+            ->assertOk();
+    }
+
+    public function test_client_cannot_access_admin_feedback_pages(): void
+    {
+        $client = User::factory()->create(['role' => UserRole::Client]);
+
+        $this->actingAs($client)
+            ->get(route('admin.feedback.index'))
+            ->assertForbidden();
+    }
+}

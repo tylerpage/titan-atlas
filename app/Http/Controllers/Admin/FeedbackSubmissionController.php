@@ -1,0 +1,146 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Enums\FeedbackStatus;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\UpdateFeedbackSubmissionRequest;
+use App\Models\FeedbackAttachment;
+use App\Models\FeedbackSubmission;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Storage;
+use Inertia\Inertia;
+use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+
+class FeedbackSubmissionController extends Controller
+{
+    public function index(): Response
+    {
+        return Inertia::render('Admin/Feedback/Index', [
+            'submissions' => FeedbackSubmission::query()
+                ->with(['user:id,name,email,role', 'clientDashboard:id,name,slug'])
+                ->withCount('attachments')
+                ->orderByRaw("CASE WHEN status = 'pending' THEN 0 ELSE 1 END")
+                ->orderByDesc('created_at')
+                ->get()
+                ->map(fn (FeedbackSubmission $submission) => $this->serializeListItem($submission)),
+            'pending_count' => FeedbackSubmission::query()
+                ->where('status', FeedbackStatus::Pending->value)
+                ->count(),
+        ]);
+    }
+
+    public function show(FeedbackSubmission $feedback): Response
+    {
+        $feedback->load([
+            'user:id,name,email,role',
+            'clientDashboard.company:id,name',
+            'reviewedBy:id,name',
+            'attachments',
+        ]);
+
+        return Inertia::render('Admin/Feedback/Show', [
+            'submission' => $this->serializeDetail($feedback),
+        ]);
+    }
+
+    public function update(
+        UpdateFeedbackSubmissionRequest $request,
+        FeedbackSubmission $feedback,
+    ): RedirectResponse {
+        if ($request->boolean('mark_reviewed') && $feedback->status === FeedbackStatus::Pending) {
+            $feedback->markReviewed($request->user(), $request->validated('admin_notes'));
+        } elseif ($request->has('admin_notes')) {
+            $feedback->update(['admin_notes' => $request->validated('admin_notes')]);
+        }
+
+        return redirect()
+            ->route('admin.feedback.show', $feedback)
+            ->with('status', 'Feedback updated.');
+    }
+
+    public function downloadAttachment(FeedbackAttachment $attachment): StreamedResponse
+    {
+        abort_unless(Storage::disk('local')->exists($attachment->storage_path), 404);
+
+        return Storage::disk('local')->download(
+            $attachment->storage_path,
+            $attachment->original_filename,
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function serializeListItem(FeedbackSubmission $submission): array
+    {
+        return [
+            'id' => $submission->id,
+            'reason' => $submission->reason->value,
+            'reason_label' => $submission->reason->label(),
+            'message_preview' => str($submission->message)->limit(120)->toString(),
+            'status' => $submission->status->value,
+            'status_label' => $submission->status->label(),
+            'page_url' => $submission->page_url,
+            'created_at' => $submission->created_at?->toIso8601String(),
+            'user' => [
+                'id' => $submission->user->id,
+                'name' => $submission->user->name,
+                'email' => $submission->user->email,
+                'role' => $submission->user->role->value,
+            ],
+            'dashboard' => $submission->clientDashboard ? [
+                'id' => $submission->clientDashboard->id,
+                'name' => $submission->clientDashboard->name,
+                'slug' => $submission->clientDashboard->slug,
+            ] : null,
+            'attachments_count' => $submission->attachments_count ?? $submission->attachments()->count(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function serializeDetail(FeedbackSubmission $submission): array
+    {
+        return [
+            'id' => $submission->id,
+            'reason' => $submission->reason->value,
+            'reason_label' => $submission->reason->label(),
+            'message' => $submission->message,
+            'status' => $submission->status->value,
+            'status_label' => $submission->status->label(),
+            'page_url' => $submission->page_url,
+            'admin_notes' => $submission->admin_notes,
+            'created_at' => $submission->created_at?->toIso8601String(),
+            'reviewed_at' => $submission->reviewed_at?->toIso8601String(),
+            'user' => [
+                'id' => $submission->user->id,
+                'name' => $submission->user->name,
+                'email' => $submission->user->email,
+                'role' => $submission->user->role->value,
+            ],
+            'dashboard' => $submission->clientDashboard ? [
+                'id' => $submission->clientDashboard->id,
+                'name' => $submission->clientDashboard->name,
+                'slug' => $submission->clientDashboard->slug,
+                'company_name' => $submission->clientDashboard->company?->name,
+            ] : null,
+            'reviewed_by' => $submission->reviewedBy ? [
+                'id' => $submission->reviewedBy->id,
+                'name' => $submission->reviewedBy->name,
+            ] : null,
+            'attachments' => $submission->attachments
+                ->map(fn (FeedbackAttachment $attachment) => [
+                    'id' => $attachment->id,
+                    'original_filename' => $attachment->original_filename,
+                    'mime_type' => $attachment->mime_type,
+                    'size_bytes' => $attachment->size_bytes,
+                    'download_url' => route('admin.feedback.attachments.download', $attachment),
+                ])
+                ->values()
+                ->all(),
+        ];
+    }
+}
