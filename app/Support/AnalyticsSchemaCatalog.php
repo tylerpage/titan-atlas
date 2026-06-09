@@ -96,7 +96,10 @@ SQL rules:
 - SELECT only. Scope every query via :dashboard_id (join connections or filter metric_snapshots).
 - Filter dates with json_extract(r.payload, '$.date') BETWEEN :start_date AND :end_date for orders.
 - Commerce orders live in raw_connector_payloads where resource_type = 'order'.
-- Search Console: resource_type keyword (queries), search_daily (site totals), search_page (landing pages). Use json_extract for clicks, impressions, ctr, position, keyword, page.
+- Search Console: resource_type keyword (queries), search_daily (site totals), search_page (landing pages), search_device (device breakdown). Use json_extract for clicks, impressions, ctr, position, keyword, page, device.
+- Google Analytics 4: resource_type traffic_daily, traffic_channel, events_daily, landing_page. Use json_extract for visitors, active_users, sessions, event_name, event_count, channel, landing_page.
+- Google Ads: resource_type spend_daily, campaign_daily. Use json_extract for cost, impressions, clicks, ctr, conversions_value, campaign_id, campaign_name.
+- StackAdapt: resource_type spend_daily, campaign_daily, channel_daily, insight_geo_daily, insight_domain_daily, insight_device_daily. Use json_extract for cost, impressions, clicks, ctr, conversions, conversions_value, roas, channel_type, campaign_id, dimension_key, dimension_label.
 
 Before writing SQL, call ListAnalyticsSchemaTool for full tables and connector fields, or DescribeConnectorSchemaTool for a specific connector.
 SUMMARY;
@@ -227,6 +230,108 @@ SUMMARY;
                         'source_api' => 'Google Search Console searchAnalytics.query (dimensions: date, page)',
                         'payload_fields' => ['date', 'page', 'clicks', 'impressions', 'ctr', 'position'],
                         'fact_table_recommendation' => 'fact_search_pages',
+                    ],
+                    [
+                        'name' => 'search_devices',
+                        'titan_resource_type' => 'search_device',
+                        'source_api' => 'Google Search Console searchAnalytics.query (dimensions: date, device)',
+                        'payload_fields' => ['date', 'device', 'clicks', 'impressions', 'ctr', 'position'],
+                        'fact_table_recommendation' => 'fact_search_devices',
+                    ],
+                ],
+            ],
+            [
+                'connector_type' => 'google_ads',
+                'label' => 'Google Ads',
+                'resources' => [
+                    [
+                        'name' => 'spend_daily',
+                        'titan_resource_type' => 'spend_daily',
+                        'source_api' => 'Google Ads API searchStream (FROM customer, segments.date)',
+                        'payload_fields' => ['date', 'cost', 'impressions', 'clicks', 'ctr', 'conversions_value'],
+                        'fact_table_recommendation' => 'fact_google_ads_spend_daily',
+                    ],
+                    [
+                        'name' => 'campaign_daily',
+                        'titan_resource_type' => 'campaign_daily',
+                        'source_api' => 'Google Ads API searchStream (FROM campaign, segments.date)',
+                        'payload_fields' => ['date', 'campaign_id', 'campaign_name', 'cost', 'impressions', 'clicks', 'ctr', 'conversions_value'],
+                        'fact_table_recommendation' => 'fact_google_ads_campaigns',
+                    ],
+                ],
+            ],
+            [
+                'connector_type' => 'stackadapt',
+                'label' => 'StackAdapt',
+                'resources' => [
+                    [
+                        'name' => 'spend_daily',
+                        'titan_resource_type' => 'spend_daily',
+                        'source_api' => 'StackAdapt GraphQL advertiserDelivery (DAILY)',
+                        'payload_fields' => ['date', 'cost', 'impressions', 'clicks', 'ctr', 'conversions', 'conversions_value', 'roas', 'secondary_conversions'],
+                        'fact_table_recommendation' => 'fact_stackadapt_spend_daily',
+                    ],
+                    [
+                        'name' => 'campaign_daily',
+                        'titan_resource_type' => 'campaign_daily',
+                        'source_api' => 'StackAdapt GraphQL campaignDelivery (DAILY)',
+                        'payload_fields' => ['date', 'campaign_id', 'campaign_name', 'campaign_group_id', 'campaign_group_name', 'channel_type', 'cost', 'impressions', 'clicks', 'conversions', 'conversions_value'],
+                        'fact_table_recommendation' => 'fact_stackadapt_campaigns',
+                    ],
+                    [
+                        'name' => 'channel_daily',
+                        'titan_resource_type' => 'channel_daily',
+                        'source_api' => 'StackAdapt GraphQL campaignDelivery aggregated by channel_type',
+                        'payload_fields' => ['date', 'channel_type', 'cost', 'impressions', 'clicks', 'conversions', 'conversions_value', 'video_starts', 'audio_starts'],
+                        'fact_table_recommendation' => 'fact_stackadapt_channels',
+                    ],
+                    [
+                        'name' => 'insight_geo_daily',
+                        'titan_resource_type' => 'insight_geo_daily',
+                        'source_api' => 'StackAdapt GraphQL campaignInsight (COUNTRY, REGION, DATE)',
+                        'payload_fields' => ['date', 'dimension_key', 'dimension_label', 'cost', 'impressions', 'clicks', 'conversions'],
+                        'fact_table_recommendation' => 'fact_stackadapt_geo',
+                    ],
+                    [
+                        'name' => 'insight_domain_daily',
+                        'titan_resource_type' => 'insight_domain_daily',
+                        'source_api' => 'StackAdapt GraphQL campaignInsight (APP, DATE)',
+                        'payload_fields' => ['date', 'dimension_key', 'dimension_label', 'cost', 'impressions', 'clicks', 'conversions'],
+                        'fact_table_recommendation' => 'fact_stackadapt_domains',
+                    ],
+                    [
+                        'name' => 'insight_device_daily',
+                        'titan_resource_type' => 'insight_device_daily',
+                        'source_api' => 'StackAdapt GraphQL campaignInsight (DEVICE_TYPE, DATE)',
+                        'payload_fields' => ['date', 'dimension_key', 'dimension_label', 'cost', 'impressions', 'clicks', 'conversions'],
+                        'fact_table_recommendation' => 'fact_stackadapt_devices',
+                    ],
+                ],
+            ],
+            [
+                'connector_type' => 'google_analytics',
+                'label' => 'Google Analytics 4',
+                'resources' => [
+                    [
+                        'name' => 'traffic_daily',
+                        'titan_resource_type' => 'traffic_daily',
+                        'source_api' => 'GA4 Data API runReport (dimensions: date)',
+                        'payload_fields' => ['date', 'visitors', 'active_users', 'sessions'],
+                        'fact_table_recommendation' => 'fact_ga4_traffic_daily',
+                    ],
+                    [
+                        'name' => 'events_daily',
+                        'titan_resource_type' => 'events_daily',
+                        'source_api' => 'GA4 Data API runReport (dimensions: date, eventName)',
+                        'payload_fields' => ['date', 'event_name', 'event_count'],
+                        'fact_table_recommendation' => 'fact_ga4_events',
+                    ],
+                    [
+                        'name' => 'landing_pages',
+                        'titan_resource_type' => 'landing_page',
+                        'source_api' => 'GA4 Data API runReport (dimensions: date, landingPage)',
+                        'payload_fields' => ['date', 'landing_page', 'sessions', 'active_users'],
+                        'fact_table_recommendation' => 'fact_ga4_landing_pages',
                     ],
                 ],
             ],

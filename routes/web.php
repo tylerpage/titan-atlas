@@ -34,6 +34,9 @@ Route::post('/logout', [LoginController::class, 'destroy'])
     ->middleware('auth')
     ->name('logout');
 
+Route::get('/admin/google/oauth/callback', [AdminGoogleOAuthController::class, 'callback'])
+    ->name('admin.google.oauth.callback');
+
 Route::get('/s/{code}', [DashboardShareController::class, 'show'])->name('dashboard.share.show');
 
 Route::middleware('auth')->group(function () {
@@ -77,7 +80,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/dashboards/{dashboard}/connections', [AdminDashboardController::class, 'storeConnection'])->name('dashboards.connections.store');
         Route::post('/connections/test', [AdminDashboardController::class, 'testConnection'])->name('connections.test');
         Route::get('/google/oauth/redirect', [AdminGoogleOAuthController::class, 'redirect'])->name('google.oauth.redirect');
-        Route::get('/google/oauth/callback', [AdminGoogleOAuthController::class, 'callback'])->name('google.oauth.callback');
         Route::get('/connections/{connection}', [AdminConnectionController::class, 'show'])->name('connections.show');
         Route::get('/connections/{connection}/edit', [AdminConnectionController::class, 'edit'])->name('connections.edit');
         Route::post('/connections/{connection}', [AdminConnectionController::class, 'update'])->name('connections.update');

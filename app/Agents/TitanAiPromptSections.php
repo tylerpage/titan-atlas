@@ -112,12 +112,14 @@ SKILL;
         $describeConnector = $this->tool('describe_connector_schema');
 
         return <<<SKILL
-## Skill: SEO & Search Console
-- Search Console data lives in raw_connector_payloads: resource_type keyword (queries), search_daily (site totals), search_page (landing URLs).
-- Key payload fields: clicks, impressions, ctr, position, keyword, page, date.
+## Skill: SEO, Search Console & GA4
+- Search Console data lives in raw_connector_payloads: resource_type keyword (queries), search_daily (site totals), search_page (landing URLs), search_device (device breakdown).
+- Key payload fields: clicks, impressions, ctr, position, keyword, page, device, date.
 - Position is average rank (lower is better). CTR is a ratio (0–1) in payloads.
-- Query-level analysis → resource_type = 'keyword'. Landing-page analysis → resource_type = 'search_page'. Trend charts → search_daily.
-- For connector field details call {$describeConnector} with connector search_console.
+- Query-level analysis → resource_type = 'keyword'. Landing-page analysis → resource_type = 'search_page'. Device breakdown → resource_type = 'search_device'. Trend charts → search_daily.
+- GA4 data: resource_type traffic_daily (visitors, active_users, sessions), events_daily (event_name, event_count), landing_page (landing_page, sessions). Traffic trends → traffic_daily. Event analysis → events_daily.
+- Google Ads data: resource_type spend_daily (cost, impressions, clicks, ctr, conversions_value), campaign_daily (+ campaign_id, campaign_name). Spend trends → spend_daily. Campaign analysis → campaign_daily.
+- For connector field details call {$describeConnector} with connector search_console, google_analytics, or google_ads.
 SKILL;
     }
 

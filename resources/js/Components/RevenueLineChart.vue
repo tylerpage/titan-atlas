@@ -40,6 +40,10 @@ const props = defineProps({
         type: String,
         default: 'Revenue',
     },
+    comparisonSeriesLabel: {
+        type: String,
+        default: 'Previous period',
+    },
 });
 
 function formatValue(value) {
@@ -95,7 +99,7 @@ const datasets = computed(() => {
 
     if (props.comparing && props.comparisonSeries.length > 0) {
         items.push({
-            label: 'Previous period',
+            label: props.comparisonSeriesLabel,
             data: valuesForSeries(props.comparisonSeries),
             borderColor: '#94a3b8',
             backgroundColor: 'transparent',

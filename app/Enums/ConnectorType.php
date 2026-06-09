@@ -10,6 +10,7 @@ enum ConnectorType: string
     case SearchConsole = 'search_console';
     case GoogleAnalytics = 'google_analytics';
     case Semrush = 'semrush';
+    case StackAdapt = 'stackadapt';
 
     public function label(): string
     {
@@ -20,6 +21,7 @@ enum ConnectorType: string
             self::SearchConsole => 'Google Search Console',
             self::GoogleAnalytics => 'Google Analytics 4',
             self::Semrush => 'SEMrush',
+            self::StackAdapt => 'StackAdapt',
         };
     }
 
@@ -58,8 +60,23 @@ enum ConnectorType: string
                 ],
             ],
             self::GoogleAds => [
-                ['key' => 'customer_id', 'label' => 'Customer ID', 'placeholder' => '1234567890'],
-                ['key' => 'refresh_token', 'label' => 'Refresh token', 'type' => 'password'],
+                [
+                    'key' => 'customer_id',
+                    'label' => 'Google Ads account',
+                    'placeholder' => '1234567890',
+                    'help' => 'Choose an accessible Ads account after connecting with Google.',
+                ],
+                [
+                    'key' => 'login_customer_id',
+                    'label' => 'Manager account ID (optional)',
+                    'placeholder' => '9876543210',
+                    'help' => 'Required only for manager (MCC) access. Enter the manager customer ID without dashes.',
+                ],
+                [
+                    'key' => 'refresh_token',
+                    'label' => 'Google refresh token',
+                    'type' => 'oauth_hidden',
+                ],
             ],
             self::SearchConsole => [
                 [
@@ -75,11 +92,40 @@ enum ConnectorType: string
                 ],
             ],
             self::GoogleAnalytics => [
-                ['key' => 'property_id', 'label' => 'GA4 property ID', 'placeholder' => '123456789'],
-                ['key' => 'refresh_token', 'label' => 'Refresh token', 'type' => 'password'],
+                [
+                    'key' => 'property_id',
+                    'label' => 'GA4 property',
+                    'placeholder' => '123456789',
+                    'help' => 'Choose a GA4 property after connecting with Google.',
+                ],
+                [
+                    'key' => 'refresh_token',
+                    'label' => 'Google refresh token',
+                    'type' => 'oauth_hidden',
+                ],
             ],
             self::Semrush => [
                 ['key' => 'api_key', 'label' => 'API key', 'type' => 'password'],
+            ],
+            self::StackAdapt => [
+                [
+                    'key' => 'graphql_api_key',
+                    'label' => 'GraphQL API key',
+                    'type' => 'password',
+                    'help' => 'Dedicated GraphQL API key from StackAdapt. Used as a Bearer token against api.stackadapt.com/graphql.',
+                ],
+                [
+                    'key' => 'advertiser_id',
+                    'label' => 'Advertiser',
+                    'placeholder' => 'Select after testing connection',
+                    'help' => 'One StackAdapt advertiser per connection. Run Test connection to list accessible advertisers.',
+                ],
+                [
+                    'key' => 'rest_api_key',
+                    'label' => 'REST API key (legacy, optional)',
+                    'type' => 'password',
+                    'help' => 'Optional legacy REST key used only when GraphQL auth fails during migration. New syncs use GraphQL only.',
+                ],
             ],
         };
     }
@@ -99,12 +145,12 @@ enum ConnectorType: string
 
     public function supportsLiveConnectionTest(): bool
     {
-        return in_array($this, [self::Shopify, self::BigCommerce, self::SearchConsole], true);
+        return in_array($this, [self::Shopify, self::BigCommerce, self::SearchConsole, self::GoogleAnalytics, self::GoogleAds, self::StackAdapt], true);
     }
 
     public function usesGoogleOAuth(): bool
     {
-        return $this === self::SearchConsole;
+        return in_array($this, [self::SearchConsole, self::GoogleAnalytics, self::GoogleAds], true);
     }
 
     /**
@@ -113,7 +159,19 @@ enum ConnectorType: string
     public function oauthHiddenCredentialKeys(): array
     {
         return match ($this) {
-            self::SearchConsole => ['refresh_token'],
+            self::SearchConsole, self::GoogleAnalytics, self::GoogleAds => ['refresh_token'],
+            default => [],
+        };
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function optionalCredentialKeys(): array
+    {
+        return match ($this) {
+            self::GoogleAds => ['login_customer_id'],
+            self::StackAdapt => ['rest_api_key'],
             default => [],
         };
     }
@@ -124,6 +182,9 @@ enum ConnectorType: string
             self::Shopify => self::productName().' syncs orders and session attribution from Shopify using the Admin API. You need a custom app Admin API access token with read_orders and read_reports scopes.',
             self::BigCommerce => self::productName().' syncs orders from BigCommerce using the v2 Orders API. You need a store API account with Orders (read-only) permission.',
             self::SearchConsole => self::productName().' syncs Google Search Console search analytics: daily site totals, query (keyword) performance, and landing-page metrics. Platform setup: enable the Search Console API in Google Cloud, create an OAuth web client, add redirect URI '.route('admin.google.oauth.callback', absolute: true).', and set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET in '.self::productName().'. Then click Connect with Google — you must have owner, full, or restricted access on the property.',
+            self::GoogleAnalytics => self::productName().' syncs GA4 traffic, events, and landing-page metrics. The unified GA4 dashboard also requires a Search Console connection on the same dashboard. Platform setup: enable the Google Analytics Data API and Google Analytics Admin API in Google Cloud, create an OAuth web client, add redirect URI '.route('admin.google.oauth.callback', absolute: true).', and set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET in '.self::productName().'. Then click Connect with Google and choose a GA4 property.',
+            self::GoogleAds => self::productName().' syncs Google Ads spend, impressions, clicks, CTR, and conversion value with daily and campaign breakdowns. Platform setup: enable the Google Ads API in Google Cloud, create an OAuth web client, add redirect URI '.route('admin.google.oauth.callback', absolute: true).', set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET, and obtain a developer token from the Google Ads API Center (GOOGLE_ADS_DEVELOPER_TOKEN). Then click Connect with Google and choose an Ads account.',
+            self::StackAdapt => self::productName().' syncs StackAdapt programmatic delivery data: daily advertiser spend, campaign performance, channel mix (CTV, native, display, video, audio, and more), plus geo, domain, and device insights. Paste your StackAdapt GraphQL API key, test the connection to list advertisers, then select one advertiser per connection.',
             default => null,
         };
     }

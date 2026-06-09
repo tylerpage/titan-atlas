@@ -70,6 +70,28 @@ class GoogleTokenService
     }
 
     /**
+     * @return array{email: string|null, name: string|null}
+     */
+    public function fetchUserInfo(string $accessToken): array
+    {
+        $response = Http::withToken($accessToken)
+            ->acceptJson()
+            ->get('https://www.googleapis.com/oauth2/v2/userinfo');
+
+        if (! $response->successful()) {
+            throw new RuntimeException('Google user info request failed.');
+        }
+
+        $email = $response->json('email');
+        $name = $response->json('name');
+
+        return [
+            'email' => is_string($email) && $email !== '' ? $email : null,
+            'name' => is_string($name) && $name !== '' ? $name : null,
+        ];
+    }
+
+    /**
      * @param  array<string, string>  $payload
      */
     protected function tokenRequest(array $payload): Response

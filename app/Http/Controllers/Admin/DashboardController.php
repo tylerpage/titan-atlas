@@ -107,6 +107,8 @@ class DashboardController extends Controller
 
     public function createConnection(ClientDashboard $dashboard): Response
     {
+        $pendingOAuth = app(\App\Services\Google\GoogleOAuthPendingSession::class);
+
         return Inertia::render('Admin/Dashboards/Connections/Create', [
             'dashboard' => [
                 'id' => $dashboard->id,
@@ -116,8 +118,8 @@ class DashboardController extends Controller
             'connectors' => collect(ConnectorType::cases())
                 ->map(fn (ConnectorType $type) => $type->toConnectorOption())
                 ->values(),
-            'google_oauth' => app(\App\Services\Google\GoogleOAuthPendingSession::class)
-                ->toInertiaProps(ConnectorType::SearchConsole, $dashboard->id),
+            'defaultConnectorType' => $pendingOAuth->defaultConnectorTypeForDashboard($dashboard->id),
+            'googleOauth' => $pendingOAuth->propsForDashboardDefault($dashboard->id),
         ]);
     }
 

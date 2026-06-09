@@ -1,7 +1,7 @@
 import { onUnmounted, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 
-export function useDashboardSyncPoll(isSyncing, { only = ['dashboard'], intervalMs = 10000 } = {}) {
+export function useDashboardSyncPoll(isSyncing, { only = ['dashboard'], intervalMs = 30000 } = {}) {
     let timer = null;
 
     function stop() {

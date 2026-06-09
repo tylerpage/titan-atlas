@@ -43,7 +43,7 @@ class CreateConnectionService
         $connection->save();
 
         if ($type->usesGoogleOAuth()) {
-            app(GoogleOAuthPendingSession::class)->forget();
+            app(GoogleOAuthPendingSession::class)->forget($dashboard->id, $type);
         }
 
         SyncConnectionJob::dispatch($connection, SyncRunType::Backfill);

@@ -38,8 +38,8 @@ class ConnectionController extends Controller
         return Inertia::render('Admin/Dashboards/Connections/Edit', [
             'connection' => $this->serializeConnection($connection),
             'connectors' => $this->connectorOptions(),
-            'google_oauth' => app(\App\Services\Google\GoogleOAuthPendingSession::class)
-                ->toInertiaProps($connection->connector_type, $connection->client_dashboard_id),
+            'googleOauth' => app(\App\Services\Google\GoogleOAuthPendingSession::class)
+                ->propsForDashboard($connection->connector_type, $connection->client_dashboard_id),
         ]);
     }
 
@@ -139,10 +139,40 @@ class ConnectionController extends Controller
     }
 
     /**
+     * @param  array<string, mixed>  $credentials
+     * @return array<string, string>
+     */
+    protected function credentialHints(Connection $connection, array $credentials): array
+    {
+        return match ($connection->connector_type) {
+            ConnectorType::SearchConsole => is_string($credentials['site_url'] ?? null) && $credentials['site_url'] !== ''
+                ? ['site_url' => $credentials['site_url']]
+                : [],
+            ConnectorType::GoogleAnalytics => is_string($credentials['property_id'] ?? null) && $credentials['property_id'] !== ''
+                ? ['property_id' => $credentials['property_id']]
+                : [],
+            ConnectorType::GoogleAds => array_filter([
+                'customer_id' => is_string($credentials['customer_id'] ?? null) && $credentials['customer_id'] !== ''
+                    ? $credentials['customer_id']
+                    : null,
+                'login_customer_id' => is_string($credentials['login_customer_id'] ?? null) && $credentials['login_customer_id'] !== ''
+                    ? $credentials['login_customer_id']
+                    : null,
+            ]),
+            ConnectorType::StackAdapt => is_string($credentials['advertiser_id'] ?? null) && $credentials['advertiser_id'] !== ''
+                ? ['advertiser_id' => $credentials['advertiser_id']]
+                : [],
+            default => [],
+        };
+    }
+
+    /**
      * @return array<string, mixed>
      */
     protected function serializeConnection(Connection $connection): array
     {
+        $credentials = $connection->credentials();
+
         return [
             'id' => $connection->id,
             'name' => $connection->name,
@@ -155,6 +185,7 @@ class ConnectionController extends Controller
             'backfill_started_at' => $connection->backfill_started_at?->toIso8601String(),
             'backfill_completed_at' => $connection->backfill_completed_at?->toIso8601String(),
             'credential_fields' => $connection->connector_type->credentialFields(),
+            'credential_hints' => $this->credentialHints($connection, $credentials),
             'dashboard' => [
                 'id' => $connection->clientDashboard->id,
                 'name' => $connection->clientDashboard->name,

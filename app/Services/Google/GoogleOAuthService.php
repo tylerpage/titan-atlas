@@ -13,13 +13,27 @@ class GoogleOAuthService
     public function scopeFor(ConnectorType $type): string
     {
         return match ($type) {
-            ConnectorType::SearchConsole => 'https://www.googleapis.com/auth/webmasters.readonly',
+            ConnectorType::SearchConsole => implode(' ', [
+                'https://www.googleapis.com/auth/webmasters.readonly',
+                'https://www.googleapis.com/auth/userinfo.email',
+                'https://www.googleapis.com/auth/userinfo.profile',
+            ]),
+            ConnectorType::GoogleAnalytics => implode(' ', [
+                'https://www.googleapis.com/auth/analytics.readonly',
+                'https://www.googleapis.com/auth/userinfo.email',
+                'https://www.googleapis.com/auth/userinfo.profile',
+            ]),
+            ConnectorType::GoogleAds => implode(' ', [
+                'https://www.googleapis.com/auth/adwords',
+                'https://www.googleapis.com/auth/userinfo.email',
+                'https://www.googleapis.com/auth/userinfo.profile',
+            ]),
             default => throw new RuntimeException("Google OAuth is not configured for {$type->value}."),
         };
     }
 
     /**
-     * @param  array{connector_type: string, dashboard_id: int, connection_id?: int|null, return_to: string}  $context
+     * @param  array{connector_type: string, dashboard_id: int, connection_id?: int|null, return_to: string, user_id: int}  $context
      */
     public function authorizationUrl(array $context): string
     {
@@ -31,7 +45,7 @@ class GoogleOAuthService
             'response_type' => 'code',
             'scope' => $this->scopeFor(ConnectorType::from($context['connector_type'])),
             'access_type' => 'offline',
-            'prompt' => 'consent',
+            'prompt' => 'select_account consent',
             'state' => $this->encodeState($context),
         ]);
 
@@ -39,7 +53,7 @@ class GoogleOAuthService
     }
 
     /**
-     * @return array{connector_type: string, dashboard_id: int, connection_id?: int|null, return_to: string}
+     * @return array{connector_type: string, dashboard_id: int, connection_id?: int|null, return_to: string, user_id: int}
      */
     public function decodeState(string $state): array
     {
@@ -50,10 +64,11 @@ class GoogleOAuthService
         }
 
         if (! is_array($payload)
-            || ! isset($payload['connector_type'], $payload['dashboard_id'], $payload['return_to'])
+            || ! isset($payload['connector_type'], $payload['dashboard_id'], $payload['return_to'], $payload['user_id'])
             || ! is_string($payload['connector_type'])
             || ! is_int($payload['dashboard_id'])
-            || ! is_string($payload['return_to'])) {
+            || ! is_string($payload['return_to'])
+            || ! is_int($payload['user_id'])) {
             throw new RuntimeException('Invalid OAuth state payload.');
         }
 
@@ -80,7 +95,7 @@ class GoogleOAuthService
     }
 
     /**
-     * @param  array{connector_type: string, dashboard_id: int, connection_id?: int|null, return_to: string}  $context
+     * @param  array{connector_type: string, dashboard_id: int, connection_id?: int|null, return_to: string, user_id: int}  $context
      */
     protected function encodeState(array $context): string
     {
@@ -89,6 +104,7 @@ class GoogleOAuthService
             'dashboard_id' => $context['dashboard_id'],
             'connection_id' => $context['connection_id'] ?? null,
             'return_to' => $context['return_to'],
+            'user_id' => $context['user_id'],
             'expires_at' => now()->addMinutes(15)->timestamp,
         ];
 

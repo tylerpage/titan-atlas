@@ -66,7 +66,10 @@ return [
     'sync' => [
         'daily_at' => env('TITAN_SYNC_DAILY_AT', '02:00'),
         'hourly_today' => env('TITAN_SYNC_HOURLY_TODAY', true),
-        'pages_per_job' => (int) env('TITAN_SYNC_PAGES_PER_JOB', 5),
+        // Keep each queue job short for hosted workers (e.g. Laravel Cloud ~60s limit).
+        'pages_per_job' => (int) env('TITAN_SYNC_PAGES_PER_JOB', 2),
+        'max_seconds_per_job' => (int) env('TITAN_SYNC_MAX_SECONDS_PER_JOB', 45),
+        'job_timeout' => (int) env('TITAN_SYNC_JOB_TIMEOUT', 55),
         'memory_limit' => env('TITAN_SYNC_MEMORY_LIMIT', '512M'),
     ],
 
@@ -88,8 +91,52 @@ return [
         'backfill_months' => (int) env('TITAN_SEARCH_CONSOLE_BACKFILL_MONTHS', 16),
         'incremental_days' => (int) env('TITAN_SEARCH_CONSOLE_INCREMENTAL_DAYS', 5),
         'data_lag_days' => (int) env('TITAN_SEARCH_CONSOLE_DATA_LAG_DAYS', 3),
-        'row_limit' => (int) env('TITAN_SEARCH_CONSOLE_ROW_LIMIT', 5000),
-        'chunk_days' => (int) env('TITAN_SEARCH_CONSOLE_CHUNK_DAYS', 7),
+        'row_limit' => (int) env('TITAN_SEARCH_CONSOLE_ROW_LIMIT', 1000),
+        'chunk_days' => (int) env('TITAN_SEARCH_CONSOLE_CHUNK_DAYS', 1),
+        'top_queries_limit' => (int) env('TITAN_SEARCH_CONSOLE_TOP_QUERIES_LIMIT', 25),
+    ],
+
+    'google_ads' => [
+        'api_version' => env('TITAN_GOOGLE_ADS_API_VERSION', 'v21'),
+        'developer_token' => env('GOOGLE_ADS_DEVELOPER_TOKEN'),
+        'backfill_months' => (int) env('TITAN_GOOGLE_ADS_BACKFILL_MONTHS', 16),
+        'incremental_days' => (int) env('TITAN_GOOGLE_ADS_INCREMENTAL_DAYS', 5),
+        'data_lag_days' => (int) env('TITAN_GOOGLE_ADS_DATA_LAG_DAYS', 1),
+        'row_limit' => (int) env('TITAN_GOOGLE_ADS_ROW_LIMIT', 1000),
+        'chunk_days' => (int) env('TITAN_GOOGLE_ADS_CHUNK_DAYS', 1),
+        'top_campaigns_limit' => (int) env('TITAN_GOOGLE_ADS_TOP_CAMPAIGNS_LIMIT', 25),
+    ],
+
+    'stackadapt' => [
+        'graphql_endpoint' => env('TITAN_STACKADAPT_GRAPHQL_ENDPOINT', 'https://api.stackadapt.com/graphql'),
+        'rest_base_url' => env('TITAN_STACKADAPT_REST_BASE_URL', 'https://api.stackadapt.com/v2'),
+        'backfill_months' => (int) env('TITAN_STACKADAPT_BACKFILL_MONTHS', 16),
+        'incremental_days' => (int) env('TITAN_STACKADAPT_INCREMENTAL_DAYS', 5),
+        'data_lag_days' => (int) env('TITAN_STACKADAPT_DATA_LAG_DAYS', 1),
+        'chunk_days' => (int) env('TITAN_STACKADAPT_CHUNK_DAYS', 1),
+        'page_size' => (int) env('TITAN_STACKADAPT_PAGE_SIZE', 250),
+        'top_campaigns_limit' => (int) env('TITAN_STACKADAPT_TOP_CAMPAIGNS_LIMIT', 25),
+        'top_channels_limit' => (int) env('TITAN_STACKADAPT_TOP_CHANNELS_LIMIT', 10),
+        'top_insights_limit' => (int) env('TITAN_STACKADAPT_TOP_INSIGHTS_LIMIT', 15),
+        'use_rest_fallback' => (bool) env('TITAN_STACKADAPT_USE_REST_FALLBACK', false),
+    ],
+
+    'google_analytics' => [
+        'backfill_months' => (int) env('TITAN_GA4_BACKFILL_MONTHS', 16),
+        'incremental_days' => (int) env('TITAN_GA4_INCREMENTAL_DAYS', 5),
+        'data_lag_days' => (int) env('TITAN_GA4_DATA_LAG_DAYS', 2),
+        'row_limit' => (int) env('TITAN_GA4_ROW_LIMIT', 1000),
+        'chunk_days' => (int) env('TITAN_GA4_CHUNK_DAYS', 1),
+        'top_events_limit' => (int) env('TITAN_GA4_TOP_EVENTS_LIMIT', 15),
+        'top_keywords_limit' => (int) env('TITAN_GA4_TOP_KEYWORDS_LIMIT', 25),
+        'opportunities' => [
+            'min_impressions' => (int) env('TITAN_GA4_OPP_MIN_IMPRESSIONS', 50),
+            'low_ctr_multiplier' => (float) env('TITAN_GA4_OPP_LOW_CTR_MULTIPLIER', 0.5),
+            'striking_distance_min' => (float) env('TITAN_GA4_OPP_STRIKING_MIN_POSITION', 4),
+            'striking_distance_max' => (float) env('TITAN_GA4_OPP_STRIKING_MAX_POSITION', 10),
+            'traffic_drop_percent' => (float) env('TITAN_GA4_OPP_TRAFFIC_DROP_PERCENT', 30),
+            'limit' => (int) env('TITAN_GA4_OPP_LIMIT', 10),
+        ],
     ],
 
     'reporting' => [

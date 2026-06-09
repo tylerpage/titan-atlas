@@ -1,9 +1,12 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
-import { Link, useForm } from '@inertiajs/vue3';
+import { Link, useForm, usePage } from '@inertiajs/vue3';
 import AppLayout from '../../../../Layouts/AppLayout.vue';
 import CredentialFieldLabel from '../../../../Components/CredentialFieldLabel.vue';
 import GoogleOAuthConnect from '../../../../Components/GoogleOAuthConnect.vue';
+import StackAdaptConnect from '../../../../Components/StackAdaptConnect.vue';
+
+const page = usePage();
 
 const props = defineProps({
     dashboard: {
@@ -16,13 +19,53 @@ const props = defineProps({
     },
     googleOauth: {
         type: Object,
-        default: () => ({ connected: false, sites: [] }),
+        default: () => ({ connected: false, connector_type: null, sites: [] }),
+    },
+    defaultConnectorType: {
+        type: String,
+        default: null,
     },
 });
 
+const googleOauth = computed(() => {
+    const flashed = page.props.flash?.google_oauth;
+
+    if (flashed?.connected) {
+        return flashed;
+    }
+
+    return page.props.googleOauth ?? props.googleOauth ?? { connected: false, sites: [], connector_type: null };
+});
+const defaultConnectorType = computed(() => {
+    if (googleOauth.value?.connected && googleOauth.value?.connector_type) {
+        return googleOauth.value.connector_type;
+    }
+
+    return page.props.defaultConnectorType ?? props.defaultConnectorType ?? null;
+});
+const oauthError = computed(() => {
+    const errors = page.props.errors ?? {};
+
+    return (
+        page.props.flash?.error
+        ?? errors.credentials
+        ?? errors['credentials.refresh_token']
+        ?? null
+    );
+});
+
+function initialConnectorType() {
+    return (
+        defaultConnectorType.value
+        ?? (googleOauth.value?.connected ? googleOauth.value.connector_type : null)
+        ?? props.connectors[0]?.value
+        ?? ''
+    );
+}
+
 const form = useForm({
     name: '',
-    connector_type: props.connectors[0]?.value ?? '',
+    connector_type: initialConnectorType(),
     credentials: {},
 });
 
@@ -35,6 +78,55 @@ const visibleCredentialFields = computed(() =>
 );
 
 const usesGoogleOAuth = computed(() => Boolean(selectedConnector.value?.uses_google_oauth));
+const usesStackAdapt = computed(() => form.connector_type === 'stackadapt');
+const stackAdaptAdvertisers = ref([]);
+
+function applyGoogleOauthPrefill() {
+    const oauth = googleOauth.value;
+
+    if (!oauth?.connected) {
+        return;
+    }
+
+    if (oauth.connector_type && form.connector_type !== oauth.connector_type) {
+        form.connector_type = oauth.connector_type;
+    }
+
+    const sites = oauth.sites ?? [];
+
+    if (!form.credentials.site_url && sites.length === 1) {
+        form.credentials.site_url = sites[0].siteUrl;
+    }
+
+    const properties = oauth.properties ?? [];
+
+    if (!form.credentials.property_id && properties.length === 1) {
+        form.credentials.property_id = properties[0].propertyId;
+    }
+
+    const customers = oauth.customers ?? [];
+
+    if (!form.credentials.customer_id && customers.length === 1) {
+        form.credentials.customer_id = customers[0].customerId;
+        form.credentials.login_customer_id = customers[0].managerCustomerId ?? '';
+    }
+}
+
+function credentialsForRequest() {
+    const credentials = { ...form.credentials };
+
+    if (form.connector_type === 'google_ads') {
+        credentials.customer_id = String(credentials.customer_id ?? '').replace(/\D/g, '');
+
+        if (credentials.login_customer_id) {
+            credentials.login_customer_id = String(credentials.login_customer_id).replace(/\D/g, '');
+        } else {
+            delete credentials.login_customer_id;
+        }
+    }
+
+    return credentials;
+}
 
 watch(
     () => form.connector_type,
@@ -51,8 +143,28 @@ watch(
         if (!form.name) {
             form.name = connector?.label ?? '';
         }
+
+        applyGoogleOauthPrefill();
     },
     { immediate: true },
+);
+
+watch(
+    defaultConnectorType,
+    (type) => {
+        if (type && form.connector_type !== type) {
+            form.connector_type = type;
+        }
+    },
+    { immediate: true },
+);
+
+watch(
+    googleOauth,
+    () => {
+        applyGoogleOauthPrefill();
+    },
+    { immediate: true, deep: true },
 );
 
 const testing = ref(false);
@@ -68,6 +180,16 @@ async function testConnection() {
     testing.value = true;
     testStatus.value = null;
 
+    if (usesGoogleOAuth.value && form.connector_type === 'google_ads' && !credentialsForRequest().customer_id) {
+        testStatus.value = {
+            type: 'error',
+            message: 'Select or enter a Google Ads customer ID before testing.',
+        };
+        testing.value = false;
+
+        return;
+    }
+
     try {
         const response = await fetch(route('admin.connections.test'), {
             method: 'POST',
@@ -80,17 +202,36 @@ async function testConnection() {
             body: JSON.stringify({
                 connector_type: form.connector_type,
                 dashboard_id: props.dashboard.id,
-                credentials: form.credentials,
+                credentials: credentialsForRequest(),
             }),
         });
 
         const data = await response.json();
+
+        if (!response.ok && data.errors) {
+            const firstError = Object.values(data.errors).flat()[0];
+
+            testStatus.value = {
+                type: 'error',
+                message: firstError ?? 'Connection validation failed.',
+            };
+
+            return;
+        }
 
         testStatus.value = {
             type: data.valid ? 'success' : 'error',
             message: data.message ?? (data.valid ? 'Connection successful.' : 'Connection failed.'),
             debug: data.debug ?? null,
         };
+
+        if (usesStackAdapt.value && Array.isArray(data.debug?.advertisers)) {
+            stackAdaptAdvertisers.value = data.debug.advertisers;
+
+            if (!form.credentials.advertiser_id && data.debug.advertisers.length === 1) {
+                form.credentials.advertiser_id = data.debug.advertisers[0].advertiserId;
+            }
+        }
     } catch {
         testStatus.value = {
             type: 'error',
@@ -102,6 +243,30 @@ async function testConnection() {
 }
 
 function submit() {
+    if (usesGoogleOAuth.value && form.connector_type === 'search_console' && !form.credentials.site_url) {
+        form.setError('credentials.site_url', 'Select a Search Console property after connecting with Google.');
+
+        return;
+    }
+
+    if (usesGoogleOAuth.value && form.connector_type === 'google_analytics' && !form.credentials.property_id) {
+        form.setError('credentials.property_id', 'Select a GA4 property after connecting with Google.');
+
+        return;
+    }
+
+    if (usesGoogleOAuth.value && form.connector_type === 'google_ads' && !form.credentials.customer_id) {
+        form.setError('credentials.customer_id', 'Select a Google Ads account after connecting with Google.');
+
+        return;
+    }
+
+    if (usesStackAdapt.value && !form.credentials.advertiser_id) {
+        form.setError('credentials.advertiser_id', 'Select a StackAdapt advertiser after testing your GraphQL API key.');
+
+        return;
+    }
+
     form.post(route('admin.dashboards.connections.store', props.dashboard.id));
 }
 </script>
@@ -118,6 +283,10 @@ function submit() {
             class="mx-auto max-w-2xl space-y-6 rounded-xl border border-slate-200 bg-white p-8 shadow-sm"
             @submit.prevent="submit"
         >
+            <p v-if="oauthError" class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {{ oauthError }}
+            </p>
+
             <div>
                 <label for="connector_type" class="mb-1 block text-sm font-medium">Connector</label>
                 <select id="connector_type" v-model="form.connector_type" required class="w-full rounded-lg border border-slate-300 px-3 py-2">
@@ -149,25 +318,34 @@ function submit() {
                 <GoogleOAuthConnect
                     v-if="usesGoogleOAuth"
                     v-model:site-url="form.credentials.site_url"
+                    v-model:property-id="form.credentials.property_id"
+                    v-model:customer-id="form.credentials.customer_id"
+                    v-model:login-customer-id="form.credentials.login_customer_id"
                     :connector-type="form.connector_type"
                     :dashboard-id="dashboard.id"
                     return-to="create"
                     :google-oauth="googleOauth"
                 />
 
+                <StackAdaptConnect
+                    v-if="usesStackAdapt"
+                    v-model:advertiser-id="form.credentials.advertiser_id"
+                    :advertisers="stackAdaptAdvertisers"
+                />
+
                 <div v-for="field in visibleCredentialFields" :key="field.key">
                     <CredentialFieldLabel
-                        v-if="!usesGoogleOAuth || field.key !== 'site_url'"
+                        v-if="(!usesGoogleOAuth || !['site_url', 'property_id', 'customer_id', 'login_customer_id'].includes(field.key)) && (!usesStackAdapt || field.key !== 'advertiser_id')"
                         :for-id="field.key"
                         :label="field.label"
                         :help="field.help"
                     />
                     <input
-                        v-if="!usesGoogleOAuth || field.key !== 'site_url'"
+                        v-if="(!usesGoogleOAuth || !['site_url', 'property_id', 'customer_id', 'login_customer_id'].includes(field.key)) && (!usesStackAdapt || field.key !== 'advertiser_id')"
                         :id="field.key"
                         v-model="form.credentials[field.key]"
                         :type="field.type ?? 'text'"
-                        required
+                        :required="field.key !== 'login_customer_id' && field.key !== 'rest_api_key'"
                         class="w-full rounded-lg border border-slate-300 px-3 py-2"
                         :placeholder="field.placeholder ?? ''"
                     />

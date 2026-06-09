@@ -10,6 +10,7 @@ use App\Ingestion\Connectors\GoogleAnalyticsConnector;
 use App\Ingestion\Connectors\SearchConsoleConnector;
 use App\Ingestion\Connectors\SemrushConnector;
 use App\Ingestion\Connectors\ShopifyConnector;
+use App\Ingestion\Connectors\StackAdaptConnector;
 use InvalidArgumentException;
 
 class ConnectorRegistry
@@ -26,6 +27,7 @@ class ConnectorRegistry
             ConnectorType::SearchConsole->value => SearchConsoleConnector::class,
             ConnectorType::GoogleAnalytics->value => GoogleAnalyticsConnector::class,
             ConnectorType::Semrush->value => SemrushConnector::class,
+            ConnectorType::StackAdapt->value => StackAdaptConnector::class,
         ];
     }
 

@@ -12,7 +12,7 @@ use Carbon\Carbon;
 class SearchConsoleConnector extends AbstractConnector
 {
     /** @var list<string> */
-    protected array $streams = ['search_daily', 'keyword', 'search_page'];
+    protected array $streams = ['search_daily', 'keyword', 'search_page', 'search_device'];
 
     public function __construct(protected SearchConsoleClient $client) {}
 
@@ -210,6 +210,7 @@ class SearchConsoleConnector extends AbstractConnector
         return match ($stream) {
             'keyword' => ['date', 'query'],
             'search_page' => ['date', 'page'],
+            'search_device' => ['date', 'device'],
             default => ['date'],
         };
     }
@@ -279,6 +280,23 @@ class SearchConsoleConnector extends AbstractConnector
                 $records[] = [
                     'resource_type' => 'search_page',
                     'external_id' => $date.':'.hash('sha256', $page),
+                    'payload' => $payload,
+                ];
+
+                continue;
+            }
+
+            if ($stream === 'search_device') {
+                $device = (string) ($keys[1] ?? '');
+
+                if ($device === '') {
+                    continue;
+                }
+
+                $payload['device'] = $device;
+                $records[] = [
+                    'resource_type' => 'search_device',
+                    'external_id' => $date.':'.$device,
                     'payload' => $payload,
                 ];
 

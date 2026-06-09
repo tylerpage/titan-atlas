@@ -31,6 +31,18 @@ class TestConnectionRequest extends FormRequest
                     continue;
                 }
 
+                if ($connectorType === ConnectorType::StackAdapt && $key === 'advertiser_id') {
+                    $credentialRules["credentials.{$key}"] = ['nullable', 'string', 'max:2048'];
+
+                    continue;
+                }
+
+                if (in_array($key, $connectorType->optionalCredentialKeys(), true)) {
+                    $credentialRules["credentials.{$key}"] = ['nullable', 'string', 'max:2048'];
+
+                    continue;
+                }
+
                 $credentialRules["credentials.{$key}"] = ['required', 'string', 'max:2048'];
             }
         } else {

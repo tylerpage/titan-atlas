@@ -50,7 +50,10 @@ class ConnectionService
         $connection->save();
 
         if ($connection->connector_type->usesGoogleOAuth()) {
-            app(GoogleOAuthPendingSession::class)->forget();
+            app(GoogleOAuthPendingSession::class)->forget(
+                $connection->client_dashboard_id,
+                $connection->connector_type,
+            );
         }
 
         return $connection->fresh();

@@ -3,7 +3,7 @@ import { Link, router } from '@inertiajs/vue3';
 import { toRef } from 'vue';
 import AppLayout from '../../../Layouts/AppLayout.vue';
 import DashboardSyncingBadge from '../../../Components/DashboardSyncingBadge.vue';
-import { useDashboardSyncPoll } from '../../../composables/useDashboardSyncPoll';
+import { useDashboardSyncPoll } from '../../../Composables/useDashboardSyncPoll';
 
 const props = defineProps({
     dashboard: {

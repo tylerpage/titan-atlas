@@ -14,7 +14,7 @@ class SyncConnectionJob implements ShouldQueue
 
     public int $tries = 5;
 
-    public int $timeout = 900;
+    public int $timeout;
 
     /**
      * @return list<int>
@@ -44,6 +44,7 @@ class SyncConnectionJob implements ShouldQueue
         $this->cursor = $cursor;
         $this->fetched = $fetched;
         $this->written = $written;
+        $this->timeout = max(30, (int) config('titan.sync.job_timeout', 55));
         $this->onQueue(config('titan.queues.ingestion', 'ingestion'));
     }
 

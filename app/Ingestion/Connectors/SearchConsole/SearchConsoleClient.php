@@ -26,12 +26,17 @@ class SearchConsoleClient
             return [];
         }
 
+        if (isset($entries['siteUrl'])) {
+            $entries = [$entries];
+        }
+
         return collect($entries)
             ->filter(fn ($entry) => is_array($entry) && isset($entry['siteUrl']))
             ->map(fn (array $entry) => [
                 'siteUrl' => (string) $entry['siteUrl'],
                 'permissionLevel' => (string) ($entry['permissionLevel'] ?? 'unknown'),
             ])
+            ->sortBy('siteUrl')
             ->values()
             ->all();
     }

@@ -32,6 +32,12 @@ class StoreConnectionRequest extends FormRequest
                     continue;
                 }
 
+                if (in_array($key, $connectorType->optionalCredentialKeys(), true)) {
+                    $credentialRules["credentials.{$key}"] = ['nullable', 'string', 'max:2048'];
+
+                    continue;
+                }
+
                 $credentialRules["credentials.{$key}"] = ['required', 'string', 'max:2048'];
             }
         } else {
@@ -59,21 +65,25 @@ class StoreConnectionRequest extends FormRequest
     {
         $validator->after(function (Validator $validator): void {
             $connectorType = ConnectorType::tryFrom((string) $this->input('connector_type'));
-
-            if (! $connectorType?->usesGoogleOAuth()) {
-                return;
-            }
-
             $credentials = $this->input('credentials', []);
 
-            if (! is_array($credentials) || ! empty($credentials['refresh_token'])) {
+            if (! is_array($credentials)) {
                 return;
             }
 
-            $validator->errors()->add(
-                'credentials.refresh_token',
-                'Connect with Google before saving this connection.',
-            );
+            if ($connectorType?->usesGoogleOAuth() && empty($credentials['refresh_token'])) {
+                $validator->errors()->add(
+                    'credentials.refresh_token',
+                    'Connect with Google before saving this connection.',
+                );
+            }
+
+            if ($connectorType === ConnectorType::StackAdapt && empty($credentials['advertiser_id'])) {
+                $validator->errors()->add(
+                    'credentials.advertiser_id',
+                    'Select a StackAdapt advertiser after testing your GraphQL API key.',
+                );
+            }
         });
     }
 }

@@ -52,7 +52,9 @@ class SyncConnectionService
             }
 
             $pagesProcessed = 0;
-            $maxPages = max(1, (int) config('titan.sync.pages_per_job', 20));
+            $maxPages = max(1, (int) config('titan.sync.pages_per_job', 2));
+            $maxSeconds = max(10, (int) config('titan.sync.max_seconds_per_job', 45));
+            $startedAt = microtime(true);
             $hasMore = true;
 
             while ($hasMore && ($cursor !== null || $pagesProcessed === 0)) {
@@ -79,7 +81,12 @@ class SyncConnectionService
                     'records_written' => $written,
                 ]);
 
-                if ($pagesProcessed >= $maxPages && $hasMore && $cursor !== null) {
+                $elapsedSeconds = microtime(true) - $startedAt;
+                $shouldContinueInNewJob = $hasMore
+                    && $cursor !== null
+                    && ($pagesProcessed >= $maxPages || $elapsedSeconds >= $maxSeconds);
+
+                if ($shouldContinueInNewJob) {
                     SyncConnectionJob::dispatch(
                         $connection,
                         $type,

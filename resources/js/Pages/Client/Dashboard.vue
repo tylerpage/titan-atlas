@@ -4,10 +4,14 @@ import { Link, router, usePage } from '@inertiajs/vue3';
 import AppLayout from '../../Layouts/AppLayout.vue';
 import DashboardSyncingBadge from '../../Components/DashboardSyncingBadge.vue';
 import CoverPageBlockGrid from '../../Components/CoverPageBlockGrid.vue';
-import { useDashboardSyncPoll } from '../../composables/useDashboardSyncPoll';
+import { useDashboardSyncPoll } from '../../Composables/useDashboardSyncPoll';
 import CoverTable from '../../Components/CoverTable.vue';
 import DashboardSavedBoardsPanel from '../../Components/Dashboard/DashboardSavedBoardsPanel.vue';
 import DashboardTitanAiPanel from '../../Components/Dashboard/DashboardTitanAiPanel.vue';
+import SearchConsoleDashboardPanel from '../../Components/Dashboard/SearchConsoleDashboardPanel.vue';
+import GoogleAnalyticsDashboardPanel from '../../Components/Dashboard/GoogleAnalyticsDashboardPanel.vue';
+import GoogleAdsDashboardPanel from '../../Components/Dashboard/GoogleAdsDashboardPanel.vue';
+import StackAdaptDashboardPanel from '../../Components/Dashboard/StackAdaptDashboardPanel.vue';
 import RevenueLineChart from '../../Components/RevenueLineChart.vue';
 import { useAppBranding } from '../../Composables/useAppBranding';
 
@@ -161,8 +165,13 @@ const isAiTab = computed(() => activeTab.value === 'ai');
 const isSavedTab = computed(() => activeTab.value === 'saved');
 const isDataTab = computed(() => !isCoverTab.value && !isAiTab.value && !isSavedTab.value);
 const canEditCoverPage = computed(() => isAdmin.value && isCoverTab.value && props.coverPageData?.id);
-const showCommerceView = computed(() => isDataTab.value && props.connectorData !== null);
-const showLegacyWidgets = computed(() => isDataTab.value && (!hasConnections.value || (!showCommerceView.value && hasConnections.value)));
+const showCommerceView = computed(() => isDataTab.value && props.connectorData?.kind === 'commerce');
+const showSearchConsoleView = computed(() => isDataTab.value && props.connectorData?.kind === 'search_console');
+const showGoogleAnalyticsView = computed(() => isDataTab.value && props.connectorData?.kind === 'google_analytics');
+const showGoogleAdsView = computed(() => isDataTab.value && props.connectorData?.kind === 'google_ads');
+const showStackAdaptView = computed(() => isDataTab.value && props.connectorData?.kind === 'stackadapt');
+const showConnectorView = computed(() => showCommerceView.value || showSearchConsoleView.value || showGoogleAnalyticsView.value || showGoogleAdsView.value || showStackAdaptView.value);
+const showLegacyWidgets = computed(() => isDataTab.value && (!hasConnections.value || (!showConnectorView.value && hasConnections.value)));
 const showTabFilters = computed(() => isDataTab.value);
 const shareStatus = ref(null);
 const sharing = ref(false);
@@ -826,14 +835,14 @@ function sourceMediumLabel(order) {
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="order in connectorData.orders" :key="order.external_id" class="border-t border-slate-100">
+                            <tr v-for="order in connectorData.orders ?? []" :key="order.external_id" class="border-t border-slate-100">
                                 <td class="px-4 py-3 font-medium">{{ order.order_number }}</td>
                                 <td class="px-4 py-3 text-slate-600">{{ order.date }}</td>
                                 <td class="px-4 py-3">{{ formatMoney(order.total) }}</td>
                                 <td class="px-4 py-3 text-slate-600">{{ sourceMediumLabel(order) }}</td>
                                 <td class="px-4 py-3 text-slate-600">{{ order.channel || '—' }}</td>
                             </tr>
-                            <tr v-if="connectorData.orders.length === 0">
+                            <tr v-if="(connectorData.orders ?? []).length === 0">
                                 <td colspan="5" class="px-4 py-8 text-center text-slate-500">
                                     No orders in this date range. Run a sync on this connection to pull up to 5 years of order history.
                                 </td>
@@ -843,6 +852,39 @@ function sourceMediumLabel(order) {
                 </div>
             </section>
         </template>
+
+        <SearchConsoleDashboardPanel
+            v-else-if="showSearchConsoleView"
+            :connector-data="connectorData"
+            :connection-name="activeConnection?.name ?? ''"
+            :primary-color="dashboard.primary_color"
+            :comparing="comparing"
+        />
+
+        <GoogleAnalyticsDashboardPanel
+            v-else-if="showGoogleAnalyticsView"
+            :connector-data="connectorData"
+            :connection-name="activeConnection?.name ?? ''"
+            :dashboard-id="dashboard.id"
+            :primary-color="dashboard.primary_color"
+            :comparing="comparing"
+        />
+
+        <GoogleAdsDashboardPanel
+            v-else-if="showGoogleAdsView"
+            :connector-data="connectorData"
+            :connection-name="activeConnection?.name ?? ''"
+            :primary-color="dashboard.primary_color"
+            :comparing="comparing"
+        />
+
+        <StackAdaptDashboardPanel
+            v-else-if="showStackAdaptView"
+            :connector-data="connectorData"
+            :connection-name="activeConnection?.name ?? ''"
+            :primary-color="dashboard.primary_color"
+            :comparing="comparing"
+        />
 
         <div
             v-else-if="hasConnections && activeConnection"

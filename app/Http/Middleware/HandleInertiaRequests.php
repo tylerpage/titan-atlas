@@ -5,7 +5,9 @@ namespace App\Http\Middleware;
 use App\Enums\FeedbackStatus;
 use App\Models\FeedbackSubmission;
 use App\Services\Auth\ImpersonationService;
+use App\Services\Google\GoogleOAuthPendingSession;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Middleware;
 
@@ -36,7 +38,9 @@ class HandleInertiaRequests extends Middleware
             ],
             'flash' => [
                 'status' => fn () => $request->session()->get('status'),
+                'error' => fn () => $request->session()->get('error'),
                 'focused_block_id' => fn () => $request->session()->get('focused_block_id'),
+                'google_oauth' => fn () => $request->session()->get(GoogleOAuthPendingSession::FLASH_KEY),
             ],
             'impersonation' => [
                 'active' => $impersonation->isImpersonating(),
@@ -55,12 +59,25 @@ class HandleInertiaRequests extends Middleware
 
     protected function pendingFeedbackCount(Request $request): int
     {
-        if (! $request->user()?->isAdmin() || ! Schema::hasTable('feedback_submissions')) {
+        if (! $request->user()?->isAdmin()) {
+            return 0;
+        }
+
+        if (! $this->feedbackTableExists()) {
             return 0;
         }
 
         return FeedbackSubmission::query()
             ->where('status', FeedbackStatus::Pending->value)
             ->count();
+    }
+
+    protected function feedbackTableExists(): bool
+    {
+        return Cache::remember(
+            'schema.feedback_submissions.exists',
+            now()->addHour(),
+            fn () => Schema::hasTable('feedback_submissions'),
+        );
     }
 }

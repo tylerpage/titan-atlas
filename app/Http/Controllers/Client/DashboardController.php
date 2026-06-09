@@ -2,12 +2,17 @@
 
 namespace App\Http\Controllers\Client;
 
+use App\Enums\ConnectorType;
 use App\Enums\DateComparison;
 use App\Http\Controllers\Controller;
 use App\Models\ClientDashboard;
 use App\Models\Connection;
 use App\Models\CoverPage;
 use App\Services\Analytics\CommerceDashboardService;
+use App\Services\Analytics\GoogleAdsDashboardService;
+use App\Services\Analytics\StackAdaptDashboardService;
+use App\Services\Analytics\GoogleAnalyticsDashboardService;
+use App\Services\Analytics\SearchConsoleDashboardService;
 use App\Services\Analytics\CoverPageDataResolver;
 use App\Services\Analytics\WidgetDataService;
 use App\Services\Client\ClientDashboardTabDataService;
@@ -23,6 +28,10 @@ class DashboardController extends Controller
         ClientDashboard $dashboard,
         WidgetDataService $widgets,
         CommerceDashboardService $commerce,
+        SearchConsoleDashboardService $searchConsole,
+        GoogleAnalyticsDashboardService $googleAnalytics,
+        GoogleAdsDashboardService $googleAds,
+        StackAdaptDashboardService $stackAdapt,
         CoverPageDataResolver $coverPages,
         ClientDashboardTabDataService $tabData,
     ): Response {
@@ -78,6 +87,38 @@ class DashboardController extends Controller
 
         if ($isDataTab && $selectedConnection?->connector_type->isCommerce()) {
             $connectorData = $commerce->dataFor(
+                $dashboard,
+                $selectedConnection,
+                $dateRange,
+                $customRange,
+                $comparison,
+            );
+        } elseif ($isDataTab && $selectedConnection?->connector_type === ConnectorType::SearchConsole) {
+            $connectorData = $searchConsole->dataFor(
+                $dashboard,
+                $selectedConnection,
+                $dateRange,
+                $customRange,
+                $comparison,
+            );
+        } elseif ($isDataTab && $selectedConnection?->connector_type === ConnectorType::GoogleAnalytics) {
+            $connectorData = $googleAnalytics->dataFor(
+                $dashboard,
+                $selectedConnection,
+                $dateRange,
+                $customRange,
+                $comparison,
+            );
+        } elseif ($isDataTab && $selectedConnection?->connector_type === ConnectorType::GoogleAds) {
+            $connectorData = $googleAds->dataFor(
+                $dashboard,
+                $selectedConnection,
+                $dateRange,
+                $customRange,
+                $comparison,
+            );
+        } elseif ($isDataTab && $selectedConnection?->connector_type === ConnectorType::StackAdapt) {
+            $connectorData = $stackAdapt->dataFor(
                 $dashboard,
                 $selectedConnection,
                 $dateRange,

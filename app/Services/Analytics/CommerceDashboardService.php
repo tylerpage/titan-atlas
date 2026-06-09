@@ -54,6 +54,7 @@ class CommerceDashboardService
             : null;
 
         return [
+            'kind' => 'commerce',
             'summary' => [
                 'revenue' => $revenue['total'],
                 'orders' => $orders['total'],

@@ -90,6 +90,39 @@ class SearchConsoleConnectorTest extends TestCase
         $this->assertTrue($second->hasMore);
     }
 
+    public function test_fetch_emits_search_device_records(): void
+    {
+        $this->fakeGoogleApis([
+            'query_responses' => [
+                [
+                    'rows' => [
+                        ['keys' => ['2025-06-01', 'MOBILE'], 'clicks' => 20, 'impressions' => 400, 'ctr' => 0.05, 'position' => 3.0],
+                        ['keys' => ['2025-06-01', 'DESKTOP'], 'clicks' => 30, 'impressions' => 600, 'ctr' => 0.05, 'position' => 4.0],
+                    ],
+                ],
+            ],
+        ]);
+
+        $connection = $this->makeConnection([
+            'site_url' => 'https://example.com/',
+            'refresh_token' => 'refresh-token',
+        ]);
+
+        $cursor = 'gsc:'.json_encode([
+            'stream' => 'search_device',
+            'start_date' => '2025-06-01',
+            'end_date' => '2025-06-07',
+            'start_row' => 0,
+        ], JSON_THROW_ON_ERROR);
+
+        $result = app(SearchConsoleConnector::class)->fetch($connection, $cursor);
+
+        $this->assertCount(2, $result->records);
+        $this->assertSame('search_device', $result->records[0]['resource_type']);
+        $this->assertSame('MOBILE', $result->records[0]['payload']['device']);
+        $this->assertSame('DESKTOP', $result->records[1]['payload']['device']);
+    }
+
     /**
      * @param  array<string, mixed>  $credentials
      */
