@@ -1,16 +1,8 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import {
-    Chart,
-    BarController,
-    BarElement,
-    CategoryScale,
-    LinearScale,
-    Tooltip,
-    Legend,
-} from 'chart.js';
+import { Chart, ensureChartJsRegistered } from '../lib/chartSetup';
 
-Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
+ensureChartJsRegistered();
 
 const props = defineProps({
     items: {
@@ -41,21 +33,8 @@ let chart = null;
 const labels = computed(() => props.items.map((item) => item[props.labelKey] ?? ''));
 const values = computed(() => props.items.map((item) => Number(item[props.valueKey] ?? 0)));
 
-function renderChart() {
-    if (!canvasRef.value || props.items.length === 0) {
-        if (chart) {
-            chart.destroy();
-            chart = null;
-        }
-
-        return;
-    }
-
-    if (chart) {
-        chart.destroy();
-    }
-
-    chart = new Chart(canvasRef.value, {
+function buildChartConfig() {
+    return {
         type: 'bar',
         data: {
             labels: labels.value,
@@ -92,20 +71,46 @@ function renderChart() {
                 },
             },
         },
-    });
+    };
 }
 
-onMounted(renderChart);
+function syncChart() {
+    if (!canvasRef.value || props.items.length === 0) {
+        if (chart) {
+            chart.destroy();
+            chart = null;
+        }
+
+        return;
+    }
+
+    if (!chart) {
+        chart = new Chart(canvasRef.value, buildChartConfig());
+
+        return;
+    }
+
+    chart.data.labels = labels.value;
+    chart.data.datasets[0].data = values.value;
+    chart.data.datasets[0].backgroundColor = props.color;
+    chart.options.indexAxis = props.horizontal ? 'y' : 'x';
+    chart.options.scales.x.grid.display = props.horizontal;
+    chart.options.scales.y.grid.display = !props.horizontal;
+    chart.update('none');
+}
+
+onMounted(syncChart);
 
 watch(
     () => [props.items, props.labelKey, props.valueKey, props.color, props.horizontal],
-    renderChart,
+    syncChart,
     { deep: true },
 );
 
 onBeforeUnmount(() => {
     if (chart) {
         chart.destroy();
+        chart = null;
     }
 });
 </script>

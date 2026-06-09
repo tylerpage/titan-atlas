@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, toRef, watch } from 'vue';
+import { computed, onUnmounted, ref, toRef, watch } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import AppLayout from '../../Layouts/AppLayout.vue';
 import DashboardSyncingBadge from '../../Components/DashboardSyncingBadge.vue';
@@ -129,6 +129,62 @@ const props = defineProps({
 });
 
 useDashboardSyncPoll(toRef(() => props.dashboard.is_syncing));
+
+const isNavigating = ref(false);
+
+const removeNavigationListeners = [
+    router.on('start', () => {
+        isNavigating.value = true;
+    }),
+    router.on('finish', () => {
+        isNavigating.value = false;
+    }),
+];
+
+onUnmounted(() => {
+    removeNavigationListeners.forEach((removeListener) => removeListener());
+});
+
+const dataTabOnlyProps = [
+    'dashboard',
+    'connectorData',
+    'widgetData',
+    'dateRange',
+    'rangeStart',
+    'rangeEnd',
+    'comparison',
+    'comparisonRangeStart',
+    'comparisonRangeEnd',
+    'selectedConnectionId',
+    'tab',
+];
+
+function onlyPropsForTab(tab) {
+    if (tab === 'cover') {
+        return ['tab', 'coverPageData', 'coverPageOptions', 'selectedCoverPageId'];
+    }
+
+    if (tab === 'ai') {
+        return ['tab', 'aiView', 'aiSession', 'aiSessions', 'aiSavedDashboards', 'previewStart', 'previewEnd'];
+    }
+
+    if (tab === 'saved') {
+        return ['tab', 'savedBoards', 'savedBoard', 'previewStart', 'previewEnd'];
+    }
+
+    return dataTabOnlyProps;
+}
+
+function visitDashboard(query, overrides = {}, extraOptions = {}) {
+    const tab = overrides.tab ?? query.tab ?? activeTab.value;
+
+    router.get(route('client.dashboard.show', props.dashboard.slug), query, {
+        preserveState: true,
+        preserveScroll: true,
+        only: onlyPropsForTab(tab),
+        ...extraOptions,
+    });
+}
 
 const selectedRange = ref(props.dateRange);
 const selectedComparison = ref(props.comparison);
@@ -298,10 +354,7 @@ function navigateDashboard(overrides = {}) {
         activeTab.value = overrides.tab;
     }
 
-    router.get(route('client.dashboard.show', props.dashboard.slug), dashboardQuery(overrides), {
-        preserveState: true,
-        preserveScroll: true,
-    });
+    visitDashboard(dashboardQuery(overrides), overrides);
 }
 
 function selectAiTab() {
@@ -314,20 +367,12 @@ function selectSavedTab() {
 
 function selectCoverTab() {
     activeTab.value = 'cover';
-
-    router.get(route('client.dashboard.show', props.dashboard.slug), dashboardQuery({ tab: 'cover' }), {
-        preserveState: true,
-        preserveScroll: true,
-    });
+    visitDashboard(dashboardQuery({ tab: 'cover' }), { tab: 'cover' });
 }
 
 function selectCoverPage(coverPageId) {
     activeCoverPageId.value = coverPageId;
-
-    router.get(route('client.dashboard.show', props.dashboard.slug), dashboardQuery({ tab: 'cover', cover_page: coverPageId }), {
-        preserveState: true,
-        preserveScroll: true,
-    });
+    visitDashboard(dashboardQuery({ tab: 'cover', cover_page: coverPageId }), { tab: 'cover' });
 }
 
 function csrfToken() {
@@ -384,20 +429,13 @@ async function shareDashboard() {
 }
 
 function applyFilters() {
-    router.get(route('client.dashboard.show', props.dashboard.slug), dashboardQuery(), {
-        preserveState: true,
-        preserveScroll: true,
-    });
+    visitDashboard(dashboardQuery());
 }
 
 function selectConnection(connectionId) {
     activeConnectionId.value = connectionId;
     activeTab.value = 'data';
-
-    router.get(route('client.dashboard.show', props.dashboard.slug), dashboardQuery({ tab: 'data', connection: connectionId }), {
-        preserveState: true,
-        preserveScroll: true,
-    });
+    visitDashboard(dashboardQuery({ tab: 'data', connection: connectionId }), { tab: 'data' });
 }
 
 function formatNumber(value, currency = false) {
@@ -477,6 +515,8 @@ function sourceMediumLabel(order) {
                 </div>
             </div>
 
+            <p v-if="isNavigating && isDataTab" class="mb-4 text-sm text-slate-500">Updating dashboard…</p>
+
             <form v-if="showTabFilters" class="flex flex-wrap items-end gap-3" @submit.prevent="applyFilters">
                 <div>
                     <label for="range" class="mb-1 block text-sm text-slate-600">Date range</label>
@@ -484,6 +524,7 @@ function sourceMediumLabel(order) {
                         id="range"
                         v-model="selectedRange"
                         class="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                        :disabled="isNavigating"
                     >
                         <option v-for="(label, value) in dateRangePresets" :key="value" :value="value">
                             {{ label }}
@@ -498,6 +539,7 @@ function sourceMediumLabel(order) {
                         id="compare"
                         v-model="selectedComparison"
                         class="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                        :disabled="isNavigating"
                     >
                         <option v-for="(label, value) in dateComparisons" :key="value" :value="value">
                             {{ label }}
@@ -528,9 +570,10 @@ function sourceMediumLabel(order) {
 
                 <button
                     type="submit"
-                    class="rounded-lg bg-primary px-4 py-2 text-sm text-white hover:bg-primary-hover"
+                    class="rounded-lg bg-primary px-4 py-2 text-sm text-white hover:bg-primary-hover disabled:opacity-50"
+                    :disabled="isNavigating"
                 >
-                    Apply
+                    {{ isNavigating ? 'Updating…' : 'Apply' }}
                 </button>
 
                 <button
@@ -569,7 +612,8 @@ function sourceMediumLabel(order) {
                 <button
                     v-if="showCoverTab"
                     type="button"
-                    class="shrink-0 border-b-2 px-4 py-3 text-sm font-medium transition"
+                    class="shrink-0 border-b-2 px-4 py-3 text-sm font-medium transition disabled:opacity-50"
+                    :disabled="isNavigating"
                     :class="
                         isCoverTab
                             ? 'border-slate-900 text-slate-900'
@@ -583,7 +627,8 @@ function sourceMediumLabel(order) {
                     v-for="connection in connections"
                     :key="connection.id"
                     type="button"
-                    class="shrink-0 border-b-2 px-4 py-3 text-sm font-medium transition"
+                    class="shrink-0 border-b-2 px-4 py-3 text-sm font-medium transition disabled:opacity-50"
+                    :disabled="isNavigating"
                     :class="
                         isDataTab && connection.id === activeConnectionId
                             ? 'border-slate-900 text-slate-900'
@@ -598,7 +643,8 @@ function sourceMediumLabel(order) {
                 </button>
                 <button
                     type="button"
-                    class="shrink-0 border-b-2 px-4 py-3 text-sm font-medium transition"
+                    class="shrink-0 border-b-2 px-4 py-3 text-sm font-medium transition disabled:opacity-50"
+                    :disabled="isNavigating"
                     :class="
                         isAiTab
                             ? 'border-slate-900 text-slate-900'
@@ -610,7 +656,8 @@ function sourceMediumLabel(order) {
                 </button>
                 <button
                     type="button"
-                    class="shrink-0 border-b-2 px-4 py-3 text-sm font-medium transition"
+                    class="shrink-0 border-b-2 px-4 py-3 text-sm font-medium transition disabled:opacity-50"
+                    :disabled="isNavigating"
                     :class="
                         isSavedTab
                             ? 'border-slate-900 text-slate-900'

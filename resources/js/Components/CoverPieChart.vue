@@ -1,14 +1,8 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import {
-    Chart,
-    PieController,
-    ArcElement,
-    Tooltip,
-    Legend,
-} from 'chart.js';
+import { Chart, ensureChartJsRegistered } from '../lib/chartSetup';
 
-Chart.register(PieController, ArcElement, Tooltip, Legend);
+ensureChartJsRegistered();
 
 const props = defineProps({
     segments: {
@@ -35,28 +29,19 @@ let chart = null;
 const labels = computed(() => props.segments.map((segment) => segment[props.labelKey] ?? ''));
 const values = computed(() => props.segments.map((segment) => Number(segment[props.valueKey] ?? 0)));
 
-function renderChart() {
-    if (!canvasRef.value || props.segments.length === 0) {
-        if (chart) {
-            chart.destroy();
-            chart = null;
-        }
+function segmentColors() {
+    return props.segments.map((_, index) => props.colors[index % props.colors.length]);
+}
 
-        return;
-    }
-
-    if (chart) {
-        chart.destroy();
-    }
-
-    chart = new Chart(canvasRef.value, {
+function buildChartConfig() {
+    return {
         type: 'pie',
         data: {
             labels: labels.value,
             datasets: [
                 {
                     data: values.value,
-                    backgroundColor: props.segments.map((_, index) => props.colors[index % props.colors.length]),
+                    backgroundColor: segmentColors(),
                     borderWidth: 1,
                     borderColor: '#ffffff',
                 },
@@ -82,25 +67,48 @@ function renderChart() {
                 },
             },
         },
-    });
+    };
 }
 
-onMounted(renderChart);
+function syncChart() {
+    if (!canvasRef.value || props.segments.length === 0) {
+        if (chart) {
+            chart.destroy();
+            chart = null;
+        }
+
+        return;
+    }
+
+    if (!chart) {
+        chart = new Chart(canvasRef.value, buildChartConfig());
+
+        return;
+    }
+
+    chart.data.labels = labels.value;
+    chart.data.datasets[0].data = values.value;
+    chart.data.datasets[0].backgroundColor = segmentColors();
+    chart.update('none');
+}
+
+onMounted(syncChart);
 
 watch(
     () => props.segments,
-    renderChart,
+    syncChart,
     { deep: true },
 );
 
 watch(
     () => [props.labelKey, props.valueKey, props.colors.length],
-    renderChart,
+    syncChart,
 );
 
 onBeforeUnmount(() => {
     if (chart) {
         chart.destroy();
+        chart = null;
     }
 });
 </script>

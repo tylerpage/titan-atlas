@@ -37,6 +37,11 @@ return [
         'year_over_year' => 'Compare year over year',
     ],
 
+    'dashboard' => [
+        'connector_cache_enabled' => (bool) env('TITAN_DASHBOARD_CONNECTOR_CACHE_ENABLED', true),
+        'connector_cache_ttl_seconds' => (int) env('TITAN_DASHBOARD_CONNECTOR_CACHE_TTL_SECONDS', 90),
+    ],
+
     'invitations' => [
         'expires_days' => (int) env('TITAN_INVITATION_EXPIRY_DAYS', 7),
     ],

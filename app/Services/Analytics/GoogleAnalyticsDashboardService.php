@@ -9,6 +9,7 @@ use App\Models\Connection;
 use App\Support\DedupedRawPayloadQuery;
 use App\Support\MetricComparison;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class GoogleAnalyticsDashboardService
@@ -28,12 +29,13 @@ class GoogleAnalyticsDashboardService
         ?string $dateRange = null,
         ?array $customRange = null,
         DateComparison|string|null $comparison = null,
+        ?Collection $connections = null,
     ): array {
         [$start, $end] = $this->widgets->resolveDateRange($dashboard, $dateRange, $customRange);
         $comparisonMode = $this->resolveComparison($comparison);
         $comparisonRange = $this->widgets->resolveComparisonRange($start, $end, $comparisonMode);
 
-        $gscConnection = $this->gscConnectionFor($dashboard);
+        $gscConnection = $this->gscConnectionFor($connections ?? $dashboard->connections);
         $traffic = $this->trafficTotals($connection, $start, $end);
         $comparisonTraffic = $comparisonRange
             ? $this->trafficTotals($connection, $comparisonRange[0], $comparisonRange[1])
@@ -76,9 +78,7 @@ class GoogleAnalyticsDashboardService
                     : null,
             ],
             'traffic_series' => $traffic['sessions_series'],
-            'comparison_traffic_series' => $comparisonRange
-                ? $this->trafficTotals($connection, $comparisonRange[0], $comparisonRange[1])['sessions_series']
-                : [],
+            'comparison_traffic_series' => $comparisonTraffic['sessions_series'] ?? [],
             'events' => $this->topEvents($connection, $start, $end),
             'top_queries' => $gscConnection
                 ? $this->topQueries($gscConnection, $start, $end, $comparisonRange)
@@ -96,12 +96,18 @@ class GoogleAnalyticsDashboardService
         ];
     }
 
-    protected function gscConnectionFor(ClientDashboard $dashboard): ?Connection
+    /**
+     * @param  Collection<int, Connection>|null  $connections
+     */
+    protected function gscConnectionFor(?Collection $connections): ?Connection
     {
-        return $dashboard->connections()
-            ->where('is_active', true)
-            ->where('connector_type', ConnectorType::SearchConsole)
-            ->orderBy('name')
+        if ($connections === null || $connections->isEmpty()) {
+            return null;
+        }
+
+        return $connections
+            ->filter(fn (Connection $connection) => $connection->connector_type === ConnectorType::SearchConsole)
+            ->sortBy('name')
             ->first();
     }
 

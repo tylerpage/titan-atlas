@@ -1,18 +1,8 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import {
-    Chart,
-    LineController,
-    LineElement,
-    PointElement,
-    LinearScale,
-    CategoryScale,
-    Filler,
-    Tooltip,
-    Legend,
-} from 'chart.js';
+import { Chart, ensureChartJsRegistered } from '../lib/chartSetup';
 
-Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip, Legend);
+ensureChartJsRegistered();
 
 const props = defineProps({
     series: {
@@ -113,16 +103,8 @@ const datasets = computed(() => {
     return items;
 });
 
-function renderChart() {
-    if (!canvasRef.value) {
-        return;
-    }
-
-    if (chart) {
-        chart.destroy();
-    }
-
-    chart = new Chart(canvasRef.value, {
+function buildChartConfig() {
+    return {
         type: 'line',
         data: {
             labels: labels.value,
@@ -166,20 +148,38 @@ function renderChart() {
                 },
             },
         },
-    });
+    };
 }
 
-onMounted(renderChart);
+function syncChart() {
+    if (!canvasRef.value) {
+        return;
+    }
+
+    if (!chart) {
+        chart = new Chart(canvasRef.value, buildChartConfig());
+
+        return;
+    }
+
+    chart.data.labels = labels.value;
+    chart.data.datasets = datasets.value;
+    chart.options.plugins.legend.display = props.comparing && props.comparisonSeries.length > 0;
+    chart.update('none');
+}
+
+onMounted(syncChart);
 
 watch(
     () => [props.series, props.comparisonSeries, props.comparing, props.color, props.valueFormat, props.seriesLabel],
-    renderChart,
+    syncChart,
     { deep: true },
 );
 
 onBeforeUnmount(() => {
     if (chart) {
         chart.destroy();
+        chart = null;
     }
 });
 </script>

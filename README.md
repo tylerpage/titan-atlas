@@ -83,6 +83,33 @@ php artisan titan:sync-connections --type=today_hourly
 | Admin  | admin@titan.test   | password  |
 | Client | client@acme.test | password  |
 
+Created by `php artisan migrate --seed` locally. For production (e.g. Laravel Cloud), use `titan:create-admin` instead of the full demo seeder.
+
+## Production admin user
+
+Create or update a platform admin without seeding demo data:
+
+```bash
+php artisan titan:create-admin \
+  --email=you@example.com \
+  --name="Your Name" \
+  --password="your-strong-password"
+```
+
+Or set env vars and run with no flags (handy on Laravel Cloud):
+
+```env
+TITAN_ADMIN_EMAIL=you@example.com
+TITAN_ADMIN_NAME=Your Name
+TITAN_ADMIN_PASSWORD=your-strong-password
+```
+
+```bash
+php artisan titan:create-admin
+```
+
+On Laravel Cloud: **Commands** tab or `cloud command:run "php artisan titan:create-admin"`. Set the `TITAN_ADMIN_*` vars in the environment first so the password is not passed on the command line. Re-running updates name/role; omit `TITAN_ADMIN_PASSWORD` to leave the existing password unchanged.
+
 ## Routes
 
 - `/login` — authentication

@@ -9,10 +9,11 @@ use App\Models\ClientDashboard;
 use App\Models\Connection;
 use App\Models\CoverPage;
 use App\Services\Analytics\CommerceDashboardService;
+use App\Services\Analytics\ConnectorDashboardCache;
 use App\Services\Analytics\GoogleAdsDashboardService;
-use App\Services\Analytics\StackAdaptDashboardService;
 use App\Services\Analytics\GoogleAnalyticsDashboardService;
 use App\Services\Analytics\SearchConsoleDashboardService;
+use App\Services\Analytics\StackAdaptDashboardService;
 use App\Services\Analytics\CoverPageDataResolver;
 use App\Services\Analytics\WidgetDataService;
 use App\Services\Client\ClientDashboardTabDataService;
@@ -34,36 +35,50 @@ class DashboardController extends Controller
         StackAdaptDashboardService $stackAdapt,
         CoverPageDataResolver $coverPages,
         ClientDashboardTabDataService $tabData,
+        ConnectorDashboardCache $connectorCache,
     ): Response {
         abort_unless($request->user()?->canAccessDashboard($dashboard), 403);
 
         $dashboard->load([
             'company',
-            'widgetPlacements',
             'connections' => fn ($q) => $q->where('is_active', true)->orderBy('name'),
-            'coverPages.blocks',
+            'coverPages',
         ]);
 
         $activeCoverPage = $dashboard->coverPages->firstWhere('is_active', true);
         $hasCoverPages = $dashboard->coverPages->isNotEmpty();
         $tab = (string) $request->query('tab', $hasCoverPages && $activeCoverPage ? 'cover' : 'data');
+
+        if ($tab === 'data') {
+            $dashboard->load('widgetPlacements');
+        }
+
+        if ($tab === 'cover') {
+            $dashboard->load('coverPages.blocks');
+        }
+
         $selectedCoverPageId = (int) $request->query('cover_page', 0);
+        $selectedCoverPage = null;
+        $coverPageData = null;
+        $coverPageOptions = [];
 
-        $selectedCoverPage = $selectedCoverPageId
-            ? $dashboard->coverPages->firstWhere('id', $selectedCoverPageId)
-            : ($tab === 'cover' ? ($activeCoverPage ?? $dashboard->coverPages->first()) : null);
+        if ($tab === 'cover') {
+            $selectedCoverPage = $selectedCoverPageId
+                ? $dashboard->coverPages->firstWhere('id', $selectedCoverPageId)
+                : ($activeCoverPage ?? $dashboard->coverPages->first());
 
-        $coverPageData = $selectedCoverPage
-            ? $coverPages->resolveForClient($selectedCoverPage, $dashboard)
-            : null;
+            $coverPageData = $selectedCoverPage
+                ? $coverPages->resolveForClient($selectedCoverPage, $dashboard)
+                : null;
 
-        $coverPageOptions = $dashboard->coverPages->map(fn (CoverPage $page) => [
-            'id' => $page->id,
-            'title' => $page->title,
-            'period_start' => $page->period_start?->toDateString(),
-            'period_end' => $page->period_end?->toDateString(),
-            'is_active' => $page->is_active,
-        ])->values();
+            $coverPageOptions = $dashboard->coverPages->map(fn (CoverPage $page) => [
+                'id' => $page->id,
+                'title' => $page->title,
+                'period_start' => $page->period_start?->toDateString(),
+                'period_end' => $page->period_end?->toDateString(),
+                'is_active' => $page->is_active,
+            ])->values()->all();
+        }
 
         $dateRange = $request->query('range', $dashboard->default_date_range);
         $comparison = DateComparison::tryFrom((string) $request->query('compare', 'none'))
@@ -81,63 +96,35 @@ class DashboardController extends Controller
         $selectedConnectionId = (int) $request->query('connection', $connections->first()?->id ?? 0);
         $selectedConnection = $connections->firstWhere('id', $selectedConnectionId) ?? $connections->first();
 
-        $isDataTab = ! in_array($tab, ['cover', 'ai', 'saved'], true);
-
+        $isDataTab = $tab === 'data';
         $connectorData = null;
-
-        if ($isDataTab && $selectedConnection?->connector_type->isCommerce()) {
-            $connectorData = $commerce->dataFor(
-                $dashboard,
-                $selectedConnection,
-                $dateRange,
-                $customRange,
-                $comparison,
-            );
-        } elseif ($isDataTab && $selectedConnection?->connector_type === ConnectorType::SearchConsole) {
-            $connectorData = $searchConsole->dataFor(
-                $dashboard,
-                $selectedConnection,
-                $dateRange,
-                $customRange,
-                $comparison,
-            );
-        } elseif ($isDataTab && $selectedConnection?->connector_type === ConnectorType::GoogleAnalytics) {
-            $connectorData = $googleAnalytics->dataFor(
-                $dashboard,
-                $selectedConnection,
-                $dateRange,
-                $customRange,
-                $comparison,
-            );
-        } elseif ($isDataTab && $selectedConnection?->connector_type === ConnectorType::GoogleAds) {
-            $connectorData = $googleAds->dataFor(
-                $dashboard,
-                $selectedConnection,
-                $dateRange,
-                $customRange,
-                $comparison,
-            );
-        } elseif ($isDataTab && $selectedConnection?->connector_type === ConnectorType::StackAdapt) {
-            $connectorData = $stackAdapt->dataFor(
-                $dashboard,
-                $selectedConnection,
-                $dateRange,
-                $customRange,
-                $comparison,
-            );
-        }
-
         $widgetData = [];
 
-        if ($isDataTab && $connectorData === null) {
-            foreach ($dashboard->widgetPlacements->where('is_visible', true) as $placement) {
-                $widgetData[$placement->id] = $widgets->dataFor(
-                    $dashboard,
-                    $placement->widget_type,
-                    $dateRange,
-                    $customRange,
-                    $comparison,
-                );
+        if ($isDataTab && $selectedConnection !== null) {
+            $connectorData = $this->connectorDataFor(
+                $connectorCache,
+                $dashboard,
+                $selectedConnection,
+                $commerce,
+                $searchConsole,
+                $googleAnalytics,
+                $googleAds,
+                $stackAdapt,
+                $dateRange,
+                $customRange,
+                $comparison,
+            );
+
+            if ($connectorData === null) {
+                foreach ($dashboard->widgetPlacements->where('is_visible', true) as $placement) {
+                    $widgetData[$placement->id] = $widgets->dataFor(
+                        $dashboard,
+                        $placement->widget_type,
+                        $dateRange,
+                        $customRange,
+                        $comparison,
+                    );
+                }
             }
         }
 
@@ -147,7 +134,7 @@ class DashboardController extends Controller
         $rangeStartString = $rangeStart->toDateString();
         $rangeEndString = $rangeEnd->toDateString();
 
-        $aiTabData = $tab === 'ai' || $request->query('session')
+        $aiTabData = $tab === 'ai'
             ? $tabData->aiTabData($request, $dashboard, $rangeStartString, $rangeEndString)
             : null;
 
@@ -169,14 +156,16 @@ class DashboardController extends Controller
                 'company' => [
                     'name' => $dashboard->company->name,
                 ],
-                'widget_placements' => $dashboard->widgetPlacements->map(fn ($placement) => [
-                    'id' => $placement->id,
-                    'title' => $placement->title,
-                    'widget_type' => $placement->widget_type->value,
-                    'widget_type_label' => $placement->widget_type->label(),
-                    'column_span' => $placement->column_span,
-                    'is_visible' => $placement->is_visible,
-                ])->values(),
+                'widget_placements' => $isDataTab
+                    ? $dashboard->widgetPlacements->map(fn ($placement) => [
+                        'id' => $placement->id,
+                        'title' => $placement->title,
+                        'widget_type' => $placement->widget_type->value,
+                        'widget_type_label' => $placement->widget_type->label(),
+                        'column_span' => $placement->column_span,
+                        'is_visible' => $placement->is_visible,
+                    ])->values()
+                    : collect(),
             ],
             'connections' => $connections->map(fn (Connection $connection) => [
                 'id' => $connection->id,
@@ -211,5 +200,75 @@ class DashboardController extends Controller
             'savedBoards' => $savedTabData['savedBoards'] ?? [],
             'savedBoard' => $savedTabData['savedBoard'] ?? null,
         ]);
+    }
+
+    /**
+     * @param  array{start?: string, end?: string}|null  $customRange
+     * @return array<string, mixed>|null
+     */
+    protected function connectorDataFor(
+        ConnectorDashboardCache $connectorCache,
+        ClientDashboard $dashboard,
+        Connection $connection,
+        CommerceDashboardService $commerce,
+        SearchConsoleDashboardService $searchConsole,
+        GoogleAnalyticsDashboardService $googleAnalytics,
+        GoogleAdsDashboardService $googleAds,
+        StackAdaptDashboardService $stackAdapt,
+        string $dateRange,
+        ?array $customRange,
+        DateComparison $comparison,
+    ): ?array {
+        $resolver = match (true) {
+            $connection->connector_type->isCommerce() => fn () => $commerce->dataFor(
+                $dashboard,
+                $connection,
+                $dateRange,
+                $customRange,
+                $comparison,
+            ),
+            $connection->connector_type === ConnectorType::SearchConsole => fn () => $searchConsole->dataFor(
+                $dashboard,
+                $connection,
+                $dateRange,
+                $customRange,
+                $comparison,
+            ),
+            $connection->connector_type === ConnectorType::GoogleAnalytics => fn () => $googleAnalytics->dataFor(
+                $dashboard,
+                $connection,
+                $dateRange,
+                $customRange,
+                $comparison,
+                $dashboard->connections,
+            ),
+            $connection->connector_type === ConnectorType::GoogleAds => fn () => $googleAds->dataFor(
+                $dashboard,
+                $connection,
+                $dateRange,
+                $customRange,
+                $comparison,
+            ),
+            $connection->connector_type === ConnectorType::StackAdapt => fn () => $stackAdapt->dataFor(
+                $dashboard,
+                $connection,
+                $dateRange,
+                $customRange,
+                $comparison,
+            ),
+            default => null,
+        };
+
+        if ($resolver === null) {
+            return null;
+        }
+
+        return $connectorCache->remember(
+            $connection,
+            $dateRange,
+            $customRange,
+            $comparison,
+            $resolver,
+        );
     }
 }
