@@ -70,7 +70,7 @@ defineProps({
                 <Link
                     v-for="dashboard in dashboards"
                     :key="dashboard.id"
-                    :href="route('admin.dashboards.show', dashboard.id)"
+                    :href="route('client.dashboard.show', dashboard.slug)"
                     class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm hover:border-slate-300"
                 >
                     <h3 class="font-semibold">{{ dashboard.name }}</h3>

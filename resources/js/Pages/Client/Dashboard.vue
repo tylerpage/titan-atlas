@@ -563,6 +563,13 @@ function sourceMediumLabel(order) {
                         {{ dashboard.name }}
                     </h1>
                     <DashboardSyncingBadge :show="dashboard.is_syncing" />
+                    <Link
+                        v-if="isAdmin"
+                        :href="route('admin.dashboards.show', dashboard.id)"
+                        class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
+                    >
+                        Details
+                    </Link>
                 </div>
             </div>
 
