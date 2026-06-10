@@ -496,14 +496,19 @@ function sourceMediumLabel(order) {
 
 <template>
     <AppLayout :title="dashboard.name">
-        <template #top>
+        <Teleport to="body">
             <div
-                v-if="isNavigating && isDataTab"
-                class="relative left-1/2 -mt-8 mb-8 w-screen max-w-none -translate-x-1/2 border-b border-slate-200 bg-slate-50 px-6 py-2.5 text-center text-sm text-slate-600"
+                v-if="isNavigating"
+                class="fixed inset-0 z-[100] flex items-center justify-center bg-white/75 backdrop-blur-[2px]"
+                role="status"
+                aria-live="polite"
+                aria-busy="true"
             >
-                Updating dashboard…
+                <div class="rounded-xl border border-slate-200 bg-white px-6 py-4 shadow-lg">
+                    <p class="text-sm font-medium text-slate-700">Updating dashboard…</p>
+                </div>
             </div>
-        </template>
+        </Teleport>
 
         <div class="mb-8 flex flex-wrap items-end justify-between gap-4">
             <div class="flex items-center gap-4">
