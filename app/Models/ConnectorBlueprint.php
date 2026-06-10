@@ -88,6 +88,11 @@ class ConnectorBlueprint extends Model
             ->all();
     }
 
+    public function dashboardVersions(): HasMany
+    {
+        return $this->hasMany(ConnectorBlueprintDashboardVersion::class);
+    }
+
     public function baseUrl(array $credentials = []): string
     {
         return \App\Support\DynamicConnectorBaseUrl::resolve($this, $credentials);

@@ -64,6 +64,15 @@ class DynamicConnectorReadOnlyGuardTest extends TestCase
         $this->assertFalse($guard->detectsWriteIntent('Use POST to authenticate with client credentials'));
     }
 
+    public function test_it_does_not_treat_internal_dashboard_requests_as_external_write_intent(): void
+    {
+        $guard = app(DynamicConnectorReadOnlyGuard::class);
+
+        $this->assertTrue($guard->detectsInternalDashboardIntent('Can you create a dashboard for this connection'));
+        $this->assertFalse($guard->detectsWriteIntent('Yes, please attempt to create the dashboard again'));
+        $this->assertFalse($guard->detectsWriteIntent('Build analytics widgets on the saved dashboard'));
+    }
+
     public function test_agent_message_adds_read_only_reminder_for_write_intent(): void
     {
         $service = app(\App\Services\AI\ConnectorBuilderAgentService::class);

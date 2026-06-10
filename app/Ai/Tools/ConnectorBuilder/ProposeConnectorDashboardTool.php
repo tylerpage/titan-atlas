@@ -4,13 +4,18 @@ namespace App\Ai\Tools\ConnectorBuilder;
 
 use App\Agents\ConnectorBuilderAgentContext;
 use App\Models\AnalyticsReport;
+use App\Models\ConnectorBlueprintDashboardVersion;
 use App\Models\SavedDashboard;
+use App\Models\SavedDashboardBlock;
 use App\Services\Analytics\ReportQueryContext;
 use App\Services\Analytics\ReportQueryExecutor;
 use App\Services\Client\SavedDashboardService;
+use App\Services\ConnectorBuilder\ConnectorBlueprintDashboardVersionService;
+use App\Support\BlueprintAnalyticsSchema;
 use App\Support\ConnectorDashboardVisualization;
 use Carbon\Carbon;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Tools\Request;
 use Stringable;
 
@@ -22,13 +27,14 @@ class ProposeConnectorDashboardTool extends ConnectorBuilderTool
         ConnectorBuilderAgentContext $context,
         protected ReportQueryExecutor $executor,
         protected SavedDashboardService $savedDashboards,
+        protected ConnectorBlueprintDashboardVersionService $versions,
     ) {
         parent::__construct($context);
     }
 
     public function description(): Stringable|string
     {
-        return 'Validate dashboard widget SQL, save analytics reports, create a saved dashboard board, and store dashboard_spec on the blueprint.';
+        return 'Validate dashboard widget SQL, save analytics reports, update the saved dashboard board for this client dashboard, and store dashboard_spec on the blueprint.';
     }
 
     public function handle(Request $request): Stringable|string
@@ -39,6 +45,19 @@ class ProposeConnectorDashboardTool extends ConnectorBuilderTool
             return $this->json([
                 'success' => false,
                 'error' => 'No blueprint exists for this session.',
+            ]);
+        }
+
+        try {
+            $this->versions->snapshot(
+                $this->context->blueprint,
+                $this->context->dashboard,
+                $this->context->user,
+            );
+        } catch (ValidationException $e) {
+            return $this->json([
+                'success' => false,
+                'error' => collect($e->errors())->flatten()->first() ?? 'Dashboard scope validation failed.',
             ]);
         }
 
@@ -56,7 +75,10 @@ class ProposeConnectorDashboardTool extends ConnectorBuilderTool
         }
 
         $connectionId = $this->context->connection?->id
-            ?? $this->context->blueprint->connections()->latest()->value('id');
+            ?? $this->context->blueprint->connections()
+                ->where('client_dashboard_id', $this->context->dashboard->id)
+                ->latest()
+                ->value('id');
 
         if ($connectionId === null) {
             return $this->json([
@@ -65,6 +87,7 @@ class ProposeConnectorDashboardTool extends ConnectorBuilderTool
             ]);
         }
 
+        $schema = BlueprintAnalyticsSchema::forBlueprint($this->context->blueprint, $connectionId);
         $title = $request->string('title')->toString() ?: $this->context->blueprint->label.' Dashboard';
         $startDate = Carbon::now()->subDays(29)->startOfDay();
         $endDate = Carbon::now()->endOfDay();
@@ -108,6 +131,9 @@ class ProposeConnectorDashboardTool extends ConnectorBuilderTool
                     'prompt' => $widget['prompt'] ?? null,
                     'error' => $e->getMessage(),
                     'hint' => self::SQL_HINT,
+                    'available_payload_fields' => $schema['streams'][0]['payload_fields'] ?? [],
+                    'resource_type' => $schema['streams'][0]['resource_type'] ?? null,
+                    'sql_templates' => $schema['sql_templates'] ?? [],
                 ];
             }
         }
@@ -117,10 +143,12 @@ class ProposeConnectorDashboardTool extends ConnectorBuilderTool
                 'success' => false,
                 'error' => 'No widgets could be created.',
                 'errors' => $errors,
+                'schema' => $schema,
             ]);
         }
 
         $savedBoard = $this->resolveSavedDashboard($request, $title);
+        $this->clearSavedDashboardBlocks($savedBoard);
         $pinnedBlocks = [];
 
         foreach ($createdReports as $item) {
@@ -133,6 +161,8 @@ class ProposeConnectorDashboardTool extends ConnectorBuilderTool
             $pinnedBlocks[] = [
                 'block_id' => $block->id,
                 'report_id' => $report->id,
+                'title' => $report->prompt,
+                'column_span' => $block->column_span,
             ];
         }
 
@@ -148,6 +178,11 @@ class ProposeConnectorDashboardTool extends ConnectorBuilderTool
             return $widget;
         }, $widgets);
 
+        $latestVersion = ConnectorBlueprintDashboardVersion::query()
+            ->where('connector_blueprint_id', $this->context->blueprint->id)
+            ->where('client_dashboard_id', $this->context->dashboard->id)
+            ->max('version_number');
+
         $dashboardSpec = [
             'title' => $title,
             'widgets' => $normalizedWidgets,
@@ -155,6 +190,8 @@ class ProposeConnectorDashboardTool extends ConnectorBuilderTool
             'saved_dashboard_id' => $savedBoard->id,
             'saved_dashboard_title' => $savedBoard->title,
             'pinned_blocks' => $pinnedBlocks,
+            'current_version' => is_numeric($latestVersion) ? (int) $latestVersion : null,
+            'client_dashboard_id' => $this->context->dashboard->id,
         ];
 
         $this->context->blueprint->update(['dashboard_spec' => $dashboardSpec]);
@@ -173,6 +210,7 @@ class ProposeConnectorDashboardTool extends ConnectorBuilderTool
             'pinned_blocks' => $pinnedBlocks,
             'errors' => $errors,
             'dashboard_spec' => $dashboardSpec,
+            'message' => 'Dashboard widgets saved on this client dashboard. Prior versions can be restored with RevertConnectorDashboardTool.',
         ]);
     }
 
@@ -188,12 +226,33 @@ class ProposeConnectorDashboardTool extends ConnectorBuilderTool
             }
         }
 
+        $existingId = $this->context->blueprint->dashboard_spec['saved_dashboard_id'] ?? null;
+
+        if (is_numeric($existingId)) {
+            $board = SavedDashboard::query()
+                ->where('client_dashboard_id', $this->context->dashboard->id)
+                ->find((int) $existingId);
+
+            if ($board !== null) {
+                if ($title !== '' && $board->title !== $title) {
+                    $this->savedDashboards->update($board, ['title' => $title]);
+                }
+
+                return $board->fresh();
+            }
+        }
+
         $boardTitle = $request->string('saved_dashboard_title')->toString() ?: $title;
 
         return $this->savedDashboards->create($this->context->dashboard, $this->context->user, [
             'title' => $boardTitle,
             'description' => $request->string('saved_dashboard_description')->toString() ?: null,
         ]);
+    }
+
+    protected function clearSavedDashboardBlocks(SavedDashboard $board): void
+    {
+        SavedDashboardBlock::query()->where('saved_dashboard_id', $board->id)->delete();
     }
 
     public function schema(JsonSchema $schema): array

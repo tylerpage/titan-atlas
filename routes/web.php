@@ -104,6 +104,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/dashboards/{dashboard}/connections/ai-create/{session?}', [AdminConnectorBuilderController::class, 'aiCreate'])->name('dashboards.connections.ai-create');
         Route::post('/dashboards/{dashboard}/connector-builder/sessions', [AdminConnectorBuilderController::class, 'sendMessage'])->name('dashboards.connector-builder.sessions.store');
         Route::get('/dashboards/{dashboard}/connector-builder/sessions/{session}/status', [AdminConnectorBuilderController::class, 'sessionStatus'])->name('dashboards.connector-builder.sessions.status');
+        Route::post('/dashboards/{dashboard}/connector-blueprints/{blueprint}/revert-dashboard', [AdminConnectorBuilderController::class, 'revertDashboard'])->name('dashboards.connector-blueprints.revert-dashboard');
         Route::post('/dashboards/{dashboard}/connections', [AdminDashboardController::class, 'storeConnection'])->name('dashboards.connections.store');
         Route::post('/connections/test', [AdminDashboardController::class, 'testConnection'])->name('connections.test');
         Route::get('/google/oauth/redirect', [AdminGoogleOAuthController::class, 'redirect'])->name('google.oauth.redirect');

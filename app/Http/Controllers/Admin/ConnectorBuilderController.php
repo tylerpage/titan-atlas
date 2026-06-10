@@ -6,10 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\SendConnectorBuilderMessageRequest;
 use App\Models\ClientDashboard;
 use App\Models\ConnectorBlueprint;
+use App\Models\ConnectorBlueprintDashboardVersion;
 use App\Models\ConnectorBuilderSession;
 use App\Services\AI\ConnectorBuilderAgentService;
+use App\Services\ConnectorBuilder\ConnectorBlueprintDashboardVersionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -73,6 +76,37 @@ class ConnectorBuilderController extends Controller
                 'session' => $result['session']->id,
             ])
             ->with('status', 'The connector builder is working on your request…');
+    }
+
+    public function revertDashboard(
+        Request $request,
+        ClientDashboard $dashboard,
+        ConnectorBlueprint $blueprint,
+        ConnectorBlueprintDashboardVersionService $versions,
+    ): RedirectResponse {
+        abort_unless($request->user()?->isAdmin(), 403);
+        abort_unless($blueprint->connector_builder_session_id !== null, 404);
+
+        $session = ConnectorBuilderSession::query()
+            ->where('client_dashboard_id', $dashboard->id)
+            ->whereKey($blueprint->connector_builder_session_id)
+            ->firstOrFail();
+
+        abort_unless($session->blueprint?->is($blueprint), 404);
+
+        $version = ConnectorBlueprintDashboardVersion::query()
+            ->where('connector_blueprint_id', $blueprint->id)
+            ->where('client_dashboard_id', $dashboard->id)
+            ->findOrFail($request->integer('version_id'));
+
+        $versions->revert($blueprint, $dashboard, $version);
+
+        return redirect()
+            ->route('admin.dashboards.connections.ai-create', [
+                'dashboard' => $dashboard->id,
+                'session' => $session->id,
+            ])
+            ->with('status', "Reverted dashboard to version {$version->version_number}.");
     }
 
     /**
@@ -166,6 +200,9 @@ class ConnectorBuilderController extends Controller
                 'board' => $savedDashboardId,
             ]);
         }
+
+        $spec['versions'] = app(ConnectorBlueprintDashboardVersionService::class)
+            ->listForBlueprint($blueprint, $dashboard);
 
         return $spec;
     }

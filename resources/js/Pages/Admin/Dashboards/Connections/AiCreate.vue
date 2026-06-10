@@ -61,6 +61,18 @@ let removeFinishListener = null;
 const messagesContainer = ref(null);
 const copiedDetails = ref(false);
 
+function revertDashboardVersion(versionId) {
+    if (!blueprint.value?.id || !versionId) {
+        return;
+    }
+
+    router.post(route('admin.dashboards.connector-blueprints.revert-dashboard', [props.dashboard.id, blueprint.value.id]), {
+        version_id: versionId,
+    }, {
+        preserveScroll: true,
+    });
+}
+
 function restorePageScroll(scrollY) {
     if (scrollY == null) {
         return;
@@ -405,6 +417,25 @@ const error = computed(() => page.props.flash?.error);
                             >
                                 Open saved dashboard{{ blueprint.dashboard_spec.saved_dashboard_title ? `: ${blueprint.dashboard_spec.saved_dashboard_title}` : '' }}
                             </a>
+                            <div v-if="blueprint.dashboard_spec.versions?.length" class="mt-3 border-t border-slate-200 pt-3">
+                                <p class="font-medium text-slate-700">Version history</p>
+                                <ul class="mt-2 space-y-1">
+                                    <li
+                                        v-for="version in blueprint.dashboard_spec.versions"
+                                        :key="version.id"
+                                        class="flex items-center justify-between gap-2 text-slate-600"
+                                    >
+                                        <span>Version {{ version.version_number }}</span>
+                                        <button
+                                            type="button"
+                                            class="text-xs text-primary hover:underline"
+                                            @click="revertDashboardVersion(version.id)"
+                                        >
+                                            Revert
+                                        </button>
+                                    </li>
+                                </ul>
+                            </div>
                         </div>
 
                         <Link
