@@ -92,6 +92,8 @@ class DynamicConnector extends AbstractConnector implements FanOutSyncConnector
             path: $stream->path_template,
             queryParams: $queryParams,
             headers: $stream->headers ?? [],
+            body: $stream->request_body ?? [],
+            bodyFormat: (string) ($stream->response_mapping['body_format'] ?? 'json'),
         );
 
         $mapping = $stream->response_mapping ?? [];
@@ -141,6 +143,21 @@ class DynamicConnector extends AbstractConnector implements FanOutSyncConnector
     public function probeConnection(ConnectorBlueprint $blueprint, array $credentials): array
     {
         if ($blueprint->testEndpoint() !== null) {
+            $testRequest = $blueprint->sync_config['test_request'] ?? null;
+
+            if (is_array($testRequest)) {
+                return $this->client->request(
+                    blueprint: $blueprint,
+                    credentials: $credentials,
+                    method: (string) ($testRequest['method'] ?? 'GET'),
+                    path: (string) ($testRequest['path'] ?? $blueprint->testEndpoint()),
+                    queryParams: is_array($testRequest['query_params'] ?? null) ? $testRequest['query_params'] : [],
+                    headers: is_array($testRequest['headers'] ?? null) ? $testRequest['headers'] : [],
+                    body: is_array($testRequest['body'] ?? null) ? $testRequest['body'] : [],
+                    bodyFormat: (string) ($testRequest['body_format'] ?? 'json'),
+                );
+            }
+
             return $this->client->request(
                 blueprint: $blueprint,
                 credentials: $credentials,
@@ -164,6 +181,8 @@ class DynamicConnector extends AbstractConnector implements FanOutSyncConnector
             path: $stream->path_template,
             queryParams: $queryParams,
             headers: $stream->headers ?? [],
+            body: $stream->request_body ?? [],
+            bodyFormat: (string) ($stream->response_mapping['body_format'] ?? 'json'),
         );
     }
 

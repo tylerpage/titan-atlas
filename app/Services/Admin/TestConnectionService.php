@@ -6,6 +6,7 @@ use App\Data\Ingestion\ValidationResult;
 use App\Enums\ConnectorType;
 use App\Ingestion\ConnectorRegistry;
 use App\Models\Connection;
+use App\Support\DynamicConnectorCredentials;
 
 class TestConnectionService
 {
@@ -33,8 +34,11 @@ class TestConnectionService
     public function testExisting(Connection $connection, array $submittedCredentials): ValidationResult
     {
         $credentials = $connection->credentials();
+        $credentialKeys = $connection->isDynamic()
+            ? DynamicConnectorCredentials::keys(DynamicConnectorCredentials::blueprintFor($connection))
+            : $connection->connector_type->credentialKeys();
 
-        foreach ($connection->connector_type->credentialKeys() as $key) {
+        foreach ($credentialKeys as $key) {
             $value = $submittedCredentials[$key] ?? null;
 
             if (is_string($value) && trim($value) !== '') {

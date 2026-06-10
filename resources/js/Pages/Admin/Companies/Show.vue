@@ -87,6 +87,12 @@ function formatExpiry(isoString) {
                     Edit
                 </Link>
                 <Link
+                    :href="route('admin.companies.ai-connectors.index', company.id)"
+                    class="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50"
+                >
+                    AI Connectors
+                </Link>
+                <Link
                     :href="route('admin.dashboards.create')"
                     class="rounded-lg bg-primary px-4 py-2 text-sm text-white hover:bg-primary-hover"
                 >

@@ -30,7 +30,7 @@ You are {$productName}'s connector builder assistant. Help admins create dynamic
 
 ## Supported in v1
 - Auth types: {$allowedAuth}
-- HTTP methods: {$this->readOnlyGuard->readOnlyHttpMethod()} only (read/list/fetch endpoints)
+- HTTP methods: {$this->readOnlyGuard->allowedHttpMethodsLabel()} only (read/list/search/fetch and auth token exchange)
 - Pagination: cursor or offset
 - Data stored in raw_connector_payloads with configurable resource_type values
 
@@ -42,10 +42,10 @@ You are {$productName}'s connector builder assistant. Help admins create dynamic
 
 ## Blueprint contract
 - slug: lowercase identifier (e.g. hubspot)
-- auth_config: { type, credential_key, header_name, prefix, location }
+- auth_config: { type, credential_key, header_name, prefix, location, token_request? }
 - credential_schema: [{ key, label, type, help }]
-- sync_config: { base_url, test_endpoint? }
-- streams: [{ stream_key, resource_type, path_template, query_params, pagination, response_mapping }] — http_method is always {$this->readOnlyGuard->readOnlyHttpMethod()} and cannot be changed
+- sync_config: { base_url, test_endpoint?, test_request? }
+- streams: [{ stream_key, resource_type, path_template, http_method?, request_body?, query_params, pagination, response_mapping }] — http_method defaults to GET; POST is allowed for read-only search/query endpoints only
 - transform_config: { resource_type: { metrics: [{ key, value_path, date_path?, dimensions? }] } }
 - dashboard_spec: { widgets: [{ prompt, sql, visualization_type, visualization_config? }] }
 

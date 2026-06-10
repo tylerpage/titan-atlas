@@ -13,6 +13,7 @@ use App\Models\DashboardTemplate;
 use App\Services\Admin\CreateConnectionService;
 use App\Services\Admin\TestConnectionService;
 use App\Services\Admin\UpdateClientDashboardService;
+use App\Services\ConnectorBuilder\AiConnectorService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Storage;
@@ -105,7 +106,7 @@ class DashboardController extends Controller
             ->with('status', 'Dashboard "'.$dashboard->name.'" updated.');
     }
 
-    public function createConnection(ClientDashboard $dashboard): Response
+    public function createConnection(ClientDashboard $dashboard, AiConnectorService $aiConnectors): Response
     {
         $pendingOAuth = app(\App\Services\Google\GoogleOAuthPendingSession::class);
 
@@ -119,6 +120,14 @@ class DashboardController extends Controller
                 ->reject(fn (ConnectorType $type) => $type->isDynamic())
                 ->map(fn (ConnectorType $type) => $type->toConnectorOption())
                 ->values(),
+            'aiConnectors' => $aiConnectors->templatesForDashboard($dashboard)->map(fn ($blueprint) => [
+                'id' => $blueprint->id,
+                'label' => $blueprint->label,
+                'slug' => $blueprint->slug,
+                'status' => $blueprint->status->value,
+                'is_shared' => $blueprint->isShared(),
+                'streams_count' => $blueprint->streams()->count(),
+            ])->values(),
             'defaultConnectorType' => $pendingOAuth->defaultConnectorTypeForDashboard($dashboard->id),
             'googleOauth' => $pendingOAuth->propsForDashboardDefault($dashboard->id),
         ]);

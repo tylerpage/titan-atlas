@@ -45,8 +45,6 @@ class CreateDynamicConnectionService
 
         $connection->save();
 
-        $blueprint->update(['connection_id' => $connection->id]);
-
         SyncConnectionJob::dispatch($connection, SyncRunType::Backfill);
 
         return $connection;

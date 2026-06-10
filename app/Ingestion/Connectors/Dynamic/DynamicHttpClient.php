@@ -5,6 +5,7 @@ namespace App\Ingestion\Connectors\Dynamic;
 use App\Models\ConnectorBlueprint;
 use App\Support\DynamicConnectorReadOnlyGuard;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -12,8 +13,12 @@ use Illuminate\Support\Str;
 class DynamicHttpClient
 {
     public function __construct(protected DynamicConnectorReadOnlyGuard $readOnlyGuard) {}
+
     /**
      * @param  array<string, mixed>  $credentials
+     * @param  array<string, mixed>  $queryParams
+     * @param  array<string, mixed>  $headers
+     * @param  array<string, mixed>  $body
      */
     public function request(
         ConnectorBlueprint $blueprint,
@@ -22,6 +27,8 @@ class DynamicHttpClient
         string $path,
         array $queryParams = [],
         array $headers = [],
+        array $body = [],
+        string $bodyFormat = 'json',
     ): array {
         $this->assertAllowedMethod($method);
         $url = $this->buildUrl($blueprint, $path, $credentials);
@@ -29,34 +36,12 @@ class DynamicHttpClient
 
         $queryParams = $this->interpolateArray($queryParams, $credentials);
         $headers = $this->interpolateArray($headers, $credentials);
+        $body = $this->interpolateArray($body, $credentials);
 
-        $request = $this->baseRequest($blueprint, $credentials, $headers);
+        $request = $this->baseRequest($blueprint, $credentials, $headers, resolveToken: false);
+        $response = $this->sendRequest($request, strtoupper($method), $url, $queryParams, $body, $bodyFormat);
 
-        $response = match (strtoupper($method)) {
-            'GET' => $request->get($url, $queryParams),
-            default => throw new \InvalidArgumentException("Unsupported HTTP method [{$method}]."),
-        };
-
-        if (! $response->successful()) {
-            throw new \RuntimeException(
-                "API request failed with status {$response->status()}: ".Str::limit($response->body(), 500),
-            );
-        }
-
-        $body = $response->body();
-        $maxBytes = (int) config('titan.connector_builder.max_response_bytes', 5_000_000);
-
-        if (strlen($body) > $maxBytes) {
-            throw new \RuntimeException('API response exceeded maximum allowed size.');
-        }
-
-        $json = $response->json();
-
-        if (! is_array($json)) {
-            throw new \RuntimeException('API response was not valid JSON.');
-        }
-
-        return $json;
+        return $this->decodeJsonResponse($response);
     }
 
     /**
@@ -77,13 +62,15 @@ class DynamicHttpClient
     /**
      * @param  array<string, mixed>  $credentials
      */
-    public function applyAuth(PendingRequest $request, ConnectorBlueprint $blueprint, array $credentials): PendingRequest
+    public function applyAuth(PendingRequest $request, ConnectorBlueprint $blueprint, array $credentials, bool $resolveToken = true): PendingRequest
     {
         $auth = $blueprint->auth_config ?? [];
         $type = $auth['type'] ?? 'api_key';
 
         return match ($type) {
-            'bearer' => $request->withToken($this->credentialValue($credentials, $auth['credential_key'] ?? 'access_token')),
+            'bearer' => $request->withToken($resolveToken
+                ? $this->resolveBearerToken($blueprint, $credentials)
+                : $this->credentialValue($credentials, $auth['credential_key'] ?? 'access_token')),
             'basic' => $request->withBasicAuth(
                 $this->credentialValue($credentials, $auth['username_key'] ?? 'username'),
                 $this->credentialValue($credentials, $auth['password_key'] ?? 'password'),
@@ -235,16 +222,124 @@ class DynamicHttpClient
 
     /**
      * @param  array<string, mixed>  $credentials
+     * @param  array<string, mixed>  $headers
      */
-    protected function baseRequest(ConnectorBlueprint $blueprint, array $credentials, array $headers): PendingRequest
-    {
+    protected function baseRequest(
+        ConnectorBlueprint $blueprint,
+        array $credentials,
+        array $headers = [],
+        bool $resolveToken = true,
+    ): PendingRequest {
         $timeout = (int) config('titan.connector_builder.http_timeout_seconds', 30);
 
         $request = Http::timeout($timeout)
             ->acceptJson()
             ->withHeaders($headers);
 
-        return $this->applyAuth($request, $blueprint, $credentials);
+        return $this->applyAuth($request, $blueprint, $credentials, $resolveToken);
+    }
+
+    /**
+     * @param  array<string, mixed>  $credentials
+     */
+    protected function resolveBearerToken(ConnectorBlueprint $blueprint, array $credentials): string
+    {
+        $auth = $blueprint->auth_config ?? [];
+        $tokenRequest = $auth['token_request'] ?? null;
+
+        if (! is_array($tokenRequest)) {
+            return $this->credentialValue($credentials, $auth['credential_key'] ?? 'access_token');
+        }
+
+        $method = $this->readOnlyGuard->normalizeHttpMethod($tokenRequest['method'] ?? 'POST');
+        $path = (string) ($tokenRequest['path'] ?? '/oauth/token');
+        $body = is_array($tokenRequest['body'] ?? null) ? $tokenRequest['body'] : [];
+        $headers = is_array($tokenRequest['headers'] ?? null) ? $tokenRequest['headers'] : [];
+        $bodyFormat = (string) ($tokenRequest['body_format'] ?? 'form');
+
+        $url = $this->buildUrl($blueprint, $path, $credentials);
+        $this->assertAllowedHost($blueprint, $url);
+
+        $request = $this->baseRequest($blueprint, $credentials, $headers, resolveToken: false);
+        $response = $this->sendRequest(
+            $request,
+            $method,
+            $url,
+            [],
+            $this->interpolateArray($body, $credentials),
+            $bodyFormat,
+        );
+
+        $payload = $this->decodeJsonResponse($response);
+        $tokenPath = (string) ($tokenRequest['token_path'] ?? 'access_token');
+        $token = Arr::get($payload, $tokenPath);
+
+        if (! is_string($token) || trim($token) === '') {
+            throw new \RuntimeException('Token request did not return an access token.');
+        }
+
+        return trim($token);
+    }
+
+    /**
+     * @param  array<string, mixed>  $queryParams
+     * @param  array<string, mixed>  $body
+     */
+    protected function sendRequest(
+        PendingRequest $request,
+        string $method,
+        string $url,
+        array $queryParams,
+        array $body,
+        string $bodyFormat,
+    ): Response {
+        $request = $request->withQueryParameters($queryParams);
+
+        return match ($method) {
+            'GET' => $request->get($url),
+            'POST' => $this->sendPost($request, $url, $body, $bodyFormat),
+            default => throw new \InvalidArgumentException("Unsupported HTTP method [{$method}]."),
+        };
+    }
+
+    /**
+     * @param  array<string, mixed>  $body
+     */
+    protected function sendPost(PendingRequest $request, string $url, array $body, string $bodyFormat): Response
+    {
+        if ($bodyFormat === 'form') {
+            return $request->asForm()->post($url, $body);
+        }
+
+        if ($body === []) {
+            return $request->post($url);
+        }
+
+        return $request->asJson()->post($url, $body);
+    }
+
+    protected function decodeJsonResponse(Response $response): array
+    {
+        if (! $response->successful()) {
+            throw new \RuntimeException(
+                "API request failed with status {$response->status()}: ".Str::limit($response->body(), 500),
+            );
+        }
+
+        $body = $response->body();
+        $maxBytes = (int) config('titan.connector_builder.max_response_bytes', 5_000_000);
+
+        if (strlen($body) > $maxBytes) {
+            throw new \RuntimeException('API response exceeded maximum allowed size.');
+        }
+
+        $json = $response->json();
+
+        if (! is_array($json)) {
+            throw new \RuntimeException('API response was not valid JSON.');
+        }
+
+        return $json;
     }
 
     /**

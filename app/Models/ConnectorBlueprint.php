@@ -10,9 +10,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class ConnectorBlueprint extends Model
 {
     protected $fillable = [
+        'company_id',
         'client_dashboard_id',
         'connector_builder_session_id',
-        'connection_id',
         'slug',
         'label',
         'status',
@@ -38,6 +38,11 @@ class ConnectorBlueprint extends Model
         ];
     }
 
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
+    }
+
     public function dashboard(): BelongsTo
     {
         return $this->belongsTo(ClientDashboard::class, 'client_dashboard_id');
@@ -48,14 +53,19 @@ class ConnectorBlueprint extends Model
         return $this->belongsTo(ConnectorBuilderSession::class, 'connector_builder_session_id');
     }
 
-    public function connection(): BelongsTo
+    public function connections(): HasMany
     {
-        return $this->belongsTo(Connection::class);
+        return $this->hasMany(Connection::class);
     }
 
     public function streams(): HasMany
     {
         return $this->hasMany(ConnectorBlueprintStream::class);
+    }
+
+    public function isShared(): bool
+    {
+        return $this->client_dashboard_id === null;
     }
 
     /**

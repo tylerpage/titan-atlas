@@ -19,7 +19,7 @@ class SaveConnectorBlueprintTool extends ConnectorBuilderTool
 
     public function description(): Stringable|string
     {
-        return 'Create or update a read-only connector blueprint. Streams may only use GET requests to fetch external data; write endpoints are rejected.';
+        return 'Create or update a read-only connector blueprint. Streams may use GET or POST for fetch/search endpoints; auth token exchange may use POST via auth_config.token_request. Write endpoints are rejected.';
     }
 
     public function handle(Request $request): Stringable|string

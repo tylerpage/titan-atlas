@@ -9,6 +9,7 @@ use App\Models\MetricSnapshot;
 use App\Models\RawConnectorPayload;
 use App\Models\SyncRun;
 use App\Services\Google\GoogleOAuthPendingSession;
+use App\Support\DynamicConnectorCredentials;
 use Illuminate\Validation\ValidationException;
 
 class ConnectionService
@@ -21,8 +22,11 @@ class ConnectionService
     public function update(Connection $connection, array $data): Connection
     {
         $credentials = $connection->credentials();
+        $credentialKeys = $connection->isDynamic()
+            ? DynamicConnectorCredentials::keys(DynamicConnectorCredentials::blueprintFor($connection))
+            : $connection->connector_type->credentialKeys();
 
-        foreach ($connection->connector_type->credentialKeys() as $key) {
+        foreach ($credentialKeys as $key) {
             $value = $data['credentials'][$key] ?? null;
 
             if (is_string($value) && trim($value) !== '') {

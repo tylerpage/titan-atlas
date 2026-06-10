@@ -27,4 +27,9 @@ class Company extends Model
     {
         return $this->hasMany(UserInvitation::class);
     }
+
+    public function connectorBlueprints(): HasMany
+    {
+        return $this->hasMany(ConnectorBlueprint::class);
+    }
 }

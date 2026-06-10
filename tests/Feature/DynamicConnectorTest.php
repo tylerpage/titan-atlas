@@ -98,7 +98,7 @@ class DynamicConnectorTest extends TestCase
         );
     }
 
-    public function test_blueprint_service_rejects_post_streams(): void
+    public function test_blueprint_service_rejects_delete_streams(): void
     {
         $dashboard = ClientDashboard::query()->create([
             'company_id' => Company::query()->create(['name' => 'Acme', 'slug' => 'acme-ro'])->id,
@@ -113,6 +113,8 @@ class DynamicConnectorTest extends TestCase
             'title' => 'HubSpot',
         ]);
 
+        $dashboard->load('company');
+
         $this->expectException(\InvalidArgumentException::class);
 
         app(\App\Services\ConnectorBuilder\ConnectorBlueprintService::class)->upsert(
@@ -123,11 +125,97 @@ class DynamicConnectorTest extends TestCase
                 'label' => 'HubSpot',
                 'streams' => [[
                     'stream_key' => 'deals',
-                    'http_method' => 'POST',
+                    'http_method' => 'DELETE',
                     'path_template' => '/crm/v3/objects/deals',
                 ]],
             ],
         );
+    }
+
+    public function test_dynamic_connector_supports_post_read_stream_and_token_auth(): void
+    {
+        Http::fake([
+            'https://api.example.com/oauth/token*' => Http::response([
+                'access_token' => 'fresh-token',
+            ], 200),
+            'https://api.example.com/search*' => Http::response([
+                'results' => [[
+                    'id' => '42',
+                    'amount' => '1200',
+                    'date' => '2026-06-01',
+                ]],
+            ], 200),
+        ]);
+
+        $dashboard = ClientDashboard::query()->create([
+            'company_id' => Company::query()->create(['name' => 'Acme', 'slug' => 'acme-post'])->id,
+            'name' => 'Main',
+            'slug' => 'main-post',
+        ]);
+
+        $blueprint = ConnectorBlueprint::query()->create([
+            'company_id' => $dashboard->company_id,
+            'client_dashboard_id' => $dashboard->id,
+            'slug' => 'example',
+            'label' => 'Example',
+            'status' => ConnectorBlueprintStatus::Ready,
+            'auth_config' => [
+                'type' => 'bearer',
+                'token_request' => [
+                    'method' => 'POST',
+                    'path' => '/oauth/token',
+                    'body_format' => 'form',
+                    'body' => [
+                        'grant_type' => 'client_credentials',
+                        'client_id' => '{{client_id}}',
+                        'client_secret' => '{{client_secret}}',
+                    ],
+                    'token_path' => 'access_token',
+                ],
+            ],
+            'credential_schema' => [
+                ['key' => 'client_id', 'label' => 'Client ID', 'type' => 'text'],
+                ['key' => 'client_secret', 'label' => 'Client Secret', 'type' => 'password'],
+            ],
+            'sync_config' => [
+                'base_url' => 'https://api.example.com',
+            ],
+        ]);
+
+        ConnectorBlueprintStream::query()->create([
+            'connector_blueprint_id' => $blueprint->id,
+            'stream_key' => 'search',
+            'resource_type' => 'example_record',
+            'http_method' => 'POST',
+            'path_template' => '/search',
+            'request_body' => ['query' => 'recent deals'],
+            'response_mapping' => [
+                'records_path' => 'results',
+                'id_path' => 'id',
+                'date_path' => 'date',
+            ],
+        ]);
+
+        $connection = Connection::query()->create([
+            'client_dashboard_id' => $dashboard->id,
+            'connector_type' => ConnectorType::Dynamic,
+            'connector_blueprint_id' => $blueprint->id,
+            'name' => 'Example',
+            'encrypted_credentials' => [
+                'client_id' => 'app-id',
+                'client_secret' => 'app-secret',
+            ],
+        ]);
+
+        $connector = app(DynamicConnector::class);
+        $validation = $connector->validateCredentials($connection);
+
+        $this->assertTrue($validation->valid);
+
+        $result = $connector->fetch($connection);
+
+        $this->assertCount(1, $result->records);
+        $this->assertSame('42', $result->records[0]['external_id']);
     }
 
     public function test_admin_can_open_ai_connector_builder_page(): void
@@ -159,6 +247,7 @@ class DynamicConnectorTest extends TestCase
         ]);
 
         $blueprint = ConnectorBlueprint::query()->create([
+            'company_id' => $dashboard->company_id,
             'client_dashboard_id' => $dashboard->id,
             'slug' => 'hubspot',
             'label' => 'HubSpot',

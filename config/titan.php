@@ -191,7 +191,7 @@ return [
         'model' => env('TITAN_CONNECTOR_BUILDER_MODEL', env('TITAN_AI_MODEL', 'gpt-4o-mini')),
         'max_steps' => (int) env('TITAN_CONNECTOR_BUILDER_MAX_STEPS', 15),
         'allowed_auth_types' => ['api_key', 'bearer', 'basic'],
-        'allowed_http_methods' => ['GET'],
+        'allowed_http_methods' => ['GET', 'POST'],
         'read_only_enforced' => true,
         'max_streams_per_blueprint' => (int) env('TITAN_CONNECTOR_BUILDER_MAX_STREAMS', 8),
         'http_timeout_seconds' => (int) env('TITAN_CONNECTOR_BUILDER_HTTP_TIMEOUT', 30),

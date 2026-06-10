@@ -5,6 +5,10 @@ import AppLayout from '../../../../Layouts/AppLayout.vue';
 const props = defineProps({
     dashboard: {
         type: Object,
+        default: null,
+    },
+    company: {
+        type: Object,
         required: true,
     },
     blueprint: {
@@ -21,24 +25,44 @@ function activateBlueprint() {
     router.post(route('admin.connector-blueprints.activate', props.blueprint.id));
 }
 
+function shareBlueprint() {
+    router.post(route('admin.ai-connectors.share', props.blueprint.id));
+}
+
 function exportDevTasks() {
     navigator.clipboard.writeText(JSON.stringify(props.blueprint.dev_tasks ?? [], null, 2));
 }
 </script>
 
 <template>
-    <AppLayout :title="`${blueprint.label} · Blueprint`">
+    <AppLayout :title="`${blueprint.label} · AI Connector`">
         <div class="mb-6">
             <p class="text-sm text-slate-500">
-                <Link :href="route('admin.dashboards.show', dashboard.id)" class="hover:text-slate-700">
-                    {{ dashboard.company_name }} · {{ dashboard.name }}
-                </Link>
+                <Link :href="route('admin.ai-connectors.index')" class="hover:text-slate-700">AI Connectors</Link>
+                <span v-if="company"> · {{ company.name }}</span>
+                <span v-if="dashboard">
+                    ·
+                    <Link :href="route('admin.dashboards.show', dashboard.id)" class="hover:text-slate-700">
+                        {{ dashboard.name }}
+                    </Link>
+                </span>
             </p>
-            <h1 class="text-3xl font-semibold">{{ blueprint.label }}</h1>
+            <div class="flex flex-wrap items-center gap-3">
+                <h1 class="text-3xl font-semibold">{{ blueprint.label }}</h1>
+                <span v-if="blueprint.is_shared" class="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-800">
+                    Shared
+                </span>
+            </div>
             <p class="mt-1 text-sm text-slate-500">{{ blueprint.slug }} · {{ blueprint.status }}</p>
         </div>
 
         <div class="mb-6 flex flex-wrap gap-2">
+            <Link
+                :href="route('admin.ai-connectors.edit', blueprint.id)"
+                class="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50"
+            >
+                Edit
+            </Link>
             <button
                 type="button"
                 class="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50"
@@ -47,7 +71,15 @@ function exportDevTasks() {
                 Test connection
             </button>
             <button
-                v-if="blueprint.connection"
+                v-if="!blueprint.is_shared"
+                type="button"
+                class="rounded-lg border border-sky-300 px-4 py-2 text-sm text-sky-800 hover:bg-sky-50"
+                @click="shareBlueprint"
+            >
+                Share company-wide
+            </button>
+            <button
+                v-if="blueprint.connections?.length"
                 type="button"
                 class="rounded-lg bg-primary px-4 py-2 text-sm text-white hover:bg-primary-hover"
                 @click="activateBlueprint"
@@ -86,25 +118,25 @@ function exportDevTasks() {
                     </ul>
                 </div>
 
-                <div v-if="blueprint.connection" class="rounded-xl border border-slate-200 bg-white p-5">
-                    <h2 class="mb-3 text-lg font-semibold">Connection</h2>
-                    <Link :href="route('admin.connections.show', blueprint.connection.id)" class="text-primary hover:underline">
-                        {{ blueprint.connection.name }}
-                    </Link>
-                    <p class="mt-2 text-sm text-slate-600">Sync status: {{ blueprint.connection.sync_status }}</p>
-                    <p v-if="blueprint.connection.sync_error" class="mt-1 text-sm text-red-600">
-                        {{ blueprint.connection.sync_error }}
+                <div class="rounded-xl border border-slate-200 bg-white p-5">
+                    <h2 class="mb-3 text-lg font-semibold">Dashboard connections</h2>
+                    <p v-if="!blueprint.connections?.length" class="text-sm text-slate-600">
+                        No dashboard connections yet. Add this template from any dashboard in {{ company.name }}.
                     </p>
+                    <ul v-else class="space-y-3 text-sm">
+                        <li v-for="connection in blueprint.connections" :key="connection.id" class="rounded-lg bg-slate-50 p-3">
+                            <Link :href="route('admin.connections.show', connection.id)" class="font-medium text-primary hover:underline">
+                                {{ connection.name }}
+                            </Link>
+                            <p class="text-slate-500">{{ connection.dashboard.name }} · {{ connection.sync_status }}</p>
+                            <p v-if="connection.sync_error" class="mt-1 text-red-600">{{ connection.sync_error }}</p>
+                        </li>
+                    </ul>
                 </div>
 
                 <div v-if="blueprint.dev_tasks?.length" class="rounded-xl border border-amber-200 bg-amber-50 p-5">
                     <h2 class="mb-3 text-lg font-semibold text-amber-900">Developer tasks</h2>
-                    <ul class="space-y-3 text-sm text-amber-900">
-                        <li v-for="(task, index) in blueprint.dev_tasks" :key="index">
-                            <p class="font-medium">{{ task.task }}</p>
-                            <p>{{ task.reason }}</p>
-                        </li>
-                    </ul>
+                    <pre class="overflow-auto text-xs text-amber-950">{{ blueprint.dev_tasks }}</pre>
                 </div>
             </section>
         </div>

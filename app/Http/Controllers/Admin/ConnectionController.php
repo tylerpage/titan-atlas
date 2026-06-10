@@ -10,6 +10,7 @@ use App\Http\Requests\Admin\TestExistingConnectionRequest;
 use App\Http\Requests\Admin\UpdateConnectionRequest;
 use App\Jobs\Ingestion\SyncConnectionJob;
 use App\Models\Connection;
+use App\Support\DynamicConnectorCredentials;
 use App\Services\Admin\ConnectionService;
 use App\Services\Admin\TestConnectionService;
 use Illuminate\Http\JsonResponse;
@@ -23,6 +24,7 @@ class ConnectionController extends Controller
     {
         $connection->load([
             'clientDashboard.company',
+            'connectorBlueprint',
             'syncRuns' => fn ($q) => $q->limit(10),
         ]);
 
@@ -33,7 +35,7 @@ class ConnectionController extends Controller
 
     public function edit(Connection $connection): Response
     {
-        $connection->load('clientDashboard.company');
+        $connection->load(['clientDashboard.company', 'connectorBlueprint']);
 
         return Inertia::render('Admin/Dashboards/Connections/Edit', [
             'connection' => $this->serializeConnection($connection),
@@ -172,12 +174,18 @@ class ConnectionController extends Controller
     protected function serializeConnection(Connection $connection): array
     {
         $credentials = $connection->credentials();
+        $blueprint = DynamicConnectorCredentials::blueprintFor($connection);
+        $credentialFields = $connection->isDynamic()
+            ? DynamicConnectorCredentials::fields($blueprint)
+            : $connection->connector_type->credentialFields();
 
         return [
             'id' => $connection->id,
             'name' => $connection->name,
             'connector_type' => $connection->connector_type->value,
-            'connector_label' => $connection->connector_type->label(),
+            'connector_label' => $connection->isDynamic()
+                ? ($blueprint?->label ?? 'AI Connector')
+                : $connection->connector_type->label(),
             'is_active' => $connection->is_active,
             'sync_status' => $connection->sync_status->value,
             'sync_error' => $connection->sync_error,
@@ -186,8 +194,13 @@ class ConnectionController extends Controller
             'data_through_date' => $connection->data_through_date?->toDateString(),
             'backfill_started_at' => $connection->backfill_started_at?->toIso8601String(),
             'backfill_completed_at' => $connection->backfill_completed_at?->toIso8601String(),
-            'credential_fields' => $connection->connector_type->credentialFields(),
+            'credential_fields' => $credentialFields,
             'credential_hints' => $this->credentialHints($connection, $credentials),
+            'connector_blueprint' => $blueprint ? [
+                'id' => $blueprint->id,
+                'label' => $blueprint->label,
+                'slug' => $blueprint->slug,
+            ] : null,
             'dashboard' => [
                 'id' => $connection->clientDashboard->id,
                 'name' => $connection->clientDashboard->name,

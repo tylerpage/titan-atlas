@@ -14,6 +14,7 @@ class ConnectorBlueprintStream extends Model
         'http_method',
         'path_template',
         'query_params',
+        'request_body',
         'headers',
         'pagination',
         'response_mapping',
@@ -24,6 +25,7 @@ class ConnectorBlueprintStream extends Model
     {
         return [
             'query_params' => 'array',
+            'request_body' => 'array',
             'headers' => 'array',
             'pagination' => 'array',
             'response_mapping' => 'array',

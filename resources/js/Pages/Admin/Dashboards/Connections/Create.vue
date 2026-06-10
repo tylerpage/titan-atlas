@@ -17,6 +17,10 @@ const props = defineProps({
         type: Array,
         required: true,
     },
+    aiConnectors: {
+        type: Array,
+        default: () => [],
+    },
     googleOauth: {
         type: Object,
         default: () => ({ connected: false, connector_type: null, sites: [] }),
@@ -282,6 +286,34 @@ function submit() {
             <h1 class="text-3xl font-semibold">Add connection</h1>
             <p class="mt-2 text-slate-600">For {{ dashboard.name }}</p>
         </div>
+
+        <section v-if="aiConnectors.length" class="mx-auto mb-8 max-w-2xl rounded-xl border border-sky-200 bg-sky-50 p-6">
+            <h2 class="text-lg font-semibold text-sky-950">AI connector templates</h2>
+            <p class="mt-1 text-sm text-sky-900">
+                Reuse a saved AI connector and add this dashboard's credentials.
+            </p>
+            <ul class="mt-4 space-y-3">
+                <li
+                    v-for="template in aiConnectors"
+                    :key="template.id"
+                    class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-sky-200 bg-white px-4 py-3"
+                >
+                    <div>
+                        <p class="font-medium">{{ template.label }}</p>
+                        <p class="text-xs text-slate-500">
+                            {{ template.slug }} · {{ template.streams_count }} streams
+                            <span v-if="template.is_shared"> · shared</span>
+                        </p>
+                    </div>
+                    <Link
+                        :href="route('admin.dashboards.connections.from-template', [dashboard.id, template.id])"
+                        class="rounded-lg bg-primary px-3 py-2 text-sm text-white hover:bg-primary-hover"
+                    >
+                        Connect
+                    </Link>
+                </li>
+            </ul>
+        </section>
 
         <form
             class="mx-auto max-w-2xl space-y-6 rounded-xl border border-slate-200 bg-white p-8 shadow-sm"

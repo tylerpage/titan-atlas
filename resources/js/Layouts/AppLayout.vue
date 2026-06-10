@@ -59,6 +59,13 @@ function closeMobileMenu() {
                 </Link>
                 <Link
                     v-if="user.is_admin"
+                    :href="route('admin.ai-connectors.index')"
+                    class="text-slate-300 hover:text-white"
+                >
+                    AI Connectors
+                </Link>
+                <Link
+                    v-if="user.is_admin"
                     :href="route('admin.companies.index')"
                     class="text-slate-300 hover:text-white"
                 >
@@ -137,6 +144,14 @@ function closeMobileMenu() {
                     @click="closeMobileMenu"
                 >
                     Dashboards
+                </Link>
+                <Link
+                    v-if="user.is_admin"
+                    :href="route('admin.ai-connectors.index')"
+                    class="rounded-lg px-3 py-2 text-slate-300 hover:bg-slate-800 hover:text-white"
+                    @click="closeMobileMenu"
+                >
+                    AI Connectors
                 </Link>
                 <Link
                     v-if="user.is_admin"

@@ -14,14 +14,18 @@ class ConnectorBlueprintController extends Controller
 {
     public function show(ConnectorBlueprint $blueprint): Response
     {
-        $blueprint->load(['dashboard.company', 'streams', 'connection', 'builderSession']);
+        $blueprint->load(['company', 'dashboard.company', 'streams', 'connections.clientDashboard', 'builderSession']);
 
         return Inertia::render('Admin/Dashboards/Connections/BlueprintShow', [
             'blueprint' => $this->serializeBlueprint($blueprint),
-            'dashboard' => [
+            'dashboard' => $blueprint->dashboard ? [
                 'id' => $blueprint->dashboard->id,
                 'name' => $blueprint->dashboard->name,
                 'company_name' => $blueprint->dashboard->company->name,
+            ] : null,
+            'company' => [
+                'id' => $blueprint->company_id,
+                'name' => $blueprint->company?->name,
             ],
         ]);
     }
@@ -31,8 +35,12 @@ class ConnectorBlueprintController extends Controller
         $session = $blueprint->builderSession;
         $credentials = $session?->pending_credentials ?? [];
 
-        if ($credentials === [] && $blueprint->connection) {
-            $credentials = $blueprint->connection->credentials();
+        if ($credentials === []) {
+            $connection = $blueprint->connections()->latest()->first();
+
+            if ($connection !== null) {
+                $credentials = $connection->credentials();
+            }
         }
 
         if ($credentials === []) {
@@ -53,13 +61,13 @@ class ConnectorBlueprintController extends Controller
 
     public function activate(ConnectorBlueprint $blueprint): RedirectResponse
     {
-        if ($blueprint->connection_id === null) {
-            return back()->with('error', 'Create a connection before activating the blueprint.');
+        if (! $blueprint->connections()->exists()) {
+            return back()->with('error', 'Add at least one dashboard connection before activating this AI connector.');
         }
 
         $blueprint->update(['status' => ConnectorBlueprintStatus::Active]);
 
-        return back()->with('status', 'Blueprint marked as active.');
+        return back()->with('status', 'AI connector marked as active.');
     }
 
     /**
@@ -72,6 +80,7 @@ class ConnectorBlueprintController extends Controller
             'slug' => $blueprint->slug,
             'label' => $blueprint->label,
             'status' => $blueprint->status->value,
+            'is_shared' => $blueprint->isShared(),
             'original_prompt' => $blueprint->original_prompt,
             'auth_config' => $blueprint->auth_config ?? [],
             'credential_schema' => $blueprint->credential_schema ?? [],
@@ -87,12 +96,16 @@ class ConnectorBlueprintController extends Controller
                 'path_template' => $stream->path_template,
                 'enabled' => $stream->enabled,
             ])->values()->all(),
-            'connection' => $blueprint->connection ? [
-                'id' => $blueprint->connection->id,
-                'name' => $blueprint->connection->name,
-                'sync_status' => $blueprint->connection->sync_status->value,
-                'sync_error' => $blueprint->connection->sync_error,
-            ] : null,
+            'connections' => $blueprint->connections->map(fn ($connection) => [
+                'id' => $connection->id,
+                'name' => $connection->name,
+                'sync_status' => $connection->sync_status->value,
+                'sync_error' => $connection->sync_error,
+                'dashboard' => [
+                    'id' => $connection->clientDashboard->id,
+                    'name' => $connection->clientDashboard->name,
+                ],
+            ])->values()->all(),
         ];
     }
 }

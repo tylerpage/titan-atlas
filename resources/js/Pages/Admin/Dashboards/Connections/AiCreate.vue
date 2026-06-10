@@ -195,7 +195,7 @@ const error = computed(() => page.props.flash?.error);
                 Describe the integration you want. The agent will research the API, configure read-only sync streams, and set up dashboard analytics.
             </p>
             <p class="mt-2 text-sm text-amber-800">
-                Connectors are strictly read-only. They can fetch data from external APIs but cannot create, update, or delete records — even if you request it in your prompt.
+                Connectors are strictly read-only. They can fetch data from external APIs but cannot create, update, or delete records — even if you request it in your prompt. POST is only used for authentication or read-style API endpoints.
             </p>
         </div>
 

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AnalyticsReportController as AdminAnalyticsReportController;
 use App\Http\Controllers\Admin\CompanyController as AdminCompanyController;
 use App\Http\Controllers\Admin\ConnectionController as AdminConnectionController;
+use App\Http\Controllers\Admin\AiConnectorController as AdminAiConnectorController;
 use App\Http\Controllers\Admin\ConnectorBlueprintController as AdminConnectorBlueprintController;
 use App\Http\Controllers\Admin\ConnectorBuilderController as AdminConnectorBuilderController;
 use App\Http\Controllers\Admin\CoverPageBlockController as AdminCoverPageBlockController;
@@ -81,6 +82,16 @@ Route::middleware('auth')->group(function () {
         Route::delete('/users/{user}', [AdminUserController::class, 'destroy'])->name('users.destroy');
         Route::post('/users/{user}/password-reset', [UserPasswordResetController::class, 'store'])->name('users.password-reset.store');
 
+        Route::get('/ai-connectors', [AdminAiConnectorController::class, 'index'])->name('ai-connectors.index');
+        Route::get('/companies/{company}/ai-connectors', [AdminAiConnectorController::class, 'companyIndex'])->name('companies.ai-connectors.index');
+        Route::get('/ai-connectors/{blueprint}/edit', [AdminAiConnectorController::class, 'edit'])->name('ai-connectors.edit');
+        Route::post('/ai-connectors/{blueprint}', [AdminAiConnectorController::class, 'update'])->name('ai-connectors.update');
+        Route::delete('/ai-connectors/{blueprint}', [AdminAiConnectorController::class, 'destroy'])->name('ai-connectors.destroy');
+        Route::post('/ai-connectors/{blueprint}/share', [AdminAiConnectorController::class, 'share'])->name('ai-connectors.share');
+        Route::get('/dashboards/{dashboard}/connections/from-template/{blueprint}', [AdminAiConnectorController::class, 'createConnection'])->name('dashboards.connections.from-template');
+        Route::post('/dashboards/{dashboard}/connections/from-template/{blueprint}', [AdminAiConnectorController::class, 'storeConnection'])->name('dashboards.connections.from-template.store');
+        Route::post('/dashboards/{dashboard}/connections/from-template/{blueprint}/test', [AdminAiConnectorController::class, 'testConnection'])->name('dashboards.connections.from-template.test');
+
         Route::get('/dashboards', [AdminDashboardController::class, 'index'])->name('dashboards.index');
         Route::get('/dashboards/create', [AdminDashboardController::class, 'create'])->name('dashboards.create');
         Route::post('/dashboards', [AdminDashboardController::class, 'store'])->name('dashboards.store');
@@ -103,6 +114,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/connections/{connection}/backfill', [AdminConnectionController::class, 'backfill'])->name('connections.backfill');
         Route::post('/connections/{connection}/clear-data', [AdminConnectionController::class, 'clearData'])->name('connections.clear-data');
         Route::get('/connector-blueprints/{blueprint}', [AdminConnectorBlueprintController::class, 'show'])->name('connector-blueprints.show');
+        Route::get('/ai-connectors/{blueprint}', [AdminConnectorBlueprintController::class, 'show'])->name('ai-connectors.show');
         Route::post('/connector-blueprints/{blueprint}/test', [AdminConnectorBlueprintController::class, 'test'])->name('connector-blueprints.test');
         Route::post('/connector-blueprints/{blueprint}/activate', [AdminConnectorBlueprintController::class, 'activate'])->name('connector-blueprints.activate');
         Route::get('/dashboards/{dashboard}/cover-pages', [AdminCoverPageController::class, 'index'])->name('dashboards.cover-pages.index');

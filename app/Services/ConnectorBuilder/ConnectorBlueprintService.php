@@ -30,10 +30,11 @@ class ConnectorBlueprintService
 
         $blueprint = ConnectorBlueprint::query()->updateOrCreate(
             [
-                'client_dashboard_id' => $dashboard->id,
+                'company_id' => $dashboard->company_id,
                 'slug' => $slug,
             ],
             [
+                'client_dashboard_id' => $dashboard->id,
                 'connector_builder_session_id' => $session->id,
                 'label' => (string) ($data['label'] ?? Str::headline($slug)),
                 'status' => ConnectorBlueprintStatus::tryFrom($data['status'] ?? '') ?? ConnectorBlueprintStatus::Draft,
@@ -80,9 +81,10 @@ class ConnectorBlueprintService
                 ],
                 [
                     'resource_type' => (string) ($stream['resource_type'] ?? $streamKey),
-                    'http_method' => $this->readOnlyGuard->enforceHttpMethod($stream['http_method'] ?? null),
+                    'http_method' => $this->readOnlyGuard->normalizeHttpMethod($stream['http_method'] ?? null),
                     'path_template' => (string) ($stream['path_template'] ?? '/'),
                     'query_params' => $stream['query_params'] ?? [],
+                    'request_body' => $stream['request_body'] ?? null,
                     'headers' => $stream['headers'] ?? [],
                     'pagination' => $stream['pagination'] ?? ['type' => 'none'],
                     'response_mapping' => $stream['response_mapping'] ?? [
