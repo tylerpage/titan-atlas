@@ -17,13 +17,13 @@ const props = defineProps({
 
 const form = useForm({
     name: props.blueprint.label,
-    credentials: Object.fromEntries(
-        (props.blueprint.credential_fields ?? []).map((field) => [field.key, '']),
-    ),
+    credentials: {
+        base_url: props.blueprint.sync_config?.base_url ?? '',
+        ...Object.fromEntries(
+            (props.blueprint.credential_fields ?? []).map((field) => [field.key, '']),
+        ),
+    },
 });
-
-const showBaseUrlField = props.blueprint.requires_base_url_per_dashboard
-    || !props.blueprint.sync_config?.base_url;
 
 const testing = ref(false);
 const testStatus = ref(null);
@@ -88,7 +88,7 @@ function submit() {
                 <p><span class="font-medium">Template:</span> {{ blueprint.slug }}</p>
                 <p><span class="font-medium">Status:</span> {{ blueprint.status }}</p>
                 <p><span class="font-medium">Streams:</span> {{ blueprint.streams_count }}</p>
-                <p v-if="blueprint.sync_config?.base_url"><span class="font-medium">Base URL:</span> {{ blueprint.sync_config.base_url }}</p>
+                <p v-if="blueprint.sync_config?.base_url"><span class="font-medium">Template default base URL:</span> {{ blueprint.sync_config.base_url }}</p>
             </div>
 
             <div>
@@ -96,11 +96,11 @@ function submit() {
                 <input id="name" v-model="form.name" required class="w-full rounded-lg border border-slate-300 px-3 py-2" />
             </div>
 
-            <div v-if="showBaseUrlField">
+            <div>
                 <CredentialFieldLabel
                     for-id="credential-base-url"
                     label="API base URL"
-                    help="Root URL for this dashboard's shop or API instance."
+                    help="Your shop or API root URL for this dashboard. Overrides the template default when set."
                 />
                 <input
                     id="credential-base-url"
