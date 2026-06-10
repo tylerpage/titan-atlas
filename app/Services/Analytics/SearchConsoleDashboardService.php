@@ -5,6 +5,7 @@ namespace App\Services\Analytics;
 use App\Enums\DateComparison;
 use App\Models\ClientDashboard;
 use App\Models\Connection;
+use App\Support\ConnectorDataLag;
 use App\Support\DedupedRawPayloadQuery;
 use App\Support\JsonPayloadSql;
 use App\Support\MetricComparison;
@@ -42,6 +43,7 @@ class SearchConsoleDashboardService
 
         return [
             'kind' => 'search_console',
+            'data_lag' => ConnectorDataLag::forConfigKey('search_console', 3),
             'summary' => [
                 'impressions' => $daily['impressions'],
                 'clicks' => $daily['clicks'],

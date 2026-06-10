@@ -1,8 +1,9 @@
 <script setup>
+import { computed, ref } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import AppLayout from '../../../Layouts/AppLayout.vue';
 
-defineProps({
+const props = defineProps({
     users: {
         type: Array,
         required: true,
@@ -16,6 +17,7 @@ defineProps({
 const page = usePage();
 const deleteError = page.props.errors?.user;
 const status = page.props.flash?.status;
+const processingInvitationId = ref(null);
 
 function formatExpiry(isoString) {
     return new Date(isoString).toLocaleDateString(undefined, {
@@ -26,12 +28,57 @@ function formatExpiry(isoString) {
 }
 
 function resendInvitation(companyId, invitationId) {
-    router.post(route('admin.companies.invitations.resend', [companyId, invitationId]));
+    processingInvitationId.value = invitationId;
+
+    router.post(
+        route('admin.companies.invitations.resend', [companyId, invitationId]),
+        {},
+        {
+            preserveScroll: true,
+            onFinish: () => {
+                processingInvitationId.value = null;
+            },
+        },
+    );
+}
+
+function revokeInvitation(companyId, invitationId) {
+    if (!confirm('Revoke this invitation?')) {
+        return;
+    }
+
+    processingInvitationId.value = invitationId;
+
+    router.delete(
+        route('admin.companies.invitations.destroy', [companyId, invitationId]),
+        {
+            preserveScroll: true,
+            onFinish: () => {
+                processingInvitationId.value = null;
+            },
+        },
+    );
 }
 
 function impersonate(userId) {
     router.post(route('admin.impersonate.store', userId));
 }
+
+const tableRows = computed(() => {
+    const invitationRows = props.pendingInvitations.map((invitation) => ({
+        kind: 'invitation',
+        key: `invitation-${invitation.id}`,
+        invitation,
+    }));
+
+    const userRows = props.users.map((user) => ({
+        kind: 'user',
+        key: `user-${user.id}`,
+        user,
+    }));
+
+    return [...invitationRows, ...userRows];
+});
 </script>
 
 <template>
@@ -39,7 +86,7 @@ function impersonate(userId) {
         <div class="mb-8 flex flex-wrap items-center justify-between gap-4">
             <div>
                 <h1 class="text-3xl font-semibold">Users</h1>
-                <p class="mt-2 text-slate-600">Manage accounts, roles, and company access.</p>
+                <p class="mt-2 text-slate-600">Manage accounts, roles, company access, and pending email invitations.</p>
             </div>
             <Link
                 :href="route('admin.users.create')"
@@ -57,56 +104,6 @@ function impersonate(userId) {
             {{ deleteError }}
         </p>
 
-        <section v-if="pendingInvitations.length > 0" class="mb-10">
-            <h2 class="mb-4 text-xl font-semibold">Pending invitations</h2>
-            <p class="mb-4 text-sm text-slate-600">
-                Users who were invited by email but have not accepted yet. Resend to deliver a fresh invitation link.
-            </p>
-            <div class="overflow-hidden rounded-xl border border-slate-200 bg-white">
-                <table class="min-w-full text-sm">
-                    <thead class="bg-slate-50 text-left">
-                        <tr>
-                            <th class="px-4 py-3 font-medium">Email</th>
-                            <th class="px-4 py-3 font-medium">Company</th>
-                            <th class="px-4 py-3 font-medium">Role</th>
-                            <th class="px-4 py-3 font-medium">Expires</th>
-                            <th class="px-4 py-3 font-medium">Status</th>
-                            <th class="px-4 py-3 font-medium">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="invitation in pendingInvitations" :key="invitation.id" class="border-t border-slate-100">
-                            <td class="px-4 py-3">{{ invitation.email }}</td>
-                            <td class="px-4 py-3">
-                                <Link :href="route('admin.companies.show', invitation.company_id)" class="text-primary hover:underline">
-                                    {{ invitation.company_name }}
-                                </Link>
-                            </td>
-                            <td class="px-4 py-3 capitalize">{{ invitation.role }}</td>
-                            <td class="px-4 py-3 text-slate-600">{{ formatExpiry(invitation.expires_at) }}</td>
-                            <td class="px-4 py-3">
-                                <span
-                                    class="rounded-full px-2 py-0.5 text-xs font-medium"
-                                    :class="invitation.is_expired ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'"
-                                >
-                                    {{ invitation.is_expired ? 'Expired' : 'Pending' }}
-                                </span>
-                            </td>
-                            <td class="px-4 py-3">
-                                <button
-                                    type="button"
-                                    class="text-primary hover:underline"
-                                    @click="resendInvitation(invitation.company_id, invitation.id)"
-                                >
-                                    Resend email
-                                </button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </section>
-
         <div class="overflow-hidden rounded-xl border border-slate-200 bg-white">
             <table class="min-w-full text-sm">
                 <thead class="bg-slate-50 text-left">
@@ -115,36 +112,96 @@ function impersonate(userId) {
                         <th class="px-4 py-3 font-medium">Email</th>
                         <th class="px-4 py-3 font-medium">Role</th>
                         <th class="px-4 py-3 font-medium">Companies</th>
+                        <th class="px-4 py-3 font-medium">Status</th>
                         <th class="px-4 py-3 font-medium">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="user in users" :key="user.id" class="border-t border-slate-100">
-                        <td class="px-4 py-3 font-medium">{{ user.name }}</td>
-                        <td class="px-4 py-3 text-slate-600">{{ user.email }}</td>
-                        <td class="px-4 py-3 capitalize">{{ user.role }}</td>
-                        <td class="px-4 py-3 text-slate-600">
-                            <span v-if="user.companies.length === 0">—</span>
-                            <span v-else>{{ user.companies.map((c) => c.name).join(', ') }}</span>
-                        </td>
-                        <td class="px-4 py-3">
-                            <div class="flex flex-wrap gap-3">
-                                <Link :href="route('admin.users.edit', user.id)" class="text-primary hover:underline">
-                                    Edit
-                                </Link>
-                                <button
-                                    v-if="user.role === 'client'"
-                                    type="button"
+                    <tr
+                        v-for="row in tableRows"
+                        :key="row.key"
+                        class="border-t border-slate-100"
+                        :class="row.kind === 'invitation' ? 'bg-slate-50/60' : ''"
+                    >
+                        <template v-if="row.kind === 'user'">
+                            <td class="px-4 py-3 font-medium">{{ row.user.name }}</td>
+                            <td class="px-4 py-3 text-slate-600">{{ row.user.email }}</td>
+                            <td class="px-4 py-3 capitalize">{{ row.user.role }}</td>
+                            <td class="px-4 py-3 text-slate-600">
+                                <span v-if="row.user.companies.length === 0">—</span>
+                                <span v-else>{{ row.user.companies.map((c) => c.name).join(', ') }}</span>
+                            </td>
+                            <td class="px-4 py-3">
+                                <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
+                                    Active
+                                </span>
+                            </td>
+                            <td class="px-4 py-3">
+                                <div class="flex flex-wrap gap-3">
+                                    <Link :href="route('admin.users.edit', row.user.id)" class="text-primary hover:underline">
+                                        Edit
+                                    </Link>
+                                    <button
+                                        v-if="row.user.role === 'client'"
+                                        type="button"
+                                        class="text-primary hover:underline"
+                                        @click="impersonate(row.user.id)"
+                                    >
+                                        Impersonate
+                                    </button>
+                                </div>
+                            </td>
+                        </template>
+
+                        <template v-else>
+                            <td class="px-4 py-3 text-slate-500">—</td>
+                            <td class="px-4 py-3 text-slate-600">{{ row.invitation.email }}</td>
+                            <td class="px-4 py-3 capitalize">{{ row.invitation.role }}</td>
+                            <td class="px-4 py-3 text-slate-600">
+                                <Link
+                                    :href="route('admin.companies.show', row.invitation.company_id)"
                                     class="text-primary hover:underline"
-                                    @click="impersonate(user.id)"
                                 >
-                                    Impersonate
-                                </button>
-                            </div>
-                        </td>
+                                    {{ row.invitation.company_name }}
+                                </Link>
+                            </td>
+                            <td class="px-4 py-3">
+                                <span
+                                    class="rounded-full px-2 py-0.5 text-xs font-medium"
+                                    :class="row.invitation.is_expired ? 'bg-amber-100 text-amber-800' : 'bg-slate-200 text-slate-700'"
+                                >
+                                    {{ row.invitation.is_expired ? 'Invite expired' : 'Invite pending' }}
+                                </span>
+                                <p class="mt-1 text-xs text-slate-500">
+                                    Expires {{ formatExpiry(row.invitation.expires_at) }}
+                                </p>
+                            </td>
+                            <td class="px-4 py-3">
+                                <div class="flex flex-wrap gap-3">
+                                    <button
+                                        type="button"
+                                        class="text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                                        :disabled="processingInvitationId === row.invitation.id"
+                                        @click="resendInvitation(row.invitation.company_id, row.invitation.id)"
+                                    >
+                                        {{ processingInvitationId === row.invitation.id ? 'Sending…' : 'Resend invite' }}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="text-red-700 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                                        :disabled="processingInvitationId === row.invitation.id"
+                                        @click="revokeInvitation(row.invitation.company_id, row.invitation.id)"
+                                    >
+                                        Revoke
+                                    </button>
+                                </div>
+                            </td>
+                        </template>
                     </tr>
-                    <tr v-if="users.length === 0">
-                        <td colspan="5" class="px-4 py-6 text-slate-500">No users yet.</td>
+                    <tr v-if="tableRows.length === 0">
+                        <td colspan="6" class="px-4 py-6 text-slate-500">
+                            No users or pending invitations yet. Invite someone from a company page or add a user directly.
+                        </td>
                     </tr>
                 </tbody>
             </table>

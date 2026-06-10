@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 import { Link } from '@inertiajs/vue3';
+import ConnectorDataLagNotice from './ConnectorDataLagNotice.vue';
 import CoverBarChart from '../CoverBarChart.vue';
 import RevenueLineChart from '../RevenueLineChart.vue';
 
@@ -71,6 +72,26 @@ const opportunities = computed(() => props.connectorData.opportunities ?? {
     striking_distance: [],
     traffic_drop_pages: [],
 });
+
+const lagNoticeItems = computed(() => {
+    const items = [];
+
+    if (props.connectorData.data_lag) {
+        items.push({
+            label: 'Google Analytics 4',
+            ...props.connectorData.data_lag,
+        });
+    }
+
+    if (!props.connectorData.gsc_required && props.connectorData.gsc_data_lag) {
+        items.push({
+            label: 'Search Console',
+            ...props.connectorData.gsc_data_lag,
+        });
+    }
+
+    return items;
+});
 </script>
 
 <template>
@@ -91,6 +112,11 @@ const opportunities = computed(() => props.connectorData.opportunities ?? {
                 Add a Search Console connection in admin
             </Link>
         </div>
+
+        <ConnectorDataLagNotice
+            v-if="lagNoticeItems.length"
+            :items="lagNoticeItems"
+        />
 
         <div class="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">

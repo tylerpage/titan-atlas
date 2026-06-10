@@ -47,6 +47,8 @@ class SearchConsoleDashboardTest extends TestCase
         );
 
         $this->assertSame('search_console', $data['kind']);
+        $this->assertSame(3, $data['data_lag']['days']);
+        $this->assertSame(now()->subDays(3)->toDateString(), $data['data_lag']['complete_through']);
         $this->assertSame(1600.0, $data['summary']['impressions']);
         $this->assertSame(80.0, $data['summary']['clicks']);
         $this->assertSame(5.0, $data['summary']['ctr']);

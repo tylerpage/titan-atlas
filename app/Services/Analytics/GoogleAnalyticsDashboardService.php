@@ -6,6 +6,7 @@ use App\Enums\ConnectorType;
 use App\Enums\DateComparison;
 use App\Models\ClientDashboard;
 use App\Models\Connection;
+use App\Support\ConnectorDataLag;
 use App\Support\DedupedRawPayloadQuery;
 use App\Support\JsonPayloadSql;
 use App\Support\MetricComparison;
@@ -51,6 +52,8 @@ class GoogleAnalyticsDashboardService
 
         return [
             'kind' => 'google_analytics',
+            'data_lag' => ConnectorDataLag::forConfigKey('google_analytics', 2),
+            'gsc_data_lag' => ConnectorDataLag::forConfigKey('search_console', 3),
             'gsc_required' => $gscConnection === null,
             'gsc_connection' => $gscConnection ? [
                 'id' => $gscConnection->id,

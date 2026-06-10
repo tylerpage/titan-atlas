@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue';
+import ConnectorDataLagNotice from './ConnectorDataLagNotice.vue';
 import CoverPieChart from '../CoverPieChart.vue';
 import RevenueLineChart from '../RevenueLineChart.vue';
 
@@ -73,10 +74,26 @@ const summary = computed(() => props.connectorData.summary ?? {
     clicks_change_percent: null,
     ctr_change_percent: null,
 });
+
+const lagNoticeItems = computed(() => {
+    if (!props.connectorData.data_lag) {
+        return [];
+    }
+
+    return [{
+        label: 'Google Search Console',
+        ...props.connectorData.data_lag,
+    }];
+});
 </script>
 
 <template>
     <div>
+        <ConnectorDataLagNotice
+            v-if="lagNoticeItems.length"
+            :items="lagNoticeItems"
+        />
+
         <div class="mb-6 grid gap-4 md:grid-cols-3">
             <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <p class="text-sm text-slate-500">Impressions</p>

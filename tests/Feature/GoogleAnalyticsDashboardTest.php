@@ -70,6 +70,9 @@ class GoogleAnalyticsDashboardTest extends TestCase
         );
 
         $this->assertSame('google_analytics', $data['kind']);
+        $this->assertSame(2, $data['data_lag']['days']);
+        $this->assertSame(now()->subDays(2)->toDateString(), $data['data_lag']['complete_through']);
+        $this->assertSame(3, $data['gsc_data_lag']['days']);
         $this->assertFalse($data['gsc_required']);
         $this->assertSame(1000.0, $data['summary']['visitors']);
         $this->assertSame(600.0, $data['summary']['active_users']);
