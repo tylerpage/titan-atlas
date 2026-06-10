@@ -243,12 +243,12 @@ const error = computed(() => page.props.flash?.error);
                 </div>
 
                 <form class="border-t border-slate-100 p-4" @submit.prevent="submitMessage">
-                    <div class="flex gap-2">
-                        <input
+                    <div class="flex items-end gap-2">
+                        <textarea
                             v-model="form.message"
-                            type="text"
+                            rows="2"
                             :placeholder="isResuming ? 'Describe what you want to change...' : 'Describe the connection you want to build...'"
-                            class="flex-1 rounded-lg border border-slate-300 px-4 py-2 text-sm"
+                            class="flex-1 resize-y rounded-lg border border-slate-300 px-4 py-2 text-sm"
                             :disabled="form.processing"
                             @keydown="handleMessageKeydown"
                         />
