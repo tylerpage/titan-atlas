@@ -57,6 +57,8 @@ class SeoOpportunitiesService
         $siteCtr = $this->siteCtr($connection, $start, $end);
         $ctrThreshold = $siteCtr * $multiplier;
 
+        $impressionsSum = $this->impressionsSumSql();
+
         $rows = DedupedRawPayloadQuery::applyToQueryBuilder(
             DB::table('raw_connector_payloads'),
             $connection->id,
@@ -65,10 +67,10 @@ class SeoOpportunitiesService
             ->whereRaw(JsonPayloadSql::text('payload', 'date') . ' >= ?', [$start->toDateString()])
             ->whereRaw(JsonPayloadSql::text('payload', 'date') . ' <= ?', [$end->toDateString()])
             ->selectRaw(JsonPayloadSql::text('payload', 'keyword') . ' as query')
-            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'impressions') . '), 0) as impressions')
+            ->selectRaw($impressionsSum . ' as impressions')
             ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'clicks') . '), 0) as clicks')
             ->groupByRaw(JsonPayloadSql::text('payload', 'keyword'))
-            ->havingRaw('impressions >= ?', [$minImpressions])
+            ->havingRaw($impressionsSum . ' >= ?', [$minImpressions])
             ->orderByDesc('impressions')
             ->get();
 
@@ -106,6 +108,8 @@ class SeoOpportunitiesService
         $maxPosition = (float) ($config['striking_distance_max'] ?? 10);
         $minImpressions = (float) ($config['min_impressions'] ?? 50);
 
+        $impressionsSum = $this->impressionsSumSql();
+
         $rows = DedupedRawPayloadQuery::applyToQueryBuilder(
             DB::table('raw_connector_payloads'),
             $connection->id,
@@ -114,11 +118,11 @@ class SeoOpportunitiesService
             ->whereRaw(JsonPayloadSql::text('payload', 'date') . ' >= ?', [$start->toDateString()])
             ->whereRaw(JsonPayloadSql::text('payload', 'date') . ' <= ?', [$end->toDateString()])
             ->selectRaw(JsonPayloadSql::text('payload', 'keyword') . ' as query')
-            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'impressions') . '), 0) as impressions')
+            ->selectRaw($impressionsSum . ' as impressions')
             ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'clicks') . '), 0) as clicks')
             ->selectRaw('coalesce(avg(' . JsonPayloadSql::real('payload', 'position') . '), 0) as avg_position')
             ->groupByRaw(JsonPayloadSql::text('payload', 'keyword'))
-            ->havingRaw('impressions >= ?', [$minImpressions])
+            ->havingRaw($impressionsSum . ' >= ?', [$minImpressions])
             ->orderByDesc('impressions')
             ->get();
 
@@ -227,6 +231,11 @@ class SeoOpportunitiesService
         }
 
         return ((float) ($row->clicks ?? 0) / $impressions) * 100;
+    }
+
+    protected function impressionsSumSql(): string
+    {
+        return 'coalesce(sum(' . JsonPayloadSql::real('payload', 'impressions') . '), 0)';
     }
 
     protected function jsonStringValue(mixed $value): ?string

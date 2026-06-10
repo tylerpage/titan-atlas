@@ -156,7 +156,7 @@ class DataQualityService
             ->where('c.client_dashboard_id', $dashboard->id)
             ->select('r.connection_id', 'r.external_id', DB::raw('COUNT(*) AS cnt'))
             ->groupBy('r.connection_id', 'r.external_id')
-            ->having('cnt', '>', 1)
+            ->havingRaw('COUNT(*) > 1')
             ->limit(5)
             ->get();
 
