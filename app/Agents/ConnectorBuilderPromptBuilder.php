@@ -4,6 +4,7 @@ namespace App\Agents;
 
 use App\Support\DynamicConnectorAuth;
 use App\Support\DynamicConnectorReadOnlyGuard;
+use App\Support\JsonPayloadSql;
 
 class ConnectorBuilderPromptBuilder
 {
@@ -17,6 +18,7 @@ class ConnectorBuilderPromptBuilder
         $readOnlyPolicy = $this->readOnlyGuard->agentPolicyBlock();
         $oauthGuidance = DynamicConnectorAuth::agentOAuthGuidance();
         $resumeBlock = $this->resumeBlock($context);
+        $jsonHint = JsonPayloadSql::promptHint();
 
         return <<<PROMPT
 You are {$productName}'s connector builder assistant. Help admins create dynamic REST API connectors for dashboard "{$dashboardName}".
@@ -60,14 +62,29 @@ You are {$productName}'s connector builder assistant. Help admins create dynamic
 - transform_config: { resource_type: { metrics: [{ key, value_path, date_path?, dimensions? }] } }
 - dashboard_spec: { widgets: [{ prompt, sql, visualization_type, visualization_config? }] }
 
+## Dashboard analytics (mandatory after connection is created)
+- NEVER output widget SQL only in chat when ProposeConnectorDashboardTool is available.
+- After CreateDynamicConnectionTool: call ListBlueprintAnalyticsSchemaTool, then ProposeConnectorDashboardTool.
+- Valid visualization_type values ONLY: stat_card, line_chart, table (aliases number/kpi/bar_chart are normalized).
+- SQL rules for dynamic connector widgets:
+  - Query raw_connector_payloads r JOIN connections c ON c.id = r.connection_id
+  - Filter c.client_dashboard_id = :dashboard_id AND r.resource_type = '<exact stream resource_type>'
+  - Optionally filter r.connection_id = :connection_id for the new connection
+  - Include :start_date and :end_date when filtering or grouping by date
+  - {$jsonHint}
+- Use stream resource_type values from the blueprint — never invent names like shopware_order.
+- Zero rows before backfill completes is OK; SQL must still be structurally valid.
+- ProposeConnectorDashboardTool creates analytics reports and a saved dashboard board automatically.
+
 ## Workflow
 1. ResearchConnectorApiTool or use your knowledge
 2. SaveConnectorBlueprintTool
 3. Ask user for credentials; UpdateBlueprintCredentialsTool when provided
 4. TestBlueprintConnectionTool
 5. CreateDynamicConnectionTool
-6. ProposeConnectorDashboardTool (SQL must use :dashboard_id, :start_date, :end_date; query raw_connector_payloads JSON)
-7. RecordDevTasksTool only for true blockers
+6. ListBlueprintAnalyticsSchemaTool
+7. ProposeConnectorDashboardTool
+8. RecordDevTasksTool only for true blockers
 
 Preserve the user's original prompt requirements in dashboard_spec widgets.
 

@@ -5,6 +5,7 @@ namespace App\Ai\Tools\ConnectorBuilder;
 use App\Agents\ConnectorBuilderAgentContext;
 use App\Enums\ConnectorBlueprintStatus;
 use App\Services\ConnectorBuilder\ConnectorBlueprintService;
+use App\Support\ConnectorDashboardVisualization;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Tools\Request;
 use Stringable;
@@ -26,6 +27,11 @@ class SaveConnectorBlueprintTool extends ConnectorBuilderTool
     public function handle(Request $request): Stringable|string
     {
         try {
+            $dashboardSpec = $request->array('dashboard_spec');
+            $dashboardWarnings = $dashboardSpec !== []
+                ? ConnectorDashboardVisualization::validateWidgetSql($dashboardSpec['widgets'] ?? [])
+                : [];
+
             $blueprint = $this->blueprints->upsert(
                 dashboard: $this->context->dashboard,
                 session: $this->context->session,
@@ -38,7 +44,7 @@ class SaveConnectorBlueprintTool extends ConnectorBuilderTool
                     'credential_schema' => $request->array('credential_schema'),
                     'sync_config' => $request->array('sync_config'),
                     'transform_config' => $request->array('transform_config'),
-                    'dashboard_spec' => $request->array('dashboard_spec'),
+                    'dashboard_spec' => $dashboardSpec,
                     'streams' => $request->array('streams'),
                 ],
             );
@@ -51,6 +57,7 @@ class SaveConnectorBlueprintTool extends ConnectorBuilderTool
                 'slug' => $blueprint->slug,
                 'status' => $blueprint->status->value,
                 'stream_count' => $blueprint->streams->count(),
+                'dashboard_spec_warnings' => $dashboardWarnings,
             ]);
         } catch (\Throwable $e) {
             return $this->json([

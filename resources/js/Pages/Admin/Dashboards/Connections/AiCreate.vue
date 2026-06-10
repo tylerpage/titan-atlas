@@ -384,6 +384,29 @@ const error = computed(() => page.props.flash?.error);
                             <p v-if="blueprint.connection" class="text-slate-500">Sync: {{ blueprint.connection.sync_status }}</p>
                         </div>
 
+                        <div v-if="blueprint.dashboard_spec?.widgets?.length" class="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                            <p class="font-medium text-slate-700">Dashboard widgets</p>
+                            <p v-if="blueprint.dashboard_spec.title" class="text-slate-600">{{ blueprint.dashboard_spec.title }}</p>
+                            <ul class="mt-2 space-y-2">
+                                <li v-for="(widget, index) in blueprint.dashboard_spec.widgets" :key="index" class="text-slate-600">
+                                    <span class="font-medium">{{ widget.prompt }}</span>
+                                    <span class="text-slate-500"> · {{ widget.visualization_type }}</span>
+                                </li>
+                            </ul>
+                            <p v-if="blueprint.dashboard_spec.created_report_ids?.length" class="mt-2 text-slate-600">
+                                {{ blueprint.dashboard_spec.created_report_ids.length }} report(s) saved
+                            </p>
+                            <a
+                                v-if="blueprint.dashboard_spec.saved_dashboard_url"
+                                :href="blueprint.dashboard_spec.saved_dashboard_url"
+                                class="mt-2 inline-block text-primary hover:underline"
+                                target="_blank"
+                                rel="noopener"
+                            >
+                                Open saved dashboard{{ blueprint.dashboard_spec.saved_dashboard_title ? `: ${blueprint.dashboard_spec.saved_dashboard_title}` : '' }}
+                            </a>
+                        </div>
+
                         <Link
                             :href="route('admin.connector-blueprints.show', blueprint.id)"
                             class="inline-block text-sm text-primary hover:underline"

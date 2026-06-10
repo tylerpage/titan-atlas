@@ -28,7 +28,7 @@ class ConnectorBuilderController extends Controller
 
         return Inertia::render('Admin/Dashboards/Connections/AiCreate', [
             'dashboard' => $this->serializeDashboard($dashboard),
-            'session' => $session ? $this->serializeSession($session) : null,
+            'session' => $session ? $this->serializeSession($session, $dashboard) : null,
             'isResuming' => $session !== null && (
                 $session->blueprint !== null || $session->messages->isNotEmpty()
             ),
@@ -90,7 +90,7 @@ class ConnectorBuilderController extends Controller
     /**
      * @return array<string, mixed>
      */
-    protected function serializeSession(ConnectorBuilderSession $session): array
+    protected function serializeSession(ConnectorBuilderSession $session, ClientDashboard $dashboard): array
     {
         return [
             'id' => $session->id,
@@ -104,14 +104,14 @@ class ConnectorBuilderController extends Controller
                 'content' => $message->content,
                 'metadata' => $message->metadata,
             ])->values()->all(),
-            'blueprint' => $session->blueprint ? $this->serializeBlueprint($session->blueprint) : null,
+            'blueprint' => $session->blueprint ? $this->serializeBlueprint($session->blueprint, $dashboard) : null,
         ];
     }
 
     /**
      * @return array<string, mixed>
      */
-    protected function serializeBlueprint(ConnectorBlueprint $blueprint): array
+    protected function serializeBlueprint(ConnectorBlueprint $blueprint, ClientDashboard $dashboard): array
     {
         return [
             'id' => $blueprint->id,
@@ -124,7 +124,7 @@ class ConnectorBuilderController extends Controller
             'sync_config' => $blueprint->sync_config ?? [],
             'requires_base_url_per_dashboard' => \App\Support\DynamicConnectorBaseUrl::requiresPerDashboard($blueprint),
             'transform_config' => $blueprint->transform_config ?? [],
-            'dashboard_spec' => $blueprint->dashboard_spec ?? [],
+            'dashboard_spec' => $this->serializeDashboardSpec($blueprint, $dashboard),
             'dev_tasks' => $blueprint->dev_tasks ?? [],
             'streams' => $blueprint->streams->map(fn ($stream) => [
                 'stream_key' => $stream->stream_key,
@@ -145,5 +145,28 @@ class ConnectorBuilderController extends Controller
                 'sync_status' => $item->sync_status->value,
             ])->values()->all(),
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function serializeDashboardSpec(ConnectorBlueprint $blueprint, ClientDashboard $dashboard): array
+    {
+        $spec = $blueprint->dashboard_spec ?? [];
+
+        if ($spec === []) {
+            return [];
+        }
+
+        $savedDashboardId = $spec['saved_dashboard_id'] ?? null;
+
+        if ($savedDashboardId) {
+            $spec['saved_dashboard_url'] = route('client.dashboard.saved.show', [
+                'dashboard' => $dashboard->slug,
+                'board' => $savedDashboardId,
+            ]);
+        }
+
+        return $spec;
     }
 }
