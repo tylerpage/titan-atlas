@@ -549,7 +549,8 @@ function sourceMediumLabel(order) {
             </Transition>
         </Teleport>
 
-        <div class="mb-8 flex flex-wrap items-end justify-between gap-4">
+        <div class="mb-8 flex flex-col gap-3">
+            <div class="flex flex-wrap items-end justify-between gap-4">
             <div>
                 <img
                     v-if="dashboard.logo_url"
@@ -563,13 +564,6 @@ function sourceMediumLabel(order) {
                         {{ dashboard.name }}
                     </h1>
                     <DashboardSyncingBadge :show="dashboard.is_syncing" />
-                    <Link
-                        v-if="isAdmin"
-                        :href="route('admin.dashboards.show', dashboard.id)"
-                        class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
-                    >
-                        Details
-                    </Link>
                 </div>
             </div>
 
@@ -660,6 +654,16 @@ function sourceMediumLabel(order) {
                 >
                     {{ shareButtonLabel }}
                 </button>
+            </div>
+            </div>
+
+            <div v-if="isAdmin">
+                <Link
+                    :href="route('admin.dashboards.show', dashboard.id)"
+                    class="inline-flex rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
+                >
+                    Details
+                </Link>
             </div>
         </div>
 
