@@ -39,6 +39,9 @@ const messages = computed(() => props.session?.messages ?? []);
 const blueprint = computed(() => props.session?.blueprint ?? null);
 const isProcessing = computed(() => props.session?.status === 'processing');
 const isFailed = computed(() => props.session?.status === 'failed');
+const isGlobalBuild = computed(() => (
+    Boolean(props.session?.session_config?.create_as_global) || Boolean(blueprint.value?.is_global)
+));
 
 const credentialFields = computed(() => blueprint.value?.credential_schema ?? []);
 const showBaseUrlField = computed(() => Boolean(blueprint.value));
@@ -264,6 +267,9 @@ const error = computed(() => page.props.flash?.error);
                 </Link>
             </p>
             <h1 class="text-3xl font-semibold">{{ isResuming ? 'Continue AI Connector' : 'New AI Connector' }}</h1>
+            <p v-if="isGlobalBuild" class="mt-2 inline-flex rounded-full bg-violet-100 px-3 py-1 text-xs font-medium text-violet-800">
+                Global connector — available to all companies when ready
+            </p>
             <p class="mt-2 text-sm text-slate-600">
                 <span v-if="isResuming">
                     Keep iterating on this connector. Describe what you want to change and the agent will update the existing blueprint.

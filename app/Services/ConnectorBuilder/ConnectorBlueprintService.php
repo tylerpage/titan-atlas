@@ -35,34 +35,113 @@ class ConnectorBlueprintService
             DynamicConnectorAuth::assertAllowedType((string) $authConfig['type']);
         }
 
-        $blueprint = ConnectorBlueprint::query()->updateOrCreate(
-            [
-                'company_id' => $dashboard->company_id,
-                'slug' => $slug,
-            ],
-            [
-                'client_dashboard_id' => $dashboard->id,
-                'connector_builder_session_id' => $session->id,
-                'label' => (string) ($data['label'] ?? Str::headline($slug)),
-                'status' => ConnectorBlueprintStatus::tryFrom($data['status'] ?? '') ?? ConnectorBlueprintStatus::Draft,
-                'original_prompt' => $data['original_prompt'] ?? $session->title,
-                'auth_config' => $authConfig,
-                'credential_schema' => DynamicConnectorAuth::normalizeCredentialSchema(
-                    is_array($data['credential_schema'] ?? null) ? $data['credential_schema'] : null,
-                    $authConfig,
-                ),
-                'sync_config' => $data['sync_config'] ?? null,
-                'transform_config' => $data['transform_config'] ?? null,
-                'dashboard_spec' => $data['dashboard_spec'] ?? null,
-                'dev_tasks' => $data['dev_tasks'] ?? [],
-            ],
-        );
+        $shouldBeGlobal = $this->shouldBeGlobal($session, $session->blueprint);
+
+        if ($shouldBeGlobal) {
+            $blueprint = $this->upsertGlobalBlueprint($session, $slug, $data, $authConfig);
+        } else {
+            $blueprint = ConnectorBlueprint::query()->updateOrCreate(
+                [
+                    'company_id' => $dashboard->company_id,
+                    'slug' => $slug,
+                ],
+                [
+                    'client_dashboard_id' => $dashboard->id,
+                    'connector_builder_session_id' => $session->id,
+                    'label' => (string) ($data['label'] ?? Str::headline($slug)),
+                    'status' => ConnectorBlueprintStatus::tryFrom($data['status'] ?? '') ?? ConnectorBlueprintStatus::Draft,
+                    'original_prompt' => $data['original_prompt'] ?? $session->title,
+                    'auth_config' => $authConfig,
+                    'credential_schema' => DynamicConnectorAuth::normalizeCredentialSchema(
+                        is_array($data['credential_schema'] ?? null) ? $data['credential_schema'] : null,
+                        $authConfig,
+                    ),
+                    'sync_config' => $data['sync_config'] ?? null,
+                    'transform_config' => $data['transform_config'] ?? null,
+                    'dashboard_spec' => $data['dashboard_spec'] ?? null,
+                    'dev_tasks' => $data['dev_tasks'] ?? [],
+                ],
+            );
+        }
 
         if (isset($data['streams']) && is_array($data['streams'])) {
             $this->syncStreams($blueprint, $this->readOnlyGuard->sanitizeStreams($data['streams']));
         }
 
         return $blueprint->fresh(['streams']);
+    }
+
+    protected function shouldBeGlobal(ConnectorBuilderSession $session, ?ConnectorBlueprint $blueprint): bool
+    {
+        if ($blueprint?->isGlobal()) {
+            return true;
+        }
+
+        return (bool) data_get($session->session_config, 'create_as_global', false);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>|null  $authConfig
+     */
+    protected function upsertGlobalBlueprint(
+        ConnectorBuilderSession $session,
+        string $slug,
+        array $data,
+        ?array $authConfig,
+    ): ConnectorBlueprint {
+        $blueprint = $session->blueprint;
+
+        if ($blueprint === null) {
+            $blueprint = ConnectorBlueprint::query()
+                ->where('is_global', true)
+                ->where('slug', $slug)
+                ->first();
+        }
+
+        $this->assertGlobalSlugAvailable($slug, $blueprint?->id);
+
+        $attributes = [
+            'is_global' => true,
+            'company_id' => null,
+            'client_dashboard_id' => null,
+            'connector_builder_session_id' => $session->id,
+            'label' => (string) ($data['label'] ?? Str::headline($slug)),
+            'status' => ConnectorBlueprintStatus::tryFrom($data['status'] ?? '') ?? ConnectorBlueprintStatus::Draft,
+            'original_prompt' => $data['original_prompt'] ?? $session->title,
+            'auth_config' => $authConfig,
+            'credential_schema' => DynamicConnectorAuth::normalizeCredentialSchema(
+                is_array($data['credential_schema'] ?? null) ? $data['credential_schema'] : null,
+                $authConfig,
+            ),
+            'sync_config' => $data['sync_config'] ?? null,
+            'transform_config' => $data['transform_config'] ?? null,
+            'dashboard_spec' => $data['dashboard_spec'] ?? null,
+            'dev_tasks' => $data['dev_tasks'] ?? [],
+        ];
+
+        if ($blueprint !== null) {
+            $blueprint->update($attributes);
+
+            return $blueprint;
+        }
+
+        return ConnectorBlueprint::query()->create(array_merge(['slug' => $slug], $attributes));
+    }
+
+    protected function assertGlobalSlugAvailable(string $slug, ?int $ignoreId = null): void
+    {
+        $exists = ConnectorBlueprint::query()
+            ->where('is_global', true)
+            ->where('slug', $slug)
+            ->when($ignoreId !== null, fn ($query) => $query->whereKeyNot($ignoreId))
+            ->exists();
+
+        if ($exists) {
+            throw ValidationException::withMessages([
+                'slug' => 'Another global AI connector already uses that slug.',
+            ]);
+        }
     }
 
     /**

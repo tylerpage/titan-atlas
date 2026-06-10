@@ -55,6 +55,12 @@ function shareBlueprintGlobally(blueprintId) {
                     Reusable connector templates shared across dashboards and companies. Each dashboard connection keeps its own credentials.
                 </p>
             </div>
+            <Link
+                :href="route('admin.ai-connectors.create')"
+                class="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
+            >
+                Create AI Connector
+            </Link>
         </div>
 
         <p v-if="status" class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
@@ -82,7 +88,11 @@ function shareBlueprintGlobally(blueprintId) {
         </div>
 
         <div v-if="filteredBlueprints.length === 0" class="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-600">
-            No AI connectors yet. Build one from a dashboard using <strong>New AI Connector</strong>, then share it here.
+            No AI connectors yet.
+            <Link :href="route('admin.ai-connectors.create')" class="font-medium text-primary hover:underline">
+                Create a global AI connector
+            </Link>
+            or build one from a dashboard using <strong>New AI Connector</strong>.
         </div>
 
         <div v-else class="space-y-4">

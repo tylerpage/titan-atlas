@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreAiConnectorConnectionRequest;
+use App\Http\Requests\Admin\StoreGlobalAiConnectorRequest;
 use App\Http\Requests\Admin\TestAiConnectorConnectionRequest;
 use App\Http\Requests\Admin\UpdateAiConnectorRequest;
 use App\Enums\ConnectorType;
@@ -40,6 +41,41 @@ class AiConnectorController extends Controller
             'companies' => $companies,
             'blueprints' => $blueprints,
         ]);
+    }
+
+    public function create(): Response
+    {
+        $dashboards = ClientDashboard::query()
+            ->with('company')
+            ->orderBy('company_id')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (ClientDashboard $dashboard) => [
+                'id' => $dashboard->id,
+                'name' => $dashboard->name,
+                'company_name' => $dashboard->company->name,
+            ]);
+
+        return Inertia::render('Admin/AiConnectors/Create', [
+            'dashboards' => $dashboards,
+            'defaultSandboxDashboardId' => $dashboards->first()['id'] ?? null,
+        ]);
+    }
+
+    public function store(
+        StoreGlobalAiConnectorRequest $request,
+        AiConnectorService $connectors,
+    ): RedirectResponse {
+        $sandboxDashboard = ClientDashboard::query()->findOrFail($request->integer('sandbox_dashboard_id'));
+
+        $session = $connectors->startGlobalBuilder($request->user(), $sandboxDashboard);
+
+        return redirect()
+            ->route('admin.dashboards.connections.ai-create', [
+                'dashboard' => $sandboxDashboard->id,
+                'session' => $session->id,
+            ])
+            ->with('status', 'Describe the API you want to connect. This connector will be global across all companies.');
     }
 
     public function companyIndex(Company $company, AiConnectorService $connectors): Response

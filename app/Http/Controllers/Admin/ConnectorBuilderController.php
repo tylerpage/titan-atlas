@@ -152,6 +152,7 @@ class ConnectorBuilderController extends Controller
             'slug' => $blueprint->slug,
             'label' => $blueprint->label,
             'status' => $blueprint->status->value,
+            'is_global' => $blueprint->isGlobal(),
             'original_prompt' => $blueprint->original_prompt,
             'auth_config' => $blueprint->auth_config ?? [],
             'credential_schema' => $blueprint->credential_schema ?? [],

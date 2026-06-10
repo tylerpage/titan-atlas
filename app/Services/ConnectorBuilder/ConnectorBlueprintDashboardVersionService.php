@@ -207,7 +207,7 @@ class ConnectorBlueprintDashboardVersionService
     {
         if ($blueprint->client_dashboard_id !== null && $blueprint->client_dashboard_id !== $dashboard->id) {
             throw ValidationException::withMessages([
-                'dashboard' => 'This blueprint can only manage dashboards for its owning client dashboard.',
+                'dashboard' => 'Share this AI connector template before building dashboards on other client dashboards.',
             ]);
         }
     }

@@ -40,21 +40,61 @@ class ConnectionController extends Controller
         Connection $connection,
         RebuildConnectorDashboardService $service,
     ): RedirectResponse {
-        $connection->loadMissing('clientDashboard');
+        $connection->loadMissing(['clientDashboard', 'connectorBlueprint']);
+
+        $layouts = app(\App\Services\ConnectorBuilder\ConnectorBlueprintDashboardVersionService::class);
+        $hadLayout = $connection->connectorBlueprint !== null
+            && $layouts->currentSpec($connection->connectorBlueprint, $connection->clientDashboard) !== null;
 
         try {
             $result = $service->rebuild($connection, request()->user());
         } catch (\Illuminate\Validation\ValidationException $e) {
-            return back()->withErrors($e->errors());
+            $message = collect($e->errors())->flatten()->first() ?? 'Could not build connector dashboard.';
+
+            return back()
+                ->withErrors($e->errors())
+                ->with('error', $message);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return back()
+                ->withErrors(['dashboard' => $e->getMessage()])
+                ->with('error', $e->getMessage());
         }
 
         if (! ($result['success'] ?? false)) {
-            return back()->withErrors([
-                'dashboard' => $result['error'] ?? 'Could not rebuild connector dashboard.',
-            ]);
+            $message = $this->rebuildFailureMessage($result);
+
+            return back()
+                ->withErrors(['dashboard' => $message])
+                ->with('error', $message);
         }
 
-        return back()->with('status', 'Connector dashboard rebuilt with corrected widget SQL.');
+        return back()->with(
+            'status',
+            $hadLayout
+                ? 'Connector dashboard rebuilt with corrected widget SQL.'
+                : 'Connector dashboard built for this client dashboard.',
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $result
+     */
+    protected function rebuildFailureMessage(array $result): string
+    {
+        $message = (string) ($result['error'] ?? 'Could not build connector dashboard.');
+
+        $firstWidgetError = collect($result['errors'] ?? [])
+            ->pluck('error')
+            ->filter()
+            ->first();
+
+        if (is_string($firstWidgetError) && $firstWidgetError !== '') {
+            $message .= ' '.$firstWidgetError;
+        }
+
+        return trim($message);
     }
 
     public function edit(Connection $connection): Response

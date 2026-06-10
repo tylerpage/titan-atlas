@@ -11,7 +11,10 @@ const props = defineProps({
 });
 
 const page = usePage();
+const rebuildForm = useForm({});
 const status = computed(() => page.props.flash?.status);
+const flashError = computed(() => page.props.flash?.error);
+const dashboardError = computed(() => page.props.errors?.dashboard ?? rebuildForm.errors.dashboard);
 
 function syncConnection() {
     router.post(route('admin.connections.sync', props.connection.id));
@@ -28,8 +31,6 @@ function clearConnectionData() {
 
     router.post(route('admin.connections.clear-data', props.connection.id));
 }
-
-const rebuildForm = useForm({});
 
 const showConnectorDashboardSection = computed(() => (
     props.connection.connector_type === 'dynamic' && props.connection.connector_blueprint
@@ -48,7 +49,9 @@ function rebuildDashboard() {
         return;
     }
 
-    rebuildForm.post(route('admin.connections.rebuild-dashboard', props.connection.id));
+    rebuildForm.post(route('admin.connections.rebuild-dashboard', props.connection.id), {
+        preserveScroll: true,
+    });
 }
 
 function formatDateTime(isoString) {
@@ -146,6 +149,10 @@ function formatDateTime(isoString) {
 
         <p v-if="status" class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
             {{ status }}
+        </p>
+
+        <p v-if="flashError || dashboardError" class="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            {{ dashboardError || flashError }}
         </p>
 
         <section

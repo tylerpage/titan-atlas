@@ -3,9 +3,12 @@
 namespace App\Services\ConnectorBuilder;
 
 use App\Enums\ConnectorBlueprintStatus;
+use App\Enums\ConnectorBuilderSessionStatus;
 use App\Models\ClientDashboard;
 use App\Models\Company;
 use App\Models\ConnectorBlueprint;
+use App\Models\ConnectorBuilderSession;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -99,6 +102,19 @@ class AiConnectorService
         return $blueprint->fresh(['streams', 'connections', 'dashboard', 'company']);
     }
 
+    public function startGlobalBuilder(User $user, ClientDashboard $sandboxDashboard): ConnectorBuilderSession
+    {
+        return ConnectorBuilderSession::query()->create([
+            'client_dashboard_id' => $sandboxDashboard->id,
+            'user_id' => $user->id,
+            'status' => ConnectorBuilderSessionStatus::Active,
+            'title' => 'Global AI Connector',
+            'session_config' => [
+                'create_as_global' => true,
+            ],
+        ]);
+    }
+
     public function share(ConnectorBlueprint $blueprint): ConnectorBlueprint
     {
         $blueprint->update([
@@ -117,6 +133,7 @@ class AiConnectorService
 
         $blueprint->update([
             'is_global' => true,
+            'company_id' => null,
             'client_dashboard_id' => null,
             'status' => $blueprint->status === ConnectorBlueprintStatus::Draft
                 ? ConnectorBlueprintStatus::Ready

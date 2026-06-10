@@ -83,6 +83,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/users/{user}/password-reset', [UserPasswordResetController::class, 'store'])->name('users.password-reset.store');
 
         Route::get('/ai-connectors', [AdminAiConnectorController::class, 'index'])->name('ai-connectors.index');
+        Route::get('/ai-connectors/create', [AdminAiConnectorController::class, 'create'])->name('ai-connectors.create');
+        Route::post('/ai-connectors', [AdminAiConnectorController::class, 'store'])->name('ai-connectors.store');
         Route::get('/companies/{company}/ai-connectors', [AdminAiConnectorController::class, 'companyIndex'])->name('companies.ai-connectors.index');
         Route::get('/ai-connectors/{blueprint}/edit', [AdminAiConnectorController::class, 'edit'])->name('ai-connectors.edit');
         Route::post('/ai-connectors/{blueprint}', [AdminAiConnectorController::class, 'update'])->name('ai-connectors.update');
