@@ -8,6 +8,7 @@ use App\Models\Connection;
 use App\Models\MetricSnapshot;
 use App\Models\RawConnectorPayload;
 use App\Support\DedupedRawPayloadQuery;
+use App\Support\JsonPayloadSql;
 use App\Support\MetricComparison;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -102,12 +103,12 @@ class CommerceDashboardService
             $connection->id,
             'order',
         )
-            ->whereRaw("json_extract(payload, '$.date') >= ?", [$start->toDateString()])
-            ->whereRaw("json_extract(payload, '$.date') <= ?", [$end->toDateString()])
-            ->selectRaw("json_extract(payload, '$.date') as date")
+            ->whereRaw(JsonPayloadSql::text('payload', 'date') . ' >= ?', [$start->toDateString()])
+            ->whereRaw(JsonPayloadSql::text('payload', 'date') . ' <= ?', [$end->toDateString()])
+            ->selectRaw(JsonPayloadSql::text('payload', 'date') . ' as date')
             ->selectRaw('count(*) as orders')
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.total') as real)), 0) as revenue")
-            ->groupByRaw("json_extract(payload, '$.date')")
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'total') . '), 0) as revenue')
+            ->groupByRaw(JsonPayloadSql::text('payload', 'date'))
             ->orderBy('date')
             ->get();
 
@@ -177,9 +178,9 @@ class CommerceDashboardService
             $connection->id,
             'order',
         )
-            ->whereRaw("json_extract(payload, '$.date') >= ?", [$start->toDateString()])
-            ->whereRaw("json_extract(payload, '$.date') <= ?", [$end->toDateString()])
-            ->orderByRaw("json_extract(payload, '$.date') DESC")
+            ->whereRaw(JsonPayloadSql::text('payload', 'date') . ' >= ?', [$start->toDateString()])
+            ->whereRaw(JsonPayloadSql::text('payload', 'date') . ' <= ?', [$end->toDateString()])
+            ->orderByRaw(JsonPayloadSql::text('payload', 'date') . ' DESC')
             ->limit($pageSize)
             ->get()
             ->map(function (RawConnectorPayload $row) {
@@ -212,15 +213,15 @@ class CommerceDashboardService
             $connection->id,
             'order_line_item',
         )
-            ->whereRaw("json_extract(payload, '$.date') >= ?", [$start->toDateString()])
-            ->whereRaw("json_extract(payload, '$.date') <= ?", [$end->toDateString()])
-            ->selectRaw("coalesce(nullif(json_extract(payload, '$.sku'), ''), json_extract(payload, '$.name')) as product_key")
-            ->selectRaw("json_extract(payload, '$.sku') as sku")
-            ->selectRaw("json_extract(payload, '$.name') as name")
-            ->selectRaw("json_extract(payload, '$.image_url') as image_url")
-            ->selectRaw("sum(cast(json_extract(payload, '$.quantity') as real)) as units_sold")
-            ->selectRaw("sum(cast(json_extract(payload, '$.line_total') as real)) as revenue")
-            ->groupByRaw("product_key, json_extract(payload, '$.sku'), json_extract(payload, '$.name'), json_extract(payload, '$.image_url')")
+            ->whereRaw(JsonPayloadSql::text('payload', 'date') . ' >= ?', [$start->toDateString()])
+            ->whereRaw(JsonPayloadSql::text('payload', 'date') . ' <= ?', [$end->toDateString()])
+            ->selectRaw('coalesce(nullif(' . JsonPayloadSql::text('payload', 'sku') . ", ''), " . JsonPayloadSql::text('payload', 'name') . ') as product_key')
+            ->selectRaw(JsonPayloadSql::text('payload', 'sku') . ' as sku')
+            ->selectRaw(JsonPayloadSql::text('payload', 'name') . ' as name')
+            ->selectRaw(JsonPayloadSql::text('payload', 'image_url') . ' as image_url')
+            ->selectRaw('sum(' . JsonPayloadSql::real('payload', 'quantity') . ') as units_sold')
+            ->selectRaw('sum(' . JsonPayloadSql::real('payload', 'line_total') . ') as revenue')
+            ->groupByRaw('product_key, ' . JsonPayloadSql::text('payload', 'sku') . ', ' . JsonPayloadSql::text('payload', 'name') . ', ' . JsonPayloadSql::text('payload', 'image_url'))
             ->orderByDesc('revenue')
             ->limit($limit)
             ->get();
@@ -265,10 +266,10 @@ class CommerceDashboardService
             $connection->id,
             'session_attribution',
         )
-            ->whereRaw("json_extract(payload, '$.date') >= ?", [$start->toDateString()])
-            ->whereRaw("json_extract(payload, '$.date') <= ?", [$end->toDateString()])
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.sessions') as real)), 0) as sessions")
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.visitors') as real)), 0) as visitors")
+            ->whereRaw(JsonPayloadSql::text('payload', 'date') . ' >= ?', [$start->toDateString()])
+            ->whereRaw(JsonPayloadSql::text('payload', 'date') . ' <= ?', [$end->toDateString()])
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'sessions') . '), 0) as sessions')
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'visitors') . '), 0) as visitors')
             ->first();
 
         return [
@@ -287,16 +288,16 @@ class CommerceDashboardService
             $connection->id,
             'session_attribution',
         )
-            ->whereRaw("json_extract(payload, '$.date') >= ?", [$start->toDateString()])
-            ->whereRaw("json_extract(payload, '$.date') <= ?", [$end->toDateString()])
-            ->selectRaw("json_extract(payload, '$.source_medium') as source_medium")
-            ->selectRaw("json_extract(payload, '$.source') as source")
-            ->selectRaw("json_extract(payload, '$.medium') as medium")
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.sessions') as real)), 0) as sessions")
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.visitors') as real)), 0) as visitors")
-            ->groupByRaw("json_extract(payload, '$.source_medium')")
-            ->groupByRaw("json_extract(payload, '$.source')")
-            ->groupByRaw("json_extract(payload, '$.medium')")
+            ->whereRaw(JsonPayloadSql::text('payload', 'date') . ' >= ?', [$start->toDateString()])
+            ->whereRaw(JsonPayloadSql::text('payload', 'date') . ' <= ?', [$end->toDateString()])
+            ->selectRaw(JsonPayloadSql::text('payload', 'source_medium') . ' as source_medium')
+            ->selectRaw(JsonPayloadSql::text('payload', 'source') . ' as source')
+            ->selectRaw(JsonPayloadSql::text('payload', 'medium') . ' as medium')
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'sessions') . '), 0) as sessions')
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'visitors') . '), 0) as visitors')
+            ->groupByRaw(JsonPayloadSql::text('payload', 'source_medium'))
+            ->groupByRaw(JsonPayloadSql::text('payload', 'source'))
+            ->groupByRaw(JsonPayloadSql::text('payload', 'medium'))
             ->orderByDesc('sessions')
             ->get()
             ->map(fn ($row) => [

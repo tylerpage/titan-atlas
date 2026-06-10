@@ -4,6 +4,7 @@ namespace App\Services\Analytics;
 
 use App\Enums\SyncStatus;
 use App\Models\ClientDashboard;
+use App\Support\JsonPayloadSql;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -109,8 +110,8 @@ class DataQualityService
             ->join('connections as c', 'c.id', '=', 'r.connection_id')
             ->where('c.client_dashboard_id', $dashboard->id)
             ->where('r.resource_type', 'order')
-            ->whereRaw("json_extract(r.payload, '$.date') BETWEEN ? AND ?", [$start->toDateString(), $end->toDateString()])
-            ->selectRaw("json_extract(r.payload, '$.date') AS day, COUNT(*) AS cnt")
+            ->whereRaw(JsonPayloadSql::text('r.payload', 'date') . ' BETWEEN ? AND ?', [$start->toDateString(), $end->toDateString()])
+            ->selectRaw(JsonPayloadSql::text('r.payload', 'date') . ' AS day, COUNT(*) AS cnt')
             ->groupBy('day')
             ->pluck('cnt', 'day');
 
@@ -188,9 +189,9 @@ class DataQualityService
             ->join('connections as c', 'c.id', '=', 'r.connection_id')
             ->where('c.client_dashboard_id', $dashboard->id)
             ->where('r.resource_type', 'order')
-            ->whereRaw("json_extract(r.payload, '$.date') BETWEEN ? AND ?", [$start->toDateString(), $end->toDateString()])
+            ->whereRaw(JsonPayloadSql::text('r.payload', 'date') . ' BETWEEN ? AND ?', [$start->toDateString(), $end->toDateString()])
             ->selectRaw('COUNT(*) AS total')
-            ->selectRaw("SUM(CASE WHEN CAST(json_extract(r.payload, '$.total') AS REAL) = 0 OR json_extract(r.payload, '$.total') IS NULL THEN 1 ELSE 0 END) AS zero_count")
+            ->selectRaw('SUM(CASE WHEN ' . JsonPayloadSql::real('r.payload', 'total') . ' = 0 OR ' . JsonPayloadSql::text('r.payload', 'total') . ' IS NULL THEN 1 ELSE 0 END) AS zero_count')
             ->first();
 
         $total = (int) ($stats->total ?? 0);
@@ -268,7 +269,7 @@ class DataQualityService
             ->join('connections as c', 'c.id', '=', 'r.connection_id')
             ->where('c.client_dashboard_id', $dashboard->id)
             ->where('r.resource_type', 'order')
-            ->whereRaw("json_extract(r.payload, '$.date') BETWEEN ? AND ?", [$start->toDateString(), $end->toDateString()])
+            ->whereRaw(JsonPayloadSql::text('r.payload', 'date') . ' BETWEEN ? AND ?', [$start->toDateString(), $end->toDateString()])
             ->count();
     }
 }

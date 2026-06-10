@@ -6,6 +6,7 @@ use App\Enums\DateComparison;
 use App\Models\ClientDashboard;
 use App\Models\Connection;
 use App\Support\DedupedRawPayloadQuery;
+use App\Support\JsonPayloadSql;
 use App\Support\MetricComparison;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -112,16 +113,16 @@ class StackAdaptDashboardService
             $connection->id,
             'spend_daily',
         )
-            ->whereRaw("json_extract(payload, '$.date') >= ?", [$start->toDateString()])
-            ->whereRaw("json_extract(payload, '$.date') <= ?", [$end->toDateString()])
-            ->selectRaw("json_extract(payload, '$.date') as date")
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.cost') as real)), 0) as cost")
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.impressions') as real)), 0) as impressions")
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.clicks') as real)), 0) as clicks")
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.conversions') as real)), 0) as conversions")
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.conversions_value') as real)), 0) as conversions_value")
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.secondary_conversions') as real)), 0) as secondary_conversions")
-            ->groupByRaw("json_extract(payload, '$.date')")
+            ->whereRaw(JsonPayloadSql::text('payload', 'date') . ' >= ?', [$start->toDateString()])
+            ->whereRaw(JsonPayloadSql::text('payload', 'date') . ' <= ?', [$end->toDateString()])
+            ->selectRaw(JsonPayloadSql::text('payload', 'date') . ' as date')
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'cost') . '), 0) as cost')
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'impressions') . '), 0) as impressions')
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'clicks') . '), 0) as clicks')
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'conversions') . '), 0) as conversions')
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'conversions_value') . '), 0) as conversions_value')
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'secondary_conversions') . '), 0) as secondary_conversions')
+            ->groupByRaw(JsonPayloadSql::text('payload', 'date'))
             ->orderBy('date')
             ->get();
 
@@ -210,17 +211,17 @@ class StackAdaptDashboardService
             $connection->id,
             'channel_daily',
         )
-            ->whereRaw("json_extract(payload, '$.date') >= ?", [$start->toDateString()])
-            ->whereRaw("json_extract(payload, '$.date') <= ?", [$end->toDateString()])
-            ->selectRaw("json_extract(payload, '$.channel_type') as channel_type")
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.cost') as real)), 0) as cost")
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.impressions') as real)), 0) as impressions")
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.clicks') as real)), 0) as clicks")
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.conversions') as real)), 0) as conversions")
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.conversions_value') as real)), 0) as conversions_value")
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.video_starts') as real)), 0) as video_starts")
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.audio_starts') as real)), 0) as audio_starts")
-            ->groupByRaw("json_extract(payload, '$.channel_type')")
+            ->whereRaw(JsonPayloadSql::text('payload', 'date') . ' >= ?', [$start->toDateString()])
+            ->whereRaw(JsonPayloadSql::text('payload', 'date') . ' <= ?', [$end->toDateString()])
+            ->selectRaw(JsonPayloadSql::text('payload', 'channel_type') . ' as channel_type')
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'cost') . '), 0) as cost')
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'impressions') . '), 0) as impressions')
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'clicks') . '), 0) as clicks')
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'conversions') . '), 0) as conversions')
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'conversions_value') . '), 0) as conversions_value')
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'video_starts') . '), 0) as video_starts')
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'audio_starts') . '), 0) as audio_starts')
+            ->groupByRaw(JsonPayloadSql::text('payload', 'channel_type'))
             ->orderByDesc('cost')
             ->limit($limit)
             ->get();
@@ -285,18 +286,18 @@ class StackAdaptDashboardService
             $connection->id,
             'campaign_daily',
         )
-            ->whereRaw("json_extract(payload, '$.date') >= ?", [$start->toDateString()])
-            ->whereRaw("json_extract(payload, '$.date') <= ?", [$end->toDateString()])
-            ->selectRaw("json_extract(payload, '$.campaign_id') as campaign_id")
-            ->selectRaw("max(json_extract(payload, '$.campaign_name')) as campaign_name")
-            ->selectRaw("max(json_extract(payload, '$.campaign_group_name')) as campaign_group_name")
-            ->selectRaw("max(json_extract(payload, '$.channel_type')) as channel_type")
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.cost') as real)), 0) as cost")
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.impressions') as real)), 0) as impressions")
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.clicks') as real)), 0) as clicks")
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.conversions') as real)), 0) as conversions")
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.conversions_value') as real)), 0) as conversions_value")
-            ->groupByRaw("json_extract(payload, '$.campaign_id')")
+            ->whereRaw(JsonPayloadSql::text('payload', 'date') . ' >= ?', [$start->toDateString()])
+            ->whereRaw(JsonPayloadSql::text('payload', 'date') . ' <= ?', [$end->toDateString()])
+            ->selectRaw(JsonPayloadSql::text('payload', 'campaign_id') . ' as campaign_id')
+            ->selectRaw('max(' . JsonPayloadSql::text('payload', 'campaign_name') . ') as campaign_name')
+            ->selectRaw('max(' . JsonPayloadSql::text('payload', 'campaign_group_name') . ') as campaign_group_name')
+            ->selectRaw('max(' . JsonPayloadSql::text('payload', 'channel_type') . ') as channel_type')
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'cost') . '), 0) as cost')
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'impressions') . '), 0) as impressions')
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'clicks') . '), 0) as clicks')
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'conversions') . '), 0) as conversions')
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'conversions_value') . '), 0) as conversions_value')
+            ->groupByRaw(JsonPayloadSql::text('payload', 'campaign_id'))
             ->orderByDesc('cost')
             ->limit($limit)
             ->get();
@@ -341,15 +342,15 @@ class StackAdaptDashboardService
             $connection->id,
             $resourceType,
         )
-            ->whereRaw("json_extract(payload, '$.date') >= ?", [$start->toDateString()])
-            ->whereRaw("json_extract(payload, '$.date') <= ?", [$end->toDateString()])
-            ->selectRaw("json_extract(payload, '$.dimension_key') as dimension_key")
-            ->selectRaw("max(json_extract(payload, '$.dimension_label')) as dimension_label")
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.cost') as real)), 0) as cost")
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.impressions') as real)), 0) as impressions")
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.clicks') as real)), 0) as clicks")
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.conversions') as real)), 0) as conversions")
-            ->groupByRaw("json_extract(payload, '$.dimension_key')")
+            ->whereRaw(JsonPayloadSql::text('payload', 'date') . ' >= ?', [$start->toDateString()])
+            ->whereRaw(JsonPayloadSql::text('payload', 'date') . ' <= ?', [$end->toDateString()])
+            ->selectRaw(JsonPayloadSql::text('payload', 'dimension_key') . ' as dimension_key')
+            ->selectRaw('max(' . JsonPayloadSql::text('payload', 'dimension_label') . ') as dimension_label')
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'cost') . '), 0) as cost')
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'impressions') . '), 0) as impressions')
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'clicks') . '), 0) as clicks')
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'conversions') . '), 0) as conversions')
+            ->groupByRaw(JsonPayloadSql::text('payload', 'dimension_key'))
             ->orderByDesc('cost')
             ->limit($limit)
             ->get();

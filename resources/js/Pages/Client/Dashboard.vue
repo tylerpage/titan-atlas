@@ -496,6 +496,15 @@ function sourceMediumLabel(order) {
 
 <template>
     <AppLayout :title="dashboard.name">
+        <template #top>
+            <div
+                v-if="isNavigating && isDataTab"
+                class="relative left-1/2 -mt-8 mb-8 w-screen max-w-none -translate-x-1/2 border-b border-slate-200 bg-slate-50 px-6 py-2.5 text-center text-sm text-slate-600"
+            >
+                Updating dashboard…
+            </div>
+        </template>
+
         <div class="mb-8 flex flex-wrap items-end justify-between gap-4">
             <div class="flex items-center gap-4">
                 <img
@@ -514,8 +523,6 @@ function sourceMediumLabel(order) {
                     </div>
                 </div>
             </div>
-
-            <p v-if="isNavigating && isDataTab" class="mb-4 text-sm text-slate-500">Updating dashboard…</p>
 
             <form v-if="showTabFilters" class="flex flex-wrap items-end gap-3" @submit.prevent="applyFilters">
                 <div>

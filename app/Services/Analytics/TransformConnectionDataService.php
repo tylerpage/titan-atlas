@@ -6,6 +6,7 @@ use App\Models\Connection;
 use App\Models\MetricSnapshot;
 use App\Models\RawConnectorPayload;
 use App\Support\DedupedRawPayloadQuery;
+use App\Support\JsonPayloadSql;
 use App\Support\MetricDimensions;
 use Carbon\Carbon;
 
@@ -26,7 +27,7 @@ class TransformConnectionDataService
 
         MetricSnapshot::query()
             ->where('client_dashboard_id', $dashboard->id)
-            ->whereRaw("json_extract(dimensions, '$.connection_id') = ?", [$connectionId])
+            ->whereRaw(JsonPayloadSql::text('dimensions', 'connection_id') . ' = ?', [$connectionId])
             ->delete();
 
         $written = 0;

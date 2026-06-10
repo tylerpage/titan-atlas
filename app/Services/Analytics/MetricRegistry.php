@@ -3,6 +3,7 @@
 namespace App\Services\Analytics;
 
 use App\Enums\ReportVisualizationType;
+use App\Support\JsonPayloadSql;
 use App\Models\ClientDashboard;
 use App\Models\MetricDefinition;
 use App\Models\User;
@@ -107,6 +108,8 @@ class MetricRegistry
     public function ensureBuiltins(): void
     {
         foreach ($this->builtinDefinitions() as $definition) {
+            $definition['sql_template'] = JsonPayloadSql::normalizeSql($definition['sql_template']);
+
             MetricDefinition::query()->updateOrCreate(
                 [
                     'slug' => $definition['slug'],

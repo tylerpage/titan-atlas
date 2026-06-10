@@ -2,6 +2,7 @@
 
 namespace App\Services\Analytics;
 
+use App\Support\JsonPayloadSql;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -27,6 +28,8 @@ class ReportQueryExecutor
      */
     public function execute(string $sql, ReportQueryContext $context): array
     {
+        $sql = JsonPayloadSql::normalizeSql($sql);
+
         $this->validate($sql);
 
         $maxRows = (int) config('titan.reporting.max_rows', 500);

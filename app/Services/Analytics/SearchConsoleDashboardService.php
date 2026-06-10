@@ -6,6 +6,7 @@ use App\Enums\DateComparison;
 use App\Models\ClientDashboard;
 use App\Models\Connection;
 use App\Support\DedupedRawPayloadQuery;
+use App\Support\JsonPayloadSql;
 use App\Support\MetricComparison;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -86,12 +87,12 @@ class SearchConsoleDashboardService
             $connection->id,
             'search_daily',
         )
-            ->whereRaw("json_extract(payload, '$.date') >= ?", [$start->toDateString()])
-            ->whereRaw("json_extract(payload, '$.date') <= ?", [$end->toDateString()])
-            ->selectRaw("json_extract(payload, '$.date') as date")
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.impressions') as real)), 0) as impressions")
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.clicks') as real)), 0) as clicks")
-            ->groupByRaw("json_extract(payload, '$.date')")
+            ->whereRaw(JsonPayloadSql::text('payload', 'date') . ' >= ?', [$start->toDateString()])
+            ->whereRaw(JsonPayloadSql::text('payload', 'date') . ' <= ?', [$end->toDateString()])
+            ->selectRaw(JsonPayloadSql::text('payload', 'date') . ' as date')
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'impressions') . '), 0) as impressions')
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'clicks') . '), 0) as clicks')
+            ->groupByRaw(JsonPayloadSql::text('payload', 'date'))
             ->orderBy('date')
             ->get();
 
@@ -138,11 +139,11 @@ class SearchConsoleDashboardService
             $connection->id,
             'search_device',
         )
-            ->whereRaw("json_extract(payload, '$.date') >= ?", [$start->toDateString()])
-            ->whereRaw("json_extract(payload, '$.date') <= ?", [$end->toDateString()])
-            ->selectRaw("json_extract(payload, '$.device') as device")
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.clicks') as real)), 0) as clicks")
-            ->groupByRaw("json_extract(payload, '$.device')")
+            ->whereRaw(JsonPayloadSql::text('payload', 'date') . ' >= ?', [$start->toDateString()])
+            ->whereRaw(JsonPayloadSql::text('payload', 'date') . ' <= ?', [$end->toDateString()])
+            ->selectRaw(JsonPayloadSql::text('payload', 'device') . ' as device')
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'clicks') . '), 0) as clicks')
+            ->groupByRaw(JsonPayloadSql::text('payload', 'device'))
             ->orderByDesc('clicks')
             ->get();
 
@@ -179,12 +180,12 @@ class SearchConsoleDashboardService
             $connection->id,
             'keyword',
         )
-            ->whereRaw("json_extract(payload, '$.date') >= ?", [$start->toDateString()])
-            ->whereRaw("json_extract(payload, '$.date') <= ?", [$end->toDateString()])
-            ->selectRaw("json_extract(payload, '$.keyword') as query")
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.impressions') as real)), 0) as impressions")
-            ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.clicks') as real)), 0) as clicks")
-            ->groupByRaw("json_extract(payload, '$.keyword')")
+            ->whereRaw(JsonPayloadSql::text('payload', 'date') . ' >= ?', [$start->toDateString()])
+            ->whereRaw(JsonPayloadSql::text('payload', 'date') . ' <= ?', [$end->toDateString()])
+            ->selectRaw(JsonPayloadSql::text('payload', 'keyword') . ' as query')
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'impressions') . '), 0) as impressions')
+            ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'clicks') . '), 0) as clicks')
+            ->groupByRaw(JsonPayloadSql::text('payload', 'keyword'))
             ->orderByDesc('impressions')
             ->limit($limit)
             ->get();
@@ -197,11 +198,11 @@ class SearchConsoleDashboardService
                 $connection->id,
                 'keyword',
             )
-                ->whereRaw("json_extract(payload, '$.date') >= ?", [$comparisonRange[0]->toDateString()])
-                ->whereRaw("json_extract(payload, '$.date') <= ?", [$comparisonRange[1]->toDateString()])
-                ->selectRaw("json_extract(payload, '$.keyword') as query")
-                ->selectRaw("coalesce(sum(cast(json_extract(payload, '$.impressions') as real)), 0) as impressions")
-                ->groupByRaw("json_extract(payload, '$.keyword')")
+                ->whereRaw(JsonPayloadSql::text('payload', 'date') . ' >= ?', [$comparisonRange[0]->toDateString()])
+                ->whereRaw(JsonPayloadSql::text('payload', 'date') . ' <= ?', [$comparisonRange[1]->toDateString()])
+                ->selectRaw(JsonPayloadSql::text('payload', 'keyword') . ' as query')
+                ->selectRaw('coalesce(sum(' . JsonPayloadSql::real('payload', 'impressions') . '), 0) as impressions')
+                ->groupByRaw(JsonPayloadSql::text('payload', 'keyword'))
                 ->get()
                 ->mapWithKeys(fn ($row) => [
                     $this->jsonStringValue($row->query) => (float) $row->impressions,

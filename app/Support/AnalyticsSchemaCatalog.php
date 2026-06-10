@@ -48,10 +48,9 @@ class AnalyticsSchemaCatalog
             'notes' => [
                 'Commerce order data is in raw_connector_payloads with resource_type = order.',
                 'Order line items use resource_type = order_line_item (one row per product line, external_id order_id:line_item_id).',
-                'Use json_extract(payload, \'$.date\') for order dates and json_extract(payload, \'$.total\') for revenue.',
+                JsonPayloadSql::promptHint(),
                 'metric_snapshots may have multiple rows per date+metric_key with different dimension_hash values. Filter dimensions explicitly or GROUP BY to avoid double-counting.',
                 'All queries MUST be SELECT only and MUST filter by client_dashboard_id via connections or metric_snapshots.',
-                config('app.name', 'Atlas').' executes SQLite syntax. Warehouse dialects (Snowflake, BigQuery, Redshift, PostgreSQL) are export targets only.',
             ],
         ];
     }
@@ -87,6 +86,8 @@ class AnalyticsSchemaCatalog
             ->keys()
             ->implode(', ');
 
+        $jsonHint = JsonPayloadSql::promptHint();
+
         return <<<SUMMARY
 Connections: {$connections}
 Metric slugs: {$metricSlugs}
@@ -94,7 +95,7 @@ Placeholders: {$placeholders}
 
 SQL rules:
 - SELECT only. Scope every query via :dashboard_id (join connections or filter metric_snapshots).
-- Filter dates with json_extract(r.payload, '$.date') BETWEEN :start_date AND :end_date for orders.
+- Filter dates with payload date field BETWEEN :start_date AND :end_date for orders. {$jsonHint}
 - Commerce orders live in raw_connector_payloads where resource_type = 'order'.
 - Search Console: resource_type keyword (queries), search_daily (site totals), search_page (landing pages), search_device (device breakdown). Use json_extract for clicks, impressions, ctr, position, keyword, page, device.
 - Google Analytics 4: resource_type traffic_daily, traffic_channel, events_daily, landing_page. Use json_extract for visitors, active_users, sessions, event_name, event_count, channel, landing_page.
@@ -398,7 +399,7 @@ SUMMARY;
                     'keyword' => ['date', 'position', 'keyword'],
                     'organic_traffic' => ['date', 'sessions', 'source', 'landing_page'],
                 ],
-                'example' => "SELECT json_extract(r.payload, '$.date') AS date, COUNT(*) AS orders, SUM(CAST(json_extract(r.payload, '$.total') AS REAL)) AS revenue FROM raw_connector_payloads r JOIN connections c ON c.id = r.connection_id WHERE c.client_dashboard_id = :dashboard_id AND r.resource_type = 'order' AND json_extract(r.payload, '$.date') BETWEEN :start_date AND :end_date GROUP BY 1 ORDER BY 1",
+                'example' => $this->orderRevenueExampleSql(),
             ],
             [
                 'name' => 'metric_snapshots',
@@ -424,5 +425,14 @@ SUMMARY;
                 ],
             ],
         ];
+    }
+
+    protected function orderRevenueExampleSql(): string
+    {
+        $payload = 'r.payload';
+        $date = JsonPayloadSql::text($payload, 'date');
+        $total = JsonPayloadSql::real($payload, 'total');
+
+        return "SELECT {$date} AS date, COUNT(*) AS orders, SUM({$total}) AS revenue FROM raw_connector_payloads r JOIN connections c ON c.id = r.connection_id WHERE c.client_dashboard_id = :dashboard_id AND r.resource_type = 'order' AND {$date} BETWEEN :start_date AND :end_date GROUP BY 1 ORDER BY 1";
     }
 }
