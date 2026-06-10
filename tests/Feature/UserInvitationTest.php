@@ -29,6 +29,7 @@ class UserInvitationTest extends TestCase
         ]);
 
         $this->actingAs($admin)
+            ->from(route('admin.companies.show', $company))
             ->post(route('admin.companies.invitations.store', $company), [
                 'email' => 'invitee@example.com',
                 'role' => UserRole::Client->value,
@@ -59,6 +60,7 @@ class UserInvitationTest extends TestCase
         ]);
 
         $this->actingAs($admin)
+            ->from(route('admin.companies.show', $company))
             ->post(route('admin.companies.invitations.store', $company), [
                 'email' => 'existing@example.com',
                 'role' => UserRole::Client->value,

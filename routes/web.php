@@ -13,7 +13,10 @@ use App\Http\Controllers\Admin\ImpersonationController as AdminImpersonationCont
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\UserInvitationController as AdminUserInvitationController;
 use App\Http\Controllers\Auth\AcceptInvitationController;
+use App\Http\Controllers\Auth\ForgotPasswordController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\ResetPasswordController;
+use App\Http\Controllers\Admin\UserPasswordResetController;
 use App\Http\Controllers\Client\AnalyticsReportController as ClientAnalyticsReportController;
 use App\Http\Controllers\Client\DashboardController as ClientDashboardController;
 use App\Http\Controllers\Client\DashboardShareController;
@@ -28,6 +31,11 @@ Route::middleware('guest')->group(function () {
 
     Route::get('/invitations/{token}', [AcceptInvitationController::class, 'show'])->name('invitations.show');
     Route::post('/invitations/{token}', [AcceptInvitationController::class, 'store'])->name('invitations.store');
+
+    Route::get('/forgot-password', [ForgotPasswordController::class, 'create'])->name('password.request');
+    Route::post('/forgot-password', [ForgotPasswordController::class, 'store'])->name('password.email');
+    Route::get('/reset-password/{token}', [ResetPasswordController::class, 'create'])->name('password.reset');
+    Route::post('/reset-password', [ResetPasswordController::class, 'store'])->name('password.store');
 });
 
 Route::post('/logout', [LoginController::class, 'destroy'])
@@ -69,6 +77,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/users/{user}/edit', [AdminUserController::class, 'edit'])->name('users.edit');
         Route::post('/users/{user}', [AdminUserController::class, 'update'])->name('users.update');
         Route::delete('/users/{user}', [AdminUserController::class, 'destroy'])->name('users.destroy');
+        Route::post('/users/{user}/password-reset', [UserPasswordResetController::class, 'store'])->name('users.password-reset.store');
 
         Route::get('/dashboards', [AdminDashboardController::class, 'index'])->name('dashboards.index');
         Route::get('/dashboards/create', [AdminDashboardController::class, 'create'])->name('dashboards.create');

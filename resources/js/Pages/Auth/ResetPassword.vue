@@ -1,33 +1,37 @@
 <script setup>
-import { Link, useForm, usePage } from '@inertiajs/vue3';
+import { Link, useForm } from '@inertiajs/vue3';
 import AppLayout from '../../Layouts/AppLayout.vue';
-import { useAppBranding } from '../../Composables/useAppBranding';
 
-const { appName } = useAppBranding();
-const page = usePage();
-const status = page.props.flash?.status;
+const props = defineProps({
+    token: {
+        type: String,
+        required: true,
+    },
+    email: {
+        type: String,
+        default: '',
+    },
+});
 
 const form = useForm({
-    email: '',
+    token: props.token,
+    email: props.email,
     password: '',
-    remember: false,
+    password_confirmation: '',
 });
 
 function submit() {
-    form.post(route('login'), {
-        onFinish: () => form.reset('password'),
+    form.post(route('password.store'), {
+        onFinish: () => form.reset('password', 'password_confirmation'),
     });
 }
 </script>
 
 <template>
-    <AppLayout title="Sign in">
+    <AppLayout title="Reset password">
         <div class="mx-auto max-w-md rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
-            <h1 class="mb-6 text-2xl font-semibold">Sign in to {{ appName }}</h1>
-
-            <p v-if="status" class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                {{ status }}
-            </p>
+            <h1 class="mb-2 text-2xl font-semibold">Reset password</h1>
+            <p class="mb-6 text-sm text-slate-600">Choose a new password for your account.</p>
 
             <form class="space-y-4" @submit.prevent="submit">
                 <div>
@@ -37,45 +41,46 @@ function submit() {
                         v-model="form.email"
                         type="email"
                         required
-                        autofocus
                         class="w-full rounded-lg border border-slate-300 px-3 py-2"
                     />
                     <p v-if="form.errors.email" class="mt-1 text-sm text-red-600">{{ form.errors.email }}</p>
                 </div>
 
                 <div>
-                    <div class="mb-1 flex items-center justify-between gap-4">
-                        <label for="password" class="block text-sm font-medium">Password</label>
-                        <Link :href="route('password.request')" class="text-sm text-primary hover:underline">
-                            Forgot password?
-                        </Link>
-                    </div>
+                    <label for="password" class="mb-1 block text-sm font-medium">New password</label>
                     <input
                         id="password"
                         v-model="form.password"
+                        type="password"
+                        required
+                        autofocus
+                        class="w-full rounded-lg border border-slate-300 px-3 py-2"
+                    />
+                    <p v-if="form.errors.password" class="mt-1 text-sm text-red-600">{{ form.errors.password }}</p>
+                </div>
+
+                <div>
+                    <label for="password_confirmation" class="mb-1 block text-sm font-medium">Confirm password</label>
+                    <input
+                        id="password_confirmation"
+                        v-model="form.password_confirmation"
                         type="password"
                         required
                         class="w-full rounded-lg border border-slate-300 px-3 py-2"
                     />
                 </div>
 
-                <label class="flex items-center gap-2 text-sm">
-                    <input v-model="form.remember" type="checkbox" />
-                    Remember me
-                </label>
-
                 <button
                     type="submit"
                     class="w-full rounded-lg bg-primary px-4 py-2 font-medium text-white hover:bg-primary-hover disabled:opacity-50"
                     :disabled="form.processing"
                 >
-                    Sign in
+                    Reset password
                 </button>
             </form>
 
-            <p class="mt-6 text-sm text-slate-500">
-                Demo: admin@titan.test / client@acme.test — password:
-                <code>password</code>
+            <p class="mt-6 text-sm">
+                <Link :href="route('login')" class="text-primary hover:underline">Back to sign in</Link>
             </p>
         </div>
     </AppLayout>

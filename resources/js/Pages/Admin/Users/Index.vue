@@ -30,6 +30,7 @@ const page = usePage();
 const deleteError = page.props.errors?.user;
 const status = page.props.flash?.status;
 const processingInvitationId = ref(null);
+const processingPasswordResetUserId = ref(null);
 
 const inviteForm = useForm({
     company_id: props.companies[0]?.id ?? '',
@@ -108,6 +109,21 @@ function revokeInvitation(companyId, invitationId) {
 function impersonate(userId) {
     router.post(route('admin.impersonate.store', userId));
 }
+
+function sendPasswordReset(userId) {
+    processingPasswordResetUserId.value = userId;
+
+    router.post(
+        route('admin.users.password-reset.store', userId),
+        {},
+        {
+            preserveScroll: true,
+            onFinish: () => {
+                processingPasswordResetUserId.value = null;
+            },
+        },
+    );
+}
 </script>
 
 <template>
@@ -141,7 +157,7 @@ function impersonate(userId) {
                 @submit.prevent="sendInvitation"
             >
                 <p class="text-sm text-slate-600">
-                    Send an email invitation for someone who does not have an account yet. Existing users are added immediately without email.
+                    Only for brand-new email addresses. If the email already has an account, they are added to the company immediately and appear under Active users — use <strong>Send reset password</strong> there instead. <strong>Add user</strong> also skips invitations and creates the account directly.
                 </p>
 
                 <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -268,7 +284,7 @@ function impersonate(userId) {
                         </tr>
                         <tr v-if="pendingInvitations.length === 0">
                             <td colspan="6" class="px-4 py-6 text-slate-500">
-                                No pending invitations. Send one above and it will appear here with resend and revoke actions.
+                                No pending invitations. This list only tracks new users who have not accepted their invite yet.
                             </td>
                         </tr>
                     </tbody>
@@ -303,6 +319,14 @@ function impersonate(userId) {
                                     <Link :href="route('admin.users.edit', user.id)" class="text-primary hover:underline">
                                         Edit
                                     </Link>
+                                    <button
+                                        type="button"
+                                        class="text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                                        :disabled="processingPasswordResetUserId === user.id"
+                                        @click="sendPasswordReset(user.id)"
+                                    >
+                                        {{ processingPasswordResetUserId === user.id ? 'Sending…' : 'Send reset password' }}
+                                    </button>
                                     <button
                                         v-if="user.role === 'client'"
                                         type="button"

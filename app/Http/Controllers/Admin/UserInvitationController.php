@@ -22,9 +22,7 @@ class UserInvitationController extends Controller
             ? 'Invitation sent to '.$invitation->email.'.'
             : 'Existing user added to '.$company->name.'.';
 
-        return redirect()
-            ->route('admin.companies.show', $company)
-            ->with('status', $message);
+        return back()->with('status', $message);
     }
 
     public function resend(
