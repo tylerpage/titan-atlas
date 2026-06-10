@@ -5,6 +5,7 @@ import AppLayout from '../../../Layouts/AppLayout.vue';
 import ReportVisualization from '../../../Components/ReportVisualization.vue';
 import { useAppBranding } from '../../../Composables/useAppBranding';
 import { displayMessageContent } from '../../../Composables/useTitanAiMessage';
+import { useTitanAiPolling } from '../../../Composables/useTitanAiPolling';
 
 const { aiName } = useAppBranding();
 
@@ -54,13 +55,7 @@ const isProcessing = computed(() => props.session?.status === 'processing');
 const showPinModal = ref(false);
 const pinReportId = ref(null);
 
-let pollTimer = null;
-
-function pollSession() {
-    if (!props.session?.id || !isProcessing.value) {
-        return;
-    }
-
+function reloadSessionData() {
     router.reload({
         only: ['session'],
         preserveScroll: true,
@@ -72,23 +67,19 @@ function pollSession() {
     });
 }
 
-function startPolling() {
-    stopPolling();
+const { startPolling, stopPolling } = useTitanAiPolling({
+    isProcessing: () => isProcessing.value,
+    getStatusUrl: () => {
+        if (!props.session?.id) {
+            return null;
+        }
 
-    if (isProcessing.value) {
-        pollTimer = setInterval(pollSession, 2000);
-    }
-}
-
-function stopPolling() {
-    if (pollTimer) {
-        clearInterval(pollTimer);
-        pollTimer = null;
-    }
-}
+        return route('client.dashboard.ai.sessions.status', [props.dashboard.slug, props.session.id]);
+    },
+    onComplete: () => reloadSessionData(),
+});
 
 onMounted(startPolling);
-onBeforeUnmount(stopPolling);
 watch(isProcessing, (processing) => {
     if (processing) {
         startPolling();

@@ -96,13 +96,23 @@ class AnalyticsReportController extends Controller
             'session' => $session ? [
                 'id' => $session->id,
                 'status' => $session->status->value,
-                'messages' => $messageSerializer->serialize($session->messages, $dashboard, $start, $end),
+                'messages' => $messageSerializer->serialize($session->messages, $dashboard, $start, $end, $session->status),
             ] : null,
             'savedReport' => $savedReport,
             'reportPreview' => $reportPreview,
             'coverPages' => $coverPages,
             'defaultPreviewStart' => $previewStart,
             'defaultPreviewEnd' => $previewEnd,
+        ]);
+    }
+
+    public function sessionStatus(ClientDashboard $dashboard, AnalyticsReportSession $session): \Illuminate\Http\JsonResponse
+    {
+        abort_unless($session->client_dashboard_id === $dashboard->id, 404);
+
+        return response()->json([
+            'status' => $session->status->value,
+            'messages_count' => $session->messages()->count(),
         ]);
     }
 

@@ -12,7 +12,7 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Tools\Request;
 use Stringable;
 
-class SaveAnalyticsReportTool extends ReportingTool
+class CreateAnalyticsReportTool extends ReportingTool
 {
     public function __construct(
         ReportingAgentContext $context,
@@ -23,7 +23,7 @@ class SaveAnalyticsReportTool extends ReportingTool
 
     public function description(): Stringable|string
     {
-        return 'REQUIRED for any data answer. Saves a reusable dashboard widget (table, line_chart, or stat_card). SQL must use :start_date and :end_date placeholders. Call preview_report_query first. The UI renders the widget — do not put data in your text response.';
+        return 'REQUIRED for any data answer. Validates SQL, saves a reusable dashboard widget (table, line_chart, or stat_card), and returns a preview in one step. SQL must use :start_date and :end_date placeholders.';
     }
 
     public function handle(Request $request): Stringable|string
@@ -41,9 +41,7 @@ class SaveAnalyticsReportTool extends ReportingTool
                 connectionId: $request->integer('connection_id') ?: $this->context->connectionId,
             );
 
-            $preview = $this->matchingPreviewResult($sql)
-                ?? $this->executor->execute($sql, $queryContext);
-
+            $preview = $this->executor->execute($sql, $queryContext);
             $config = $request->array('visualization_config');
 
             $report = AnalyticsReport::query()->create([
@@ -59,6 +57,8 @@ class SaveAnalyticsReportTool extends ReportingTool
 
             $this->context->session->update(['status' => AnalyticsReportSessionStatus::Completed]);
             $this->context->lastSavedReport = $report;
+            $this->context->lastPreviewSql = $this->normalizeSql($sql);
+            $this->context->lastPreviewResult = $preview;
 
             return $this->json([
                 'success' => true,
@@ -86,22 +86,6 @@ class SaveAnalyticsReportTool extends ReportingTool
             'visualization_config' => $schema->object()->required(),
             'connection_id' => $schema->integer(),
         ];
-    }
-
-    /**
-     * @return array<string, mixed>|null
-     */
-    protected function matchingPreviewResult(string $sql): ?array
-    {
-        if ($this->context->lastPreviewResult === null || $this->context->lastPreviewSql === null) {
-            return null;
-        }
-
-        if ($this->normalizeSql($sql) !== $this->context->lastPreviewSql) {
-            return null;
-        }
-
-        return $this->context->lastPreviewResult;
     }
 
     protected function normalizeSql(string $sql): string

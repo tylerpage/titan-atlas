@@ -35,7 +35,11 @@ class PreviewReportQueryTool extends ReportingTool
                 connectionId: $request->integer('connection_id') ?: $this->context->connectionId,
             );
 
-            $result = $this->executor->execute($request->string('sql')->toString(), $context);
+            $sql = $request->string('sql')->toString();
+            $result = $this->executor->execute($sql, $context);
+
+            $this->context->lastPreviewSql = $this->normalizeSql($sql);
+            $this->context->lastPreviewResult = $result;
 
             return $this->json([
                 'success' => true,
@@ -57,5 +61,10 @@ class PreviewReportQueryTool extends ReportingTool
             'sql' => $schema->string()->required(),
             'connection_id' => $schema->integer(),
         ];
+    }
+
+    protected function normalizeSql(string $sql): string
+    {
+        return preg_replace('/\s+/', ' ', trim($sql)) ?? trim($sql);
     }
 }

@@ -18,7 +18,7 @@ class GenerateReportResponseJob implements ShouldQueue
 
     public int $timeout;
 
-    public int $tries = 1;
+    public int $tries = 2;
 
     public function __construct(
         public int $sessionId,

@@ -4,6 +4,8 @@ namespace App\Ai\Agents;
 
 use App\Agents\ClientReportingPromptBuilder;
 use App\Agents\ReportingAgentContext;
+use App\Ai\Concerns\CapsReportingConversationHistory;
+use App\Ai\Tools\CreateAnalyticsReportTool;
 use App\Ai\Tools\DescribeConnectorSchemaTool;
 use App\Ai\Tools\ExplainMetricTool;
 use App\Ai\Tools\GenerateDocumentationTool;
@@ -13,17 +15,16 @@ use App\Ai\Tools\PinReportToSavedDashboardTool;
 use App\Ai\Tools\PreviewReportQueryTool;
 use App\Ai\Tools\RunDataQualityChecksTool;
 use App\Ai\Tools\SaveAnalyticsReportTool;
-use App\Models\AnalyticsReportMessage;
 use Illuminate\Contracts\Container\Container;
 use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Contracts\Conversational;
 use Laravel\Ai\Contracts\HasTools;
-use Laravel\Ai\Messages\Message;
 use Laravel\Ai\Promptable;
 use Stringable;
 
 class ClientReportingAgent implements Agent, Conversational, HasTools
 {
+    use CapsReportingConversationHistory;
     use Promptable;
 
     public function __construct(
@@ -44,15 +45,7 @@ class ClientReportingAgent implements Agent, Conversational, HasTools
 
     public function messages(): iterable
     {
-        return $this->context->session->messages()
-            ->whereIn('role', ['user', 'assistant'])
-            ->orderBy('id')
-            ->get()
-            ->map(fn (AnalyticsReportMessage $message) => new Message(
-                $message->role === 'user' ? 'user' : 'assistant',
-                $message->content,
-            ))
-            ->all();
+        return $this->cappedSessionMessages();
     }
 
     public function tools(): iterable
@@ -66,6 +59,7 @@ class ClientReportingAgent implements Agent, Conversational, HasTools
             $this->container->makeWith(ExplainMetricTool::class, ['context' => $context]),
             $this->container->makeWith(RunDataQualityChecksTool::class, ['context' => $context]),
             $this->container->makeWith(GenerateDocumentationTool::class, ['context' => $context]),
+            $this->container->makeWith(CreateAnalyticsReportTool::class, ['context' => $context]),
             $this->container->makeWith(PreviewReportQueryTool::class, ['context' => $context]),
             $this->container->makeWith(SaveAnalyticsReportTool::class, ['context' => $context]),
             $this->container->makeWith(PinReportToSavedDashboardTool::class, ['context' => $context]),

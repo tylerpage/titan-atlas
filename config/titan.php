@@ -175,8 +175,11 @@ return [
     'reporting' => [
         'provider' => env('TITAN_AI_PROVIDER', 'openai'),
         'model' => env('TITAN_AI_MODEL', 'gpt-4o-mini'),
-        'max_steps' => (int) env('TITAN_AI_MAX_STEPS', 10),
-        'client_max_steps' => (int) env('TITAN_AI_CLIENT_MAX_STEPS', 6),
+        'max_steps' => (int) env('TITAN_AI_MAX_STEPS', 8),
+        'client_max_steps' => (int) env('TITAN_AI_CLIENT_MAX_STEPS', 4),
+        'max_history_messages' => (int) env('TITAN_AI_MAX_HISTORY_MESSAGES', 12),
+        'preview_cache_ttl_seconds' => (int) env('TITAN_AI_PREVIEW_CACHE_TTL', 60),
+        'fast_path_enabled' => env('TITAN_AI_FAST_PATH_ENABLED', true),
         'max_rows' => 500,
         'query_timeout_seconds' => 10,
         'response_timeout_seconds' => (int) env('TITAN_AI_RESPONSE_TIMEOUT', 120),

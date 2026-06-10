@@ -21,6 +21,8 @@ class ReportingAgentContext
         public ?Carbon $previewCompareEndDate = null,
         public ?int $connectionId = null,
         public ?AnalyticsReport $lastSavedReport = null,
+        public ?array $lastPreviewResult = null,
+        public ?string $lastPreviewSql = null,
         public ?MetricDefinition $lastMetricDefinition = null,
         public ?array $lastDashboardSpec = null,
         public ?array $lastQualityReport = null,

@@ -6,6 +6,7 @@ use App\Enums\ReportVisualizationType;
 use App\Models\AnalyticsReport;
 use App\Models\ClientDashboard;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 
 class ReportBlockResolver
 {
@@ -79,6 +80,35 @@ class ReportBlockResolver
      * @return array<string, mixed>|null
      */
     public function previewForChat(
+        AnalyticsReport $report,
+        ClientDashboard $dashboard,
+        Carbon $start,
+        Carbon $end,
+    ): ?array {
+        $ttl = (int) config('titan.reporting.preview_cache_ttl_seconds', 60);
+
+        if ($ttl <= 0) {
+            return $this->buildChatPreview($report, $dashboard, $start, $end);
+        }
+
+        $cacheKey = sprintf(
+            'titan:report_preview:%d:%s:%s',
+            $report->id,
+            $start->toDateString(),
+            $end->toDateString(),
+        );
+
+        return Cache::remember(
+            $cacheKey,
+            $ttl,
+            fn () => $this->buildChatPreview($report, $dashboard, $start, $end),
+        );
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    protected function buildChatPreview(
         AnalyticsReport $report,
         ClientDashboard $dashboard,
         Carbon $start,

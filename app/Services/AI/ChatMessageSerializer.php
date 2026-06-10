@@ -2,6 +2,7 @@
 
 namespace App\Services\AI;
 
+use App\Enums\AnalyticsReportSessionStatus;
 use App\Models\AnalyticsReport;
 use App\Models\AnalyticsReportMessage;
 use App\Models\ClientDashboard;
@@ -22,12 +23,15 @@ class ChatMessageSerializer
         ClientDashboard $dashboard,
         Carbon $start,
         Carbon $end,
+        ?AnalyticsReportSessionStatus $sessionStatus = null,
     ): array {
-        return $messages->map(function (AnalyticsReportMessage $message) use ($dashboard, $start, $end) {
+        $skipReportPreviews = $sessionStatus === AnalyticsReportSessionStatus::Processing;
+
+        return $messages->map(function (AnalyticsReportMessage $message) use ($dashboard, $start, $end, $skipReportPreviews) {
             $reportPreview = null;
             $reportId = $message->metadata['report_id'] ?? null;
 
-            if ($reportId) {
+            if ($reportId && ! $skipReportPreviews) {
                 $report = AnalyticsReport::query()
                     ->where('client_dashboard_id', $dashboard->id)
                     ->find($reportId);

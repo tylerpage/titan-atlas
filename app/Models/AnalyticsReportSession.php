@@ -15,12 +15,15 @@ class AnalyticsReportSession extends Model
         'user_id',
         'status',
         'title',
+        'duration_ms',
+        'used_fast_path',
     ];
 
     protected function casts(): array
     {
         return [
             'status' => AnalyticsReportSessionStatus::class,
+            'used_fast_path' => 'boolean',
         ];
     }
 

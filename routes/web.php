@@ -105,6 +105,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/cover-page-blocks/{block}/import-csv', [AdminCoverPageBlockController::class, 'importCsv'])->name('cover-page-blocks.import-csv');
         Route::get('/dashboards/{dashboard}/reports', [AdminAnalyticsReportController::class, 'index'])->name('dashboards.reports.index');
         Route::get('/dashboards/{dashboard}/reports/ask/{session?}', [AdminAnalyticsReportController::class, 'ask'])->name('dashboards.reports.ask');
+        Route::get('/dashboards/{dashboard}/reports/sessions/{session}/status', [AdminAnalyticsReportController::class, 'sessionStatus'])->name('dashboards.reports.sessions.status');
         Route::post('/dashboards/{dashboard}/reports/sessions', [AdminAnalyticsReportController::class, 'sendMessage'])->name('dashboards.reports.sessions.store');
         Route::post('/dashboards/{dashboard}/reports/{report}/place', [AdminAnalyticsReportController::class, 'place'])->name('dashboards.reports.place');
         Route::post('/reports/{report}/archive', [AdminAnalyticsReportController::class, 'archive'])->name('reports.archive');
@@ -131,6 +132,9 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/{dashboard:slug}/ai/sessions', [ClientAnalyticsReportController::class, 'sessions'])
         ->name('client.dashboard.ai.sessions')
+        ->where('dashboard', '[a-z0-9\\-]+');
+    Route::get('/{dashboard:slug}/ai/sessions/{session}/status', [ClientAnalyticsReportController::class, 'sessionStatus'])
+        ->name('client.dashboard.ai.sessions.status')
         ->where('dashboard', '[a-z0-9\\-]+');
     Route::get('/{dashboard:slug}/ai/{session?}', [ClientAnalyticsReportController::class, 'chat'])
         ->name('client.dashboard.ai.chat')

@@ -9,9 +9,11 @@ use App\Agents\ReportingPromptBuilder;
 use App\Agents\TitanAiPromptSections;
 use App\Ai\Agents\ClientReportingAgent;
 use App\Ai\Agents\ReportingAgent;
+use App\Ai\Tools\CreateAnalyticsReportTool;
 use App\Ai\Tools\PreviewReportQueryTool;
 use App\Ai\Tools\SaveAnalyticsReportTool;
 use App\Enums\AnalyticsReportSessionStatus;
+use App\Services\AI\ChatMessageSerializer;
 use App\Enums\ConnectorType;
 use App\Enums\ReportVisualizationType;
 use App\Jobs\GenerateReportResponseJob;
@@ -47,8 +49,10 @@ class TitanAiEfficiencyTest extends TestCase
     {
         $prompt = app(ClientReportingPromptBuilder::class)->systemPrompt($this->context());
 
-        $this->assertStringContainsString('SaveAnalyticsReportTool', $prompt);
+        $this->assertStringContainsString('CreateAnalyticsReportTool', $prompt);
         $this->assertStringContainsString('PreviewReportQueryTool', $prompt);
+        $this->assertStringNotContainsString('Call PreviewReportQueryTool to validate.
+  3. Call SaveAnalyticsReportTool', $prompt);
         $this->assertStringContainsString('PinReportToSavedDashboardTool', $prompt);
         $this->assertStringNotContainsString('save_analytics_report', $prompt);
     }
@@ -235,6 +239,148 @@ SQL;
 
         $this->assertSame(1, AnalyticsReportMessage::query()->where('role', 'user')->count());
         $this->assertSame(1, AnalyticsReportMessage::query()->where('role', 'assistant')->count());
+    }
+
+    public function test_save_analytics_report_tool_reuses_matching_preview_sql(): void
+    {
+        $context = $this->seededContext();
+        $preview = app(PreviewReportQueryTool::class, ['context' => $context]);
+
+        $sql = <<<'SQL'
+SELECT json_extract(r.payload, '$.date') AS date, SUM(CAST(json_extract(r.payload, '$.total') AS REAL)) AS revenue
+FROM raw_connector_payloads r
+JOIN connections c ON c.id = r.connection_id
+WHERE c.client_dashboard_id = :dashboard_id
+AND r.resource_type = 'order'
+AND json_extract(r.payload, '$.date') BETWEEN :start_date AND :end_date
+GROUP BY 1
+ORDER BY 1
+SQL;
+
+        $previewResult = json_decode($preview->handle(new Request(['sql' => $sql])), true);
+        $this->assertTrue($previewResult['success']);
+
+        $executor = $this->mock(\App\Services\Analytics\ReportQueryExecutor::class);
+        $executor->shouldReceive('execute')->never();
+
+        $saveWithMock = app(SaveAnalyticsReportTool::class, ['context' => $context, 'executor' => $executor]);
+
+        $saveResult = json_decode($saveWithMock->handle(new Request([
+            'prompt' => 'Daily revenue',
+            'sql' => $sql,
+            'visualization_type' => 'line_chart',
+            'visualization_config' => [
+                'title' => 'Daily revenue',
+                'date_column' => 'date',
+                'value_column' => 'revenue',
+                'format' => 'currency',
+            ],
+        ])), true);
+
+        $this->assertTrue($saveResult['success']);
+    }
+
+    public function test_create_analytics_report_tool_persists_widget_in_one_step(): void
+    {
+        $context = $this->seededContext();
+        $create = app(CreateAnalyticsReportTool::class, ['context' => $context]);
+
+        $sql = <<<'SQL'
+SELECT json_extract(r.payload, '$.date') AS date, SUM(CAST(json_extract(r.payload, '$.total') AS REAL)) AS revenue
+FROM raw_connector_payloads r
+JOIN connections c ON c.id = r.connection_id
+WHERE c.client_dashboard_id = :dashboard_id
+AND r.resource_type = 'order'
+AND json_extract(r.payload, '$.date') BETWEEN :start_date AND :end_date
+GROUP BY 1
+ORDER BY 1
+SQL;
+
+        $result = json_decode($create->handle(new Request([
+            'prompt' => 'Daily revenue',
+            'sql' => $sql,
+            'visualization_type' => 'line_chart',
+            'visualization_config' => [
+                'title' => 'Daily revenue',
+                'date_column' => 'date',
+                'value_column' => 'revenue',
+                'format' => 'currency',
+            ],
+        ])), true);
+
+        $this->assertTrue($result['success']);
+        $this->assertDatabaseHas('analytics_reports', [
+            'analytics_report_session_id' => $context->session->id,
+            'prompt' => 'Daily revenue',
+        ]);
+    }
+
+    public function test_chat_message_serializer_skips_report_sql_while_processing(): void
+    {
+        $context = $this->seededContext();
+        $dashboard = $context->dashboard;
+        $session = $context->session;
+        $session->update(['status' => AnalyticsReportSessionStatus::Processing]);
+
+        $report = AnalyticsReport::query()->create([
+            'client_dashboard_id' => $dashboard->id,
+            'analytics_report_session_id' => $session->id,
+            'created_by' => $context->user->id,
+            'prompt' => 'Revenue',
+            'sql' => 'SELECT 1 AS revenue',
+            'visualization_type' => ReportVisualizationType::StatCard,
+            'visualization_config' => ['header' => 'Revenue', 'value_column' => 'revenue'],
+        ]);
+
+        $message = AnalyticsReportMessage::query()->create([
+            'analytics_report_session_id' => $session->id,
+            'role' => 'assistant',
+            'content' => 'Here is revenue.',
+            'metadata' => ['report_id' => $report->id],
+        ]);
+
+        $serialized = app(ChatMessageSerializer::class)->serialize(
+            collect([$message]),
+            $dashboard,
+            $context->previewStartDate,
+            $context->previewEndDate,
+            AnalyticsReportSessionStatus::Processing,
+        );
+
+        $this->assertNull($serialized[0]['report_preview']);
+    }
+
+    public function test_list_analytics_schema_tool_returns_scoped_catalog(): void
+    {
+        $context = $this->context();
+        $tool = app(\App\Ai\Tools\ListAnalyticsSchemaTool::class, ['context' => $context]);
+        $result = json_decode($tool->handle(new Request([])), true);
+
+        $tableNames = collect($result['tables'])->pluck('name')->all();
+
+        $this->assertContains('raw_connector_payloads', $tableNames);
+        $this->assertNotContains('sync_runs', $tableNames);
+    }
+
+    public function test_agents_cap_conversation_history_from_config(): void
+    {
+        config(['titan.reporting.max_history_messages' => 4]);
+
+        $context = $this->context();
+
+        foreach (range(1, 6) as $index) {
+            AnalyticsReportMessage::query()->create([
+                'analytics_report_session_id' => $context->session->id,
+                'role' => $index % 2 === 0 ? 'assistant' : 'user',
+                'content' => "Message {$index}",
+            ]);
+        }
+
+        $messages = ClientReportingAgent::make(context: $context)->messages();
+
+        $this->assertCount(4, iterator_to_array($messages));
+        $this->assertSame('Message 3', iterator_to_array($messages)[0]->content);
+        $this->assertSame('Message 6', iterator_to_array($messages)[3]->content);
     }
 
     public function test_agents_read_max_steps_from_config(): void

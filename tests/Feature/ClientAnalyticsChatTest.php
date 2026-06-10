@@ -85,9 +85,15 @@ class ClientAnalyticsChatTest extends TestCase
         $this->assertNotNull($session);
         $this->assertSame($client->id, $session->user_id);
         $this->assertSame('What was total revenue?', $session->title);
-        $this->assertSame(AnalyticsReportSessionStatus::Processing, $session->status);
+        $this->assertSame(AnalyticsReportSessionStatus::Completed, $session->status);
+        $this->assertTrue($session->used_fast_path);
 
-        Queue::assertPushed(GenerateReportResponseJob::class, fn ($job) => $job->clientMode === true);
+        $this->assertDatabaseHas('analytics_report_messages', [
+            'analytics_report_session_id' => $session->id,
+            'role' => 'assistant',
+        ]);
+
+        Queue::assertNothingPushed();
     }
 
     public function test_client_can_view_chat_and_session_history(): void

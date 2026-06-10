@@ -12,11 +12,13 @@ use App\Models\AnalyticsReportSession;
 use App\Models\ClientDashboard;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Laravel\Ai\Enums\Lab;
 
 class ReportingAgentService
 {
+    public function __construct(protected SimpleMetricFastPathService $fastPath) {}
     /**
      * @return array{session: AnalyticsReportSession}
      */
@@ -42,6 +44,33 @@ class ReportingAgentService
 
         $this->storeMessage($session, 'user', $message);
         $session->update(['status' => AnalyticsReportSessionStatus::Processing]);
+
+        $fastPathStartedAt = microtime(true);
+
+        $fastPathResult = $this->fastPath->tryRespond(
+            dashboard: $dashboard,
+            user: $user,
+            message: $message,
+            session: $session,
+            previewStart: $previewStart,
+            previewEnd: $previewEnd,
+        );
+
+        if ($fastPathResult !== null) {
+            $durationMs = (int) round((microtime(true) - $fastPathStartedAt) * 1000);
+            $session->update(['duration_ms' => $durationMs]);
+
+            Log::info('titan_ai.session_completed', [
+                'session_id' => $session->id,
+                'dashboard_id' => $dashboard->id,
+                'duration_ms' => $durationMs,
+                'client_mode' => $clientMode,
+                'model' => 'fast_path',
+                'saved_report' => true,
+            ]);
+
+            return ['session' => $fastPathResult['session']];
+        }
 
         GenerateReportResponseJob::dispatch(
             sessionId: $session->id,
@@ -84,6 +113,8 @@ class ReportingAgentService
             $this->storeMessage($session, 'user', $message);
         }
 
+        $startedAt = microtime(true);
+
         @ini_set('max_execution_time', (string) config('titan.reporting.response_timeout_seconds', 120));
 
         $previewStartDate = $previewStart
@@ -118,11 +149,28 @@ class ReportingAgentService
 
         $this->storeMessage($session, 'assistant', $text, $metadata);
 
+        $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
+
         if ($context->lastSavedReport) {
-            $session->update(['status' => AnalyticsReportSessionStatus::Completed]);
+            $session->update([
+                'status' => AnalyticsReportSessionStatus::Completed,
+                'duration_ms' => $durationMs,
+            ]);
         } else {
-            $session->update(['status' => AnalyticsReportSessionStatus::Active]);
+            $session->update([
+                'status' => AnalyticsReportSessionStatus::Active,
+                'duration_ms' => $durationMs,
+            ]);
         }
+
+        Log::info('titan_ai.session_completed', [
+            'session_id' => $session->id,
+            'dashboard_id' => $dashboard->id,
+            'duration_ms' => $durationMs,
+            'client_mode' => $clientMode,
+            'model' => config('titan.reporting.model'),
+            'saved_report' => $context->lastSavedReport !== null,
+        ]);
 
         return [
             'session' => $session->fresh(['messages', 'report']),

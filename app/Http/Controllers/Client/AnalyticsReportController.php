@@ -51,6 +51,24 @@ class AnalyticsReportController extends Controller
         return $this->redirectToAiTab($dashboard, $request, ['ai_view' => 'history']);
     }
 
+    public function sessionStatus(
+        Request $request,
+        ClientDashboard $dashboard,
+        AnalyticsReportSession $session,
+    ): \Illuminate\Http\JsonResponse {
+        abort_unless($request->user()?->canAccessDashboard($dashboard), 403);
+        abort_unless(
+            $session->client_dashboard_id === $dashboard->id
+                && $session->user_id === $request->user()->id,
+            404,
+        );
+
+        return response()->json([
+            'status' => $session->status->value,
+            'messages_count' => $session->messages()->count(),
+        ]);
+    }
+
     public function sendMessage(
         SendReportMessageRequest $request,
         ClientDashboard $dashboard,

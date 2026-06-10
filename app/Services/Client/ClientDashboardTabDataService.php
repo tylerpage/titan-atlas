@@ -178,7 +178,7 @@ class ClientDashboardTabDataService
             'id' => $session->id,
             'title' => $session->title,
             'status' => $session->status->value,
-            'messages' => $this->messages->serialize($session->messages, $dashboard, $start, $end),
+            'messages' => $this->messages->serialize($session->messages, $dashboard, $start, $end, $session->status),
         ];
     }
 }

@@ -12,6 +12,9 @@ use App\Models\Company;
 use App\Models\User;
 use App\Enums\AnalyticsReportSessionStatus;
 use App\Jobs\GenerateReportResponseJob;
+use App\Enums\ConnectorType;
+use App\Models\Connection;
+use App\Models\RawConnectorPayload;
 use App\Services\AI\ReportingAgentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -41,7 +44,7 @@ class ReportingAgentTest extends TestCase
 
         $this->actingAs($admin)
             ->post(route('admin.dashboards.reports.sessions.store', $dashboard), [
-                'message' => 'What was total revenue?',
+                'message' => 'Show revenue by day as a line chart',
                 'preview_start' => '2025-06-01',
                 'preview_end' => '2025-06-30',
             ])
@@ -55,7 +58,7 @@ class ReportingAgentTest extends TestCase
 
         $this->assertDatabaseHas('analytics_report_messages', [
             'role' => 'user',
-            'content' => 'What was total revenue?',
+            'content' => 'Show revenue by day as a line chart',
         ]);
 
         Queue::assertPushed(GenerateReportResponseJob::class);
@@ -74,6 +77,50 @@ class ReportingAgentTest extends TestCase
         $this->assertInstanceOf(AnalyticsReportSession::class, $result['session']);
         $this->assertSame('Here is your revenue breakdown.', $result['response']);
         $this->assertGreaterThanOrEqual(2, AnalyticsReportMessage::query()->count());
+    }
+
+    public function test_simple_metric_question_uses_fast_path_without_queue(): void
+    {
+        Queue::fake();
+
+        $admin = User::factory()->create(['role' => UserRole::Admin]);
+        $dashboard = $this->createDashboard();
+        $connection = Connection::query()->create([
+            'client_dashboard_id' => $dashboard->id,
+            'name' => 'Shopify',
+            'connector_type' => ConnectorType::Shopify,
+            'encrypted_credentials' => ['shop_domain' => 'demo.myshopify.com', 'access_token' => 'token'],
+            'last_synced_at' => now(),
+        ]);
+
+        RawConnectorPayload::query()->create([
+            'connection_id' => $connection->id,
+            'resource_type' => 'order',
+            'external_id' => '1001',
+            'payload' => ['date' => '2025-06-01', 'total' => 500],
+            'payload_hash' => hash('sha256', '1001'),
+            'fetched_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->post(route('admin.dashboards.reports.sessions.store', $dashboard), [
+                'message' => 'What was total revenue?',
+                'preview_start' => '2025-06-01',
+                'preview_end' => '2025-06-30',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('analytics_report_sessions', [
+            'client_dashboard_id' => $dashboard->id,
+            'status' => AnalyticsReportSessionStatus::Completed->value,
+            'used_fast_path' => true,
+        ]);
+
+        $this->assertDatabaseHas('analytics_report_messages', [
+            'role' => 'assistant',
+        ]);
+
+        Queue::assertNothingPushed();
     }
 
     public function test_admin_can_view_reports_index(): void

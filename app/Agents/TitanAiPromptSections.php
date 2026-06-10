@@ -24,6 +24,7 @@ class TitanAiPromptSections
             'run_data_quality_checks' => 'RunDataQualityChecksTool',
             'generate_documentation' => 'GenerateDocumentationTool',
             'build_dashboard_spec' => 'BuildDashboardSpecTool',
+            'create_analytics_report' => 'CreateAnalyticsReportTool',
             'preview_report_query' => 'PreviewReportQueryTool',
             'save_analytics_report' => 'SaveAnalyticsReportTool',
             'place_report_on_cover_page' => 'PlaceReportOnCoverPageTool',
@@ -38,16 +39,16 @@ class TitanAiPromptSections
 
     public function visualOutputRules(): string
     {
+        $create = $this->tool('create_analytics_report');
         $preview = $this->tool('preview_report_query');
-        $save = $this->tool('save_analytics_report');
 
         return <<<RULES
 ## Visual output rules (MANDATORY)
 - NEVER format data as markdown tables, ASCII charts, or bullet lists of numbers in your text response.
 - For ANY question that returns data (tables, charts, stats, rankings, trends, top N lists), you MUST:
   1. Write SQL using :start_date and :end_date placeholders (never hardcode dates — saved reports reuse the user's date picker).
-  2. Call {$preview} to validate.
-  3. Call {$save} with the correct visualization_type.
+  2. Call {$create} with the correct visualization_type (validates and saves in one step).
+  3. Use {$preview} only when SQL fails and you need to debug before retrying {$create}.
 - Your text reply must be 1–2 sentences of commentary only. The dashboard widget renders the data.
 - Visualization mapping:
   - User asks for table, list, ranking, top N → visualization_type: table
@@ -76,7 +77,7 @@ RULES;
         return <<<SECTION
 ## Schema summary
 {$summary}
-For connector-specific payload fields, call {$describeConnector}. For the full catalog (tables, entities, modeling notes), call {$listSchema} before writing SQL.
+For connector-specific payload fields, call {$describeConnector}. Call {$listSchema} only when you need table columns, sync_runs, or modeling notes not covered above.
 SECTION;
     }
 

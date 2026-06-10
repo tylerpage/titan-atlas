@@ -24,7 +24,7 @@ class ListAnalyticsSchemaTool extends ReportingTool
 
     public function handle(Request $request): Stringable|string
     {
-        return $this->json($this->catalog->forDashboard($this->context->dashboard));
+        return $this->json($this->catalog->forDashboardScoped($this->context->dashboard));
     }
 
     public function schema(JsonSchema $schema): array

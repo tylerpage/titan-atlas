@@ -5,6 +5,7 @@ import AppLayout from '../../../../Layouts/AppLayout.vue';
 import ReportVisualization from '../../../../Components/ReportVisualization.vue';
 import { useAppBranding } from '../../../../Composables/useAppBranding';
 import { displayMessageContent } from '../../../../Composables/useTitanAiMessage';
+import { useTitanAiPolling } from '../../../../Composables/useTitanAiPolling';
 
 const { aiName } = useAppBranding();
 
@@ -54,7 +55,6 @@ const placeForm = useForm({
 const messages = computed(() => props.session?.messages ?? []);
 const isProcessing = computed(() => props.session?.status === 'processing');
 
-let pollTimer = null;
 let pendingPageScrollY = null;
 let removeFinishListener = null;
 
@@ -103,28 +103,17 @@ function reloadSessionData() {
     });
 }
 
-function pollSession() {
-    if (!props.session?.id || !isProcessing.value) {
-        return;
-    }
+const { startPolling, stopPolling } = useTitanAiPolling({
+    isProcessing: () => isProcessing.value,
+    getStatusUrl: () => {
+        if (!props.session?.id) {
+            return null;
+        }
 
-    reloadSessionData();
-}
-
-function startPolling() {
-    stopPolling();
-
-    if (isProcessing.value) {
-        pollTimer = setInterval(pollSession, 2000);
-    }
-}
-
-function stopPolling() {
-    if (pollTimer) {
-        clearInterval(pollTimer);
-        pollTimer = null;
-    }
-}
+        return route('admin.dashboards.reports.sessions.status', [props.dashboard.id, props.session.id]);
+    },
+    onComplete: () => reloadSessionData(),
+});
 
 onMounted(() => {
     startPolling();

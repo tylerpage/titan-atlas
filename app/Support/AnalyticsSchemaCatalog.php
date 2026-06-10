@@ -102,8 +102,48 @@ SQL rules:
 - Google Ads: resource_type spend_daily, campaign_daily. Use json_extract for cost, impressions, clicks, ctr, conversions_value, campaign_id, campaign_name.
 - StackAdapt: resource_type spend_daily, campaign_daily, channel_daily, insight_geo_daily, insight_domain_daily, insight_device_daily. Use json_extract for cost, impressions, clicks, ctr, conversions, conversions_value, roas, channel_type, campaign_id, dimension_key, dimension_label.
 
-Before writing SQL, call ListAnalyticsSchemaTool for full tables and connector fields, or DescribeConnectorSchemaTool for a specific connector.
+Routine revenue, SEO, and ad questions can use the rules above directly. Call ListAnalyticsSchemaTool only for table columns or sync health context, or DescribeConnectorSchemaTool for one connector.
 SUMMARY;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function forDashboardScoped(ClientDashboard $dashboard): array
+    {
+        $full = $this->forDashboard($dashboard);
+
+        $activeTypes = collect($full['connections'])
+            ->pluck('connector_type')
+            ->unique()
+            ->values()
+            ->all();
+
+        return [
+            'dashboard_id' => $full['dashboard_id'],
+            'connections' => $full['connections'],
+            'placeholders' => $full['placeholders'],
+            'tables' => $this->coreTables(),
+            'connector_entities' => $this->connectorEntities($activeTypes),
+            'metric_definitions' => $full['metric_definitions'],
+            'data_modeling_notes' => $full['data_modeling_notes'],
+            'notes' => $full['notes'],
+        ];
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    protected function coreTables(): array
+    {
+        return collect($this->tables())
+            ->filter(fn (array $table) => in_array($table['name'], [
+                'connections',
+                'raw_connector_payloads',
+                'metric_snapshots',
+            ], true))
+            ->values()
+            ->all();
     }
 
     /**
