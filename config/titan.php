@@ -76,6 +76,8 @@ return [
         'max_seconds_per_job' => (int) env('TITAN_SYNC_MAX_SECONDS_PER_JOB', 45),
         'job_timeout' => (int) env('TITAN_SYNC_JOB_TIMEOUT', 55),
         'memory_limit' => env('TITAN_SYNC_MEMORY_LIMIT', '512M'),
+        // Dispatch one ingestion job per connector stream so managed queues can scale past 1 worker.
+        'stream_fan_out_enabled' => (bool) env('TITAN_SYNC_STREAM_FAN_OUT_ENABLED', true),
     ],
 
     'semrush' => [

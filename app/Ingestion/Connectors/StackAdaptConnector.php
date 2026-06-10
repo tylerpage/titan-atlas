@@ -2,6 +2,7 @@
 
 namespace App\Ingestion\Connectors;
 
+use App\Contracts\Ingestion\FanOutSyncConnector;
 use App\Data\Ingestion\FetchResult;
 use App\Data\Ingestion\ValidationResult;
 use App\Enums\ConnectorType;
@@ -10,7 +11,7 @@ use App\Ingestion\Connectors\StackAdapt\StackAdaptRestClient;
 use App\Models\Connection;
 use Carbon\Carbon;
 
-class StackAdaptConnector extends AbstractConnector
+class StackAdaptConnector extends AbstractConnector implements FanOutSyncConnector
 {
     /** @var list<string> */
     protected array $streams = [
@@ -147,6 +148,10 @@ class StackAdaptConnector extends AbstractConnector
             return $this->result($records, $this->encodeCursor($nextState), true);
         }
 
+        if (! empty($state['fan_out'])) {
+            return $this->result($records, null, false);
+        }
+
         $nextStream = $this->nextStream($state['stream']);
 
         if ($nextStream !== null) {
@@ -162,6 +167,23 @@ class StackAdaptConnector extends AbstractConnector
         }
 
         return $this->result($records, null, false);
+    }
+
+    public function syncStreams(): array
+    {
+        return $this->streams;
+    }
+
+    public function initialSyncCursor(Connection $connection, string $stream, bool $fanOut = false): string
+    {
+        [$start, $end] = $this->resolveDateRange($connection);
+
+        return $this->encodeCursor([
+            'stream' => $stream,
+            'start_date' => $start->toDateString(),
+            'end_date' => $end->toDateString(),
+            'fan_out' => $fanOut,
+        ]);
     }
 
     /**
@@ -509,6 +531,7 @@ class StackAdaptConnector extends AbstractConnector
                     'start_date' => (string) $decoded['start_date'],
                     'end_date' => (string) $decoded['end_date'],
                     'page_cursor' => $decoded['page_cursor'] ?? null,
+                    'fan_out' => (bool) ($decoded['fan_out'] ?? false),
                 ];
             }
         }

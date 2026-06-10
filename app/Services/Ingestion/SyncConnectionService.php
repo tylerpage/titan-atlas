@@ -2,6 +2,7 @@
 
 namespace App\Services\Ingestion;
 
+use App\Contracts\Ingestion\FanOutSyncConnector;
 use App\Enums\SyncRunType;
 use App\Enums\SyncStatus;
 use App\Ingestion\ConnectorRegistry;
@@ -41,6 +42,22 @@ class SyncConnectionService
             if ($type === SyncRunType::Backfill && $connection->backfill_started_at === null) {
                 $connection->update(['backfill_started_at' => now()]);
             }
+
+            $connector = $this->connectors->make($connection->connector_type);
+            $validation = $connector->validateCredentials($connection);
+
+            if (! $validation->valid) {
+                throw new \RuntimeException($validation->message ?? 'Invalid credentials.');
+            }
+
+            if (
+                $cursor === null
+                && $connector instanceof FanOutSyncConnector
+                && config('titan.sync.stream_fan_out_enabled', true)
+                && count($connector->syncStreams()) > 1
+            ) {
+                return $this->startFanOutSync($connection, $type, $syncRun, $connector);
+            }
         }
 
         try {
@@ -51,6 +68,8 @@ class SyncConnectionService
                 throw new \RuntimeException($validation->message ?? 'Invalid credentials.');
             }
 
+            $initialFetched = $fetched;
+            $initialWritten = $written;
             $pagesProcessed = 0;
             $maxPages = max(1, (int) config('titan.sync.pages_per_job', 2));
             $maxSeconds = max(10, (int) config('titan.sync.max_seconds_per_job', 45));
@@ -76,10 +95,12 @@ class SyncConnectionService
                     gc_collect_cycles();
                 }
 
-                $syncRun->update([
-                    'records_fetched' => $fetched,
-                    'records_written' => $written,
-                ]);
+                if (! SyncFanOutCoordinator::isActive($syncRun->id)) {
+                    $syncRun->update([
+                        'records_fetched' => $fetched,
+                        'records_written' => $written,
+                    ]);
+                }
 
                 $elapsedSeconds = microtime(true) - $startedAt;
                 $shouldContinueInNewJob = $hasMore
@@ -98,6 +119,29 @@ class SyncConnectionService
 
                     return $syncRun->fresh();
                 }
+            }
+
+            $deltaFetched = $fetched - $initialFetched;
+            $deltaWritten = $written - $initialWritten;
+            $remainingStreams = SyncFanOutCoordinator::completeStream($syncRun->id);
+
+            if ($remainingStreams !== null) {
+                if ($deltaFetched > 0) {
+                    $syncRun->increment('records_fetched', $deltaFetched);
+                }
+
+                if ($deltaWritten > 0) {
+                    $syncRun->increment('records_written', $deltaWritten);
+                }
+
+                if ($remainingStreams > 0) {
+                    return $syncRun->fresh();
+                }
+
+                SyncFanOutCoordinator::cleanup($syncRun->id);
+                $syncRun = $syncRun->fresh();
+                $fetched = (int) $syncRun->records_fetched;
+                $written = (int) $syncRun->records_written;
             }
 
             $syncRun->markFinished(SyncStatus::Success, $fetched, $written);
@@ -132,10 +176,33 @@ class SyncConnectionService
 
             return $syncRun->fresh();
         } catch (Throwable $e) {
+            SyncFanOutCoordinator::cleanup($syncRun->id);
             $syncRun->markFailed($e->getMessage());
             $connection->markSyncFailed($e->getMessage());
 
             throw $e;
         }
+    }
+
+    protected function startFanOutSync(
+        Connection $connection,
+        SyncRunType $type,
+        SyncRun $syncRun,
+        FanOutSyncConnector $connector,
+    ): SyncRun {
+        $streams = $connector->syncStreams();
+
+        SyncFanOutCoordinator::start($syncRun->id, count($streams));
+
+        foreach ($streams as $stream) {
+            SyncConnectionJob::dispatch(
+                $connection,
+                $type,
+                $syncRun->id,
+                $connector->initialSyncCursor($connection, $stream, true),
+            );
+        }
+
+        return $syncRun->fresh();
     }
 }
