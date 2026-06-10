@@ -7,6 +7,7 @@ use App\Models\ClientDashboard;
 use App\Models\ConnectorBlueprint;
 use App\Models\ConnectorBlueprintStream;
 use App\Models\ConnectorBuilderSession;
+use App\Support\DynamicConnectorAuth;
 use App\Support\DynamicConnectorReadOnlyGuard;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -28,6 +29,12 @@ class ConnectorBlueprintService
             throw ValidationException::withMessages(['slug' => 'Blueprint slug is required.']);
         }
 
+        $authConfig = DynamicConnectorAuth::normalize(is_array($data['auth_config'] ?? null) ? $data['auth_config'] : null);
+
+        if (is_array($authConfig) && isset($authConfig['type'])) {
+            DynamicConnectorAuth::assertAllowedType((string) $authConfig['type']);
+        }
+
         $blueprint = ConnectorBlueprint::query()->updateOrCreate(
             [
                 'company_id' => $dashboard->company_id,
@@ -39,8 +46,11 @@ class ConnectorBlueprintService
                 'label' => (string) ($data['label'] ?? Str::headline($slug)),
                 'status' => ConnectorBlueprintStatus::tryFrom($data['status'] ?? '') ?? ConnectorBlueprintStatus::Draft,
                 'original_prompt' => $data['original_prompt'] ?? $session->title,
-                'auth_config' => $data['auth_config'] ?? null,
-                'credential_schema' => $data['credential_schema'] ?? null,
+                'auth_config' => $authConfig,
+                'credential_schema' => DynamicConnectorAuth::normalizeCredentialSchema(
+                    is_array($data['credential_schema'] ?? null) ? $data['credential_schema'] : null,
+                    $authConfig,
+                ),
                 'sync_config' => $data['sync_config'] ?? null,
                 'transform_config' => $data['transform_config'] ?? null,
                 'dashboard_spec' => $data['dashboard_spec'] ?? null,

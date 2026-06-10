@@ -121,4 +121,79 @@ class ConnectorBuilderChatTest extends TestCase
 
         $this->assertInstanceOf(\App\Ai\Tools\ConnectorBuilder\SaveConnectorBlueprintTool::class, $tool);
     }
+
+    public function test_admin_can_resume_ai_chat_from_existing_blueprint(): void
+    {
+        $admin = User::factory()->create(['role' => UserRole::Admin]);
+        $dashboard = ClientDashboard::query()->create([
+            'company_id' => Company::query()->create(['name' => 'Acme', 'slug' => 'acme-resume'])->id,
+            'name' => 'Main',
+            'slug' => 'main-resume',
+        ]);
+
+        $session = ConnectorBuilderSession::query()->create([
+            'client_dashboard_id' => $dashboard->id,
+            'user_id' => $admin->id,
+            'status' => ConnectorBuilderSessionStatus::Active,
+            'title' => 'Shopware',
+        ]);
+
+        ConnectorBuilderMessage::query()->create([
+            'connector_builder_session_id' => $session->id,
+            'role' => 'assistant',
+            'content' => 'Shopware blueprint saved.',
+        ]);
+
+        $blueprint = ConnectorBlueprint::query()->create([
+            'company_id' => $dashboard->company_id,
+            'client_dashboard_id' => $dashboard->id,
+            'connector_builder_session_id' => $session->id,
+            'slug' => 'shopware',
+            'label' => 'Shopware',
+            'status' => ConnectorBlueprintStatus::Ready,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.ai-connectors.chat', $blueprint))
+            ->assertRedirect(route('admin.dashboards.connections.ai-create', [$dashboard, $session]));
+
+        $this->actingAs($admin)
+            ->get(route('admin.dashboards.connections.ai-create', [$dashboard, $session]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Admin/Dashboards/Connections/AiCreate')
+                ->where('isResuming', true)
+                ->has('session.messages', 1)
+                ->where('session.blueprint.id', $blueprint->id));
+    }
+
+    public function test_blueprint_without_session_gets_a_new_session_when_resuming_chat(): void
+    {
+        $admin = User::factory()->create(['role' => UserRole::Admin]);
+        $dashboard = ClientDashboard::query()->create([
+            'company_id' => Company::query()->create(['name' => 'Acme', 'slug' => 'acme-new-session'])->id,
+            'name' => 'Main',
+            'slug' => 'main-new-session',
+        ]);
+
+        $blueprint = ConnectorBlueprint::query()->create([
+            'company_id' => $dashboard->company_id,
+            'client_dashboard_id' => $dashboard->id,
+            'slug' => 'shopware',
+            'label' => 'Shopware',
+            'status' => ConnectorBlueprintStatus::Ready,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.ai-connectors.chat', $blueprint))
+            ->assertRedirect();
+
+        $blueprint->refresh();
+
+        $this->assertNotNull($blueprint->connector_builder_session_id);
+
+        $session = ConnectorBuilderSession::query()->find($blueprint->connector_builder_session_id);
+        $this->assertNotNull($session);
+        $this->assertSame($dashboard->id, $session->client_dashboard_id);
+    }
 }

@@ -15,6 +15,10 @@ const props = defineProps({
         type: Object,
         default: null,
     },
+    isResuming: {
+        type: Boolean,
+        default: false,
+    },
 });
 
 const page = usePage();
@@ -191,9 +195,14 @@ const error = computed(() => page.props.flash?.error);
                     {{ dashboard.company_name }} · {{ dashboard.name }}
                 </Link>
             </p>
-            <h1 class="text-3xl font-semibold">New AI Connector</h1>
+            <h1 class="text-3xl font-semibold">{{ isResuming ? 'Continue AI Connector' : 'New AI Connector' }}</h1>
             <p class="mt-2 text-sm text-slate-600">
-                Describe the integration you want. The agent will research the API, configure read-only sync streams, and set up dashboard analytics.
+                <span v-if="isResuming">
+                    Keep iterating on this connector. Describe what you want to change and the agent will update the existing blueprint.
+                </span>
+                <span v-else>
+                    Describe the integration you want. The agent will research the API, configure read-only sync streams, and set up dashboard analytics.
+                </span>
             </p>
             <p class="mt-2 text-sm text-amber-800">
                 Connectors are strictly read-only. They can fetch data from external APIs but cannot create, update, or delete records — even if you request it in your prompt. POST is only used for authentication or read-style API endpoints.
@@ -213,7 +222,12 @@ const error = computed(() => page.props.flash?.error);
             <div class="flex flex-col rounded-xl border border-slate-200 bg-white shadow-sm lg:col-span-3">
                 <div class="flex-1 space-y-4 overflow-y-auto p-5" style="min-height: 400px; max-height: 560px;">
                     <div v-if="messages.length === 0" class="text-sm text-slate-500">
-                        Try: "Connect HubSpot and show deal pipeline, new contacts, and email performance."
+                        <span v-if="isResuming">
+                            Tell the agent what to change. For example: "Add an orders stream" or "Switch auth to OAuth2 client credentials."
+                        </span>
+                        <span v-else>
+                            Try: "Connect HubSpot and show deal pipeline, new contacts, and email performance."
+                        </span>
                     </div>
                     <div
                         v-for="message in messages"
@@ -233,7 +247,7 @@ const error = computed(() => page.props.flash?.error);
                         <input
                             v-model="form.message"
                             type="text"
-                            placeholder="Describe the connection you want to build..."
+                            :placeholder="isResuming ? 'Describe what you want to change...' : 'Describe the connection you want to build...'"
                             class="flex-1 rounded-lg border border-slate-300 px-4 py-2 text-sm"
                             :disabled="form.processing"
                             @keydown="handleMessageKeydown"

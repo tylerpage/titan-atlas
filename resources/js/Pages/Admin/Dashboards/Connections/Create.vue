@@ -302,7 +302,8 @@ function submit() {
                         <p class="font-medium">{{ template.label }}</p>
                         <p class="text-xs text-slate-500">
                             {{ template.slug }} · {{ template.streams_count }} streams
-                            <span v-if="template.is_shared"> · shared</span>
+                            <span v-if="template.is_global"> · global</span>
+                            <span v-else-if="template.is_shared"> · shared</span>
                         </p>
                     </div>
                     <Link

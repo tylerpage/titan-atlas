@@ -19,7 +19,7 @@ class RecordDevTasksTool extends ConnectorBuilderTool
 
     public function description(): Stringable|string
     {
-        return 'Append structured developer handoff tasks when automation cannot complete the integration.';
+        return 'Append developer handoff tasks only for true blockers (authorization-code OAuth, GraphQL, webhooks, signing). Do NOT record tasks for OAuth2 client-credentials — use oauth2_client_credentials auth instead.';
     }
 
     public function handle(Request $request): Stringable|string

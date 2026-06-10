@@ -81,6 +81,8 @@ class ConnectorBlueprintController extends Controller
             'label' => $blueprint->label,
             'status' => $blueprint->status->value,
             'is_shared' => $blueprint->isShared(),
+            'is_global' => $blueprint->isGlobal(),
+            'chat_url' => route('admin.ai-connectors.chat', $blueprint),
             'original_prompt' => $blueprint->original_prompt,
             'auth_config' => $blueprint->auth_config ?? [],
             'credential_schema' => $blueprint->credential_schema ?? [],

@@ -26,7 +26,7 @@ class GetBlueprintStatusTool extends ConnectorBuilderTool
             ]);
         }
 
-        $connection = $blueprint->connection;
+        $connection = $blueprint->connections()->latest()->first();
 
         return $this->json([
             'success' => true,

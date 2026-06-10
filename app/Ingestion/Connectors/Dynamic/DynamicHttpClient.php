@@ -3,6 +3,7 @@
 namespace App\Ingestion\Connectors\Dynamic;
 
 use App\Models\ConnectorBlueprint;
+use App\Support\DynamicConnectorAuth;
 use App\Support\DynamicConnectorReadOnlyGuard;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
@@ -12,6 +13,9 @@ use Illuminate\Support\Str;
 
 class DynamicHttpClient
 {
+    /** @var array<string, array{token: string, expires_at: int}> */
+    protected static array $tokenCache = [];
+
     public function __construct(protected DynamicConnectorReadOnlyGuard $readOnlyGuard) {}
 
     /**
@@ -38,7 +42,7 @@ class DynamicHttpClient
         $headers = $this->interpolateArray($headers, $credentials);
         $body = $this->interpolateArray($body, $credentials);
 
-        $request = $this->baseRequest($blueprint, $credentials, $headers, resolveToken: false);
+        $request = $this->baseRequest($blueprint, $credentials, $headers, resolveToken: true);
         $response = $this->sendRequest($request, strtoupper($method), $url, $queryParams, $body, $bodyFormat);
 
         return $this->decodeJsonResponse($response);
@@ -64,12 +68,12 @@ class DynamicHttpClient
      */
     public function applyAuth(PendingRequest $request, ConnectorBlueprint $blueprint, array $credentials, bool $resolveToken = true): PendingRequest
     {
-        $auth = $blueprint->auth_config ?? [];
+        $auth = DynamicConnectorAuth::normalize($blueprint->auth_config ?? []) ?? [];
         $type = $auth['type'] ?? 'api_key';
 
         return match ($type) {
-            'bearer' => $request->withToken($resolveToken
-                ? $this->resolveBearerToken($blueprint, $credentials)
+            'bearer', 'oauth2_client_credentials' => $request->withToken($resolveToken
+                ? $this->resolveBearerToken($blueprint, $credentials, $auth)
                 : $this->credentialValue($credentials, $auth['credential_key'] ?? 'access_token')),
             'basic' => $request->withBasicAuth(
                 $this->credentialValue($credentials, $auth['username_key'] ?? 'username'),
@@ -242,25 +246,51 @@ class DynamicHttpClient
     /**
      * @param  array<string, mixed>  $credentials
      */
-    protected function resolveBearerToken(ConnectorBlueprint $blueprint, array $credentials): string
-    {
-        $auth = $blueprint->auth_config ?? [];
-        $tokenRequest = $auth['token_request'] ?? null;
+    protected function resolveBearerToken(
+        ConnectorBlueprint $blueprint,
+        array $credentials,
+        ?array $auth = null,
+    ): string {
+        $auth = $auth ?? DynamicConnectorAuth::normalize($blueprint->auth_config ?? []) ?? [];
 
-        if (! is_array($tokenRequest)) {
+        if (! DynamicConnectorAuth::usesTokenRequest($auth)) {
             return $this->credentialValue($credentials, $auth['credential_key'] ?? 'access_token');
         }
 
+        $cacheKey = hash('sha256', json_encode([
+            'blueprint_id' => $blueprint->id,
+            'credentials' => $credentials,
+            'token_request' => DynamicConnectorAuth::tokenRequest($auth),
+        ]));
+
+        $cached = self::$tokenCache[$cacheKey] ?? null;
+
+        if (is_array($cached) && ($cached['expires_at'] ?? 0) > time()) {
+            return $cached['token'];
+        }
+
+        $tokenRequest = DynamicConnectorAuth::tokenRequest($auth);
         $method = $this->readOnlyGuard->normalizeHttpMethod($tokenRequest['method'] ?? 'POST');
         $path = (string) ($tokenRequest['path'] ?? '/oauth/token');
         $body = is_array($tokenRequest['body'] ?? null) ? $tokenRequest['body'] : [];
         $headers = is_array($tokenRequest['headers'] ?? null) ? $tokenRequest['headers'] : [];
         $bodyFormat = (string) ($tokenRequest['body_format'] ?? 'form');
+        $clientAuth = (string) ($tokenRequest['client_auth'] ?? 'body');
 
         $url = $this->buildUrl($blueprint, $path, $credentials);
         $this->assertAllowedHost($blueprint, $url);
 
-        $request = $this->baseRequest($blueprint, $credentials, $headers, resolveToken: false);
+        $request = Http::timeout((int) config('titan.connector_builder.http_timeout_seconds', 30))
+            ->acceptJson()
+            ->withHeaders($this->interpolateArray($headers, $credentials));
+
+        if ($clientAuth === 'basic') {
+            $request = $request->withBasicAuth(
+                $this->credentialValue($credentials, $auth['client_id_key'] ?? 'client_id'),
+                $this->credentialValue($credentials, $auth['client_secret_key'] ?? 'client_secret'),
+            );
+        }
+
         $response = $this->sendRequest(
             $request,
             $method,
@@ -278,7 +308,16 @@ class DynamicHttpClient
             throw new \RuntimeException('Token request did not return an access token.');
         }
 
-        return trim($token);
+        $token = trim($token);
+        $expiresIn = Arr::get($payload, (string) ($tokenRequest['expires_in_path'] ?? 'expires_in'));
+        $ttlSeconds = is_numeric($expiresIn) ? max(60, ((int) $expiresIn) - 30) : 3600;
+
+        self::$tokenCache[$cacheKey] = [
+            'token' => $token,
+            'expires_at' => time() + $ttlSeconds,
+        ];
+
+        return $token;
     }
 
     /**

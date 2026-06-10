@@ -11,6 +11,7 @@ class ConnectorBlueprint extends Model
 {
     protected $fillable = [
         'company_id',
+        'is_global',
         'client_dashboard_id',
         'connector_builder_session_id',
         'slug',
@@ -29,6 +30,7 @@ class ConnectorBlueprint extends Model
     {
         return [
             'status' => ConnectorBlueprintStatus::class,
+            'is_global' => 'boolean',
             'auth_config' => 'array',
             'credential_schema' => 'array',
             'sync_config' => 'array',
@@ -66,6 +68,11 @@ class ConnectorBlueprint extends Model
     public function isShared(): bool
     {
         return $this->client_dashboard_id === null;
+    }
+
+    public function isGlobal(): bool
+    {
+        return (bool) $this->is_global;
     }
 
     /**

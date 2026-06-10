@@ -88,6 +88,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/ai-connectors/{blueprint}', [AdminAiConnectorController::class, 'update'])->name('ai-connectors.update');
         Route::delete('/ai-connectors/{blueprint}', [AdminAiConnectorController::class, 'destroy'])->name('ai-connectors.destroy');
         Route::post('/ai-connectors/{blueprint}/share', [AdminAiConnectorController::class, 'share'])->name('ai-connectors.share');
+        Route::post('/ai-connectors/{blueprint}/share-global', [AdminAiConnectorController::class, 'shareGlobally'])->name('ai-connectors.share-global');
+        Route::get('/ai-connectors/{blueprint}/chat', [AdminAiConnectorController::class, 'resumeChat'])->name('ai-connectors.chat');
         Route::get('/dashboards/{dashboard}/connections/from-template/{blueprint}', [AdminAiConnectorController::class, 'createConnection'])->name('dashboards.connections.from-template');
         Route::post('/dashboards/{dashboard}/connections/from-template/{blueprint}', [AdminAiConnectorController::class, 'storeConnection'])->name('dashboards.connections.from-template.store');
         Route::post('/dashboards/{dashboard}/connections/from-template/{blueprint}/test', [AdminAiConnectorController::class, 'testConnection'])->name('dashboards.connections.from-template.test');

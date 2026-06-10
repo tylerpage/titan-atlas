@@ -79,6 +79,61 @@ class AiConnectorSharingTest extends TestCase
                 ->where('blueprint.id', $blueprint->id));
     }
 
+    public function test_global_blueprint_is_available_to_all_companies_with_separate_credentials(): void
+    {
+        Http::fake([
+            'https://api.example.com/*' => Http::response(['results' => [['id' => '1', 'date' => '2026-06-01']]], 200),
+        ]);
+
+        $companyA = Company::query()->create(['name' => 'Acme', 'slug' => 'acme-global-a']);
+        $companyB = Company::query()->create(['name' => 'Beta', 'slug' => 'beta-global-b']);
+        $dashboardA = ClientDashboard::query()->create(['company_id' => $companyA->id, 'name' => 'A', 'slug' => 'a-global']);
+        $dashboardB = ClientDashboard::query()->create(['company_id' => $companyB->id, 'name' => 'B', 'slug' => 'b-global']);
+
+        $blueprint = $this->createSharedBlueprint($companyA, $dashboardA);
+        app(AiConnectorService::class)->shareGlobally($blueprint);
+
+        $this->assertTrue($blueprint->fresh()->isGlobal());
+        $this->assertTrue(app(AiConnectorService::class)->isAvailableForDashboard($blueprint->fresh(), $dashboardB));
+
+        $templatesForB = app(AiConnectorService::class)->templatesForDashboard($dashboardB);
+        $this->assertTrue($templatesForB->contains('id', $blueprint->id));
+
+        $connectionA = app(CreateDynamicConnectionService::class)->create(
+            dashboard: $dashboardA,
+            blueprint: $blueprint->fresh(),
+            name: 'Example A',
+            credentials: ['access_token' => 'token-a'],
+        );
+
+        $connectionB = app(CreateDynamicConnectionService::class)->create(
+            dashboard: $dashboardB,
+            blueprint: $blueprint->fresh(),
+            name: 'Example B',
+            credentials: ['access_token' => 'token-b'],
+        );
+
+        $this->assertSame('token-a', $connectionA->credentials()['access_token']);
+        $this->assertSame('token-b', $connectionB->credentials()['access_token']);
+        $this->assertSame($blueprint->id, $connectionA->connector_blueprint_id);
+        $this->assertSame($blueprint->id, $connectionB->connector_blueprint_id);
+    }
+
+    public function test_admin_can_share_blueprint_globally_from_library(): void
+    {
+        $admin = User::factory()->create(['role' => UserRole::Admin]);
+        $company = Company::query()->create(['name' => 'Acme', 'slug' => 'acme-global-ui']);
+        $dashboard = ClientDashboard::query()->create(['company_id' => $company->id, 'name' => 'Main', 'slug' => 'main-global']);
+        $blueprint = $this->createSharedBlueprint($company, $dashboard);
+
+        $this->actingAs($admin)
+            ->post(route('admin.ai-connectors.share-global', $blueprint))
+            ->assertRedirect();
+
+        $this->assertTrue($blueprint->fresh()->isGlobal());
+        $this->assertTrue($blueprint->fresh()->isShared());
+    }
+
     protected function createSharedBlueprint(Company $company, ClientDashboard $dashboard): ConnectorBlueprint
     {
         $blueprint = ConnectorBlueprint::query()->create([

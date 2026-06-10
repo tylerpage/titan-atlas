@@ -90,14 +90,14 @@ class ConnectorBuilderAgentService
 
         @ini_set('max_execution_time', (string) config('titan.connector_builder.response_timeout_seconds', 180));
 
-        $session->load('blueprint.streams');
+        $session->load(['blueprint.streams', 'blueprint.connections']);
 
         $context = new ConnectorBuilderAgentContext(
             session: $session,
             dashboard: $dashboard,
             user: $user,
             blueprint: $session->blueprint,
-            connection: $session->blueprint?->connection,
+            connection: $session->blueprint?->connections->first(),
             currentUserMessage: $message,
         );
 

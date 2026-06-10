@@ -29,6 +29,9 @@ class ConnectorBuilderController extends Controller
         return Inertia::render('Admin/Dashboards/Connections/AiCreate', [
             'dashboard' => $this->serializeDashboard($dashboard),
             'session' => $session ? $this->serializeSession($session) : null,
+            'isResuming' => $session !== null && (
+                $session->blueprint !== null || $session->messages->isNotEmpty()
+            ),
         ]);
     }
 

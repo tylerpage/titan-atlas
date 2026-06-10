@@ -29,6 +29,10 @@ function shareBlueprint() {
     router.post(route('admin.ai-connectors.share', props.blueprint.id));
 }
 
+function shareBlueprintGlobally() {
+    router.post(route('admin.ai-connectors.share-global', props.blueprint.id));
+}
+
 function exportDevTasks() {
     navigator.clipboard.writeText(JSON.stringify(props.blueprint.dev_tasks ?? [], null, 2));
 }
@@ -49,7 +53,10 @@ function exportDevTasks() {
             </p>
             <div class="flex flex-wrap items-center gap-3">
                 <h1 class="text-3xl font-semibold">{{ blueprint.label }}</h1>
-                <span v-if="blueprint.is_shared" class="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-800">
+                <span v-if="blueprint.is_global" class="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-800">
+                    Global
+                </span>
+                <span v-else-if="blueprint.is_shared" class="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-800">
                     Shared
                 </span>
             </div>
@@ -57,6 +64,13 @@ function exportDevTasks() {
         </div>
 
         <div class="mb-6 flex flex-wrap gap-2">
+            <Link
+                v-if="blueprint.chat_url"
+                :href="blueprint.chat_url"
+                class="rounded-lg bg-primary px-4 py-2 text-sm text-white hover:bg-primary-hover"
+            >
+                Continue in AI chat
+            </Link>
             <Link
                 :href="route('admin.ai-connectors.edit', blueprint.id)"
                 class="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50"
@@ -71,12 +85,20 @@ function exportDevTasks() {
                 Test connection
             </button>
             <button
-                v-if="!blueprint.is_shared"
+                v-if="!blueprint.is_shared && !blueprint.is_global"
                 type="button"
                 class="rounded-lg border border-sky-300 px-4 py-2 text-sm text-sky-800 hover:bg-sky-50"
                 @click="shareBlueprint"
             >
                 Share company-wide
+            </button>
+            <button
+                v-if="!blueprint.is_global"
+                type="button"
+                class="rounded-lg border border-violet-300 px-4 py-2 text-sm text-violet-800 hover:bg-violet-50"
+                @click="shareBlueprintGlobally"
+            >
+                Share globally
             </button>
             <button
                 v-if="blueprint.connections?.length"

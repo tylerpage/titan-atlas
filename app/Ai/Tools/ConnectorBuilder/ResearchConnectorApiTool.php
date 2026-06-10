@@ -2,6 +2,7 @@
 
 namespace App\Ai\Tools\ConnectorBuilder;
 
+use App\Support\DynamicConnectorAuth;
 use App\Support\DynamicConnectorReadOnlyGuard;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Support\Facades\Http;
@@ -12,7 +13,7 @@ class ResearchConnectorApiTool extends ConnectorBuilderTool
 {
     public function description(): Stringable|string
     {
-        return 'Capture structured API research notes for read-only connectors: auth method, base URL, list/fetch endpoints, pagination, and recommended GET streams only.';
+        return 'Capture structured API research notes for read-only connectors: auth method (including oauth2_client_credentials), base URL, token endpoint, list/fetch endpoints, pagination, and recommended streams.';
     }
 
     public function handle(Request $request): Stringable|string
@@ -41,7 +42,8 @@ class ResearchConnectorApiTool extends ConnectorBuilderTool
             'recommended_streams' => $request->array('recommended_streams'),
             'notes' => $request->string('notes')->toString(),
             'docs_hint' => $docsHint,
-            'allowed_auth_types' => config('titan.connector_builder.allowed_auth_types', []),
+            'allowed_auth_types' => DynamicConnectorAuth::allowedTypes(),
+            'oauth2_client_credentials_guidance' => DynamicConnectorAuth::agentOAuthGuidance(),
             'read_only_policy' => app(DynamicConnectorReadOnlyGuard::class)->policyNotice(),
         ]);
     }

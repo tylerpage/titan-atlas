@@ -12,6 +12,7 @@ use App\Models\ClientDashboard;
 use App\Models\Company;
 use App\Models\ConnectorBlueprint;
 use App\Services\ConnectorBuilder\AiConnectorService;
+use App\Services\ConnectorBuilder\ConnectorBuilderResumeService;
 use App\Services\ConnectorBuilder\CreateDynamicConnectionService;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -88,7 +89,7 @@ class AiConnectorController extends Controller
         }
 
         return redirect()
-            ->route('admin.companies.ai-connectors.index', $companyId)
+            ->route($blueprint->isGlobal() ? 'admin.ai-connectors.index' : 'admin.companies.ai-connectors.index', $blueprint->isGlobal() ? [] : $companyId)
             ->with('status', 'AI connector deleted.');
     }
 
@@ -98,6 +99,33 @@ class AiConnectorController extends Controller
         $connectors->share($blueprint);
 
         return back()->with('status', 'AI connector is now shared across all dashboards in '.$blueprint->company->name.'.');
+    }
+
+    public function shareGlobally(ConnectorBlueprint $blueprint, AiConnectorService $connectors): RedirectResponse
+    {
+        try {
+            $connectors->shareGlobally($blueprint);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return back()->withErrors($e->errors());
+        }
+
+        return back()->with('status', 'AI connector is now available to all companies.');
+    }
+
+    public function resumeChat(
+        ConnectorBlueprint $blueprint,
+        ConnectorBuilderResumeService $resume,
+    ): RedirectResponse {
+        try {
+            $resolved = $resume->resolve($blueprint, request()->user());
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return back()->withErrors($e->errors());
+        }
+
+        return redirect()->route('admin.dashboards.connections.ai-create', [
+            'dashboard' => $resolved['dashboard']->id,
+            'session' => $resolved['session']->id,
+        ]);
     }
 
     public function createConnection(
@@ -187,6 +215,8 @@ class AiConnectorController extends Controller
             'label' => $blueprint->label,
             'status' => $blueprint->status->value,
             'is_shared' => $blueprint->isShared(),
+            'is_global' => $blueprint->isGlobal(),
+            'chat_url' => route('admin.ai-connectors.chat', $blueprint),
             'original_prompt' => $blueprint->original_prompt,
             'connections_count' => $blueprint->connections_count ?? $blueprint->connections()->count(),
             'streams_count' => $blueprint->streams_count ?? $blueprint->streams()->count(),

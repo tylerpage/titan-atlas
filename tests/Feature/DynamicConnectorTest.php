@@ -218,6 +218,100 @@ class DynamicConnectorTest extends TestCase
         $this->assertSame('42', $result->records[0]['external_id']);
     }
 
+    public function test_dynamic_connector_supports_oauth2_client_credentials_auth(): void
+    {
+        Http::fake([
+            'https://shop.example.com/api/oauth/token*' => Http::response([
+                'token_type' => 'Bearer',
+                'expires_in' => 600,
+                'access_token' => 'shopware-token',
+            ], 200),
+            'https://shop.example.com/api/order*' => Http::response([
+                'data' => [[
+                    'id' => 'order-1',
+                    'orderNumber' => '10001',
+                    'orderDateTime' => '2026-06-01T12:00:00+00:00',
+                    'amountTotal' => 99.99,
+                ]],
+            ], 200),
+        ]);
+
+        $dashboard = ClientDashboard::query()->create([
+            'company_id' => Company::query()->create(['name' => 'Shop Co', 'slug' => 'shop-co'])->id,
+            'name' => 'Shopware',
+            'slug' => 'shopware',
+        ]);
+
+        $blueprint = ConnectorBlueprint::query()->create([
+            'company_id' => $dashboard->company_id,
+            'client_dashboard_id' => $dashboard->id,
+            'slug' => 'shopware',
+            'label' => 'Shopware',
+            'status' => ConnectorBlueprintStatus::Ready,
+            'auth_config' => [
+                'type' => 'oauth2_client_credentials',
+                'token_url' => '/api/oauth/token',
+            ],
+            'credential_schema' => [
+                ['key' => 'client_id', 'label' => 'Client ID', 'type' => 'text'],
+                ['key' => 'client_secret', 'label' => 'Client Secret', 'type' => 'password'],
+            ],
+            'sync_config' => [
+                'base_url' => 'https://shop.example.com',
+                'test_endpoint' => '/api/order?limit=1',
+            ],
+        ]);
+
+        ConnectorBlueprintStream::query()->create([
+            'connector_blueprint_id' => $blueprint->id,
+            'stream_key' => 'orders',
+            'resource_type' => 'shopware_order',
+            'path_template' => '/api/order',
+            'query_params' => ['limit' => 50],
+            'response_mapping' => [
+                'records_path' => 'data',
+                'id_path' => 'id',
+                'date_path' => 'orderDateTime',
+            ],
+        ]);
+
+        $connection = Connection::query()->create([
+            'client_dashboard_id' => $dashboard->id,
+            'connector_type' => ConnectorType::Dynamic,
+            'connector_blueprint_id' => $blueprint->id,
+            'name' => 'Shopware',
+            'encrypted_credentials' => [
+                'client_id' => 'integration-id',
+                'client_secret' => 'integration-secret',
+            ],
+        ]);
+
+        $connector = app(DynamicConnector::class);
+        $validation = $connector->validateCredentials($connection);
+
+        $this->assertTrue($validation->valid);
+
+        $result = $connector->fetch($connection);
+
+        $this->assertCount(1, $result->records);
+        $this->assertSame('order-1', $result->records[0]['external_id']);
+
+        Http::assertSent(function ($request) {
+            if ($request->url() === 'https://shop.example.com/api/oauth/token') {
+                return $request->method() === 'POST'
+                    && $request->data()['grant_type'] === 'client_credentials'
+                    && $request->data()['client_id'] === 'integration-id'
+                    && $request->data()['client_secret'] === 'integration-secret';
+            }
+
+            if (str_starts_with($request->url(), 'https://shop.example.com/api/order')) {
+                return $request->hasHeader('Authorization', 'Bearer shopware-token');
+            }
+
+            return false;
+        });
+    }
+
     public function test_admin_can_open_ai_connector_builder_page(): void
     {
         $admin = User::factory()->create(['role' => UserRole::Admin]);

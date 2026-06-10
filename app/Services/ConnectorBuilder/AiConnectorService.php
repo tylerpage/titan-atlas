@@ -18,9 +18,13 @@ class AiConnectorService
     public function listForCompany(Company $company): Collection
     {
         return ConnectorBlueprint::query()
-            ->where('company_id', $company->id)
+            ->where(function ($query) use ($company) {
+                $query->where('company_id', $company->id)
+                    ->orWhere('is_global', true);
+            })
             ->withCount('connections')
-            ->with(['streams', 'dashboard'])
+            ->with(['streams', 'dashboard', 'company'])
+            ->orderByDesc('is_global')
             ->orderBy('label')
             ->get();
     }
@@ -31,22 +35,32 @@ class AiConnectorService
     public function templatesForDashboard(ClientDashboard $dashboard): Collection
     {
         return ConnectorBlueprint::query()
-            ->where('company_id', $dashboard->company_id)
             ->where(function ($query) use ($dashboard) {
-                $query->whereNull('client_dashboard_id')
-                    ->orWhere('client_dashboard_id', $dashboard->id);
+                $query->where('is_global', true)
+                    ->orWhere(function ($companyQuery) use ($dashboard) {
+                        $companyQuery->where('company_id', $dashboard->company_id)
+                            ->where(function ($scopeQuery) use ($dashboard) {
+                                $scopeQuery->whereNull('client_dashboard_id')
+                                    ->orWhere('client_dashboard_id', $dashboard->id);
+                            });
+                    });
             })
             ->whereIn('status', [
                 ConnectorBlueprintStatus::Ready->value,
                 ConnectorBlueprintStatus::Active->value,
                 ConnectorBlueprintStatus::Draft->value,
             ])
+            ->orderByDesc('is_global')
             ->orderBy('label')
             ->get();
     }
 
     public function isAvailableForDashboard(ConnectorBlueprint $blueprint, ClientDashboard $dashboard): bool
     {
+        if ($blueprint->isGlobal()) {
+            return true;
+        }
+
         if ($blueprint->company_id !== $dashboard->company_id) {
             return false;
         }
@@ -72,15 +86,7 @@ class AiConnectorService
             throw ValidationException::withMessages(['slug' => 'Slug is required.']);
         }
 
-        $exists = ConnectorBlueprint::query()
-            ->where('company_id', $blueprint->company_id)
-            ->where('slug', $slug)
-            ->whereKeyNot($blueprint->id)
-            ->exists();
-
-        if ($exists) {
-            throw ValidationException::withMessages(['slug' => 'Another AI connector in this company already uses that slug.']);
-        }
+        $this->assertSlugAvailable($blueprint, $slug);
 
         $status = ConnectorBlueprintStatus::tryFrom((string) ($data['status'] ?? '')) ?? $blueprint->status;
 
@@ -105,6 +111,21 @@ class AiConnectorService
         return $blueprint->fresh(['streams', 'connections', 'dashboard', 'company']);
     }
 
+    public function shareGlobally(ConnectorBlueprint $blueprint): ConnectorBlueprint
+    {
+        $this->assertSlugAvailable($blueprint, $blueprint->slug);
+
+        $blueprint->update([
+            'is_global' => true,
+            'client_dashboard_id' => null,
+            'status' => $blueprint->status === ConnectorBlueprintStatus::Draft
+                ? ConnectorBlueprintStatus::Ready
+                : $blueprint->status,
+        ]);
+
+        return $blueprint->fresh(['streams', 'connections', 'dashboard', 'company']);
+    }
+
     public function delete(ConnectorBlueprint $blueprint): void
     {
         if ($blueprint->connections()->exists()) {
@@ -114,5 +135,32 @@ class AiConnectorService
         }
 
         $blueprint->delete();
+    }
+
+    protected function assertSlugAvailable(ConnectorBlueprint $blueprint, string $slug): void
+    {
+        if ($blueprint->isGlobal()) {
+            $exists = ConnectorBlueprint::query()
+                ->where('is_global', true)
+                ->where('slug', $slug)
+                ->whereKeyNot($blueprint->id)
+                ->exists();
+
+            if ($exists) {
+                throw ValidationException::withMessages(['slug' => 'Another global AI connector already uses that slug.']);
+            }
+
+            return;
+        }
+
+        $exists = ConnectorBlueprint::query()
+            ->where('company_id', $blueprint->company_id)
+            ->where('slug', $slug)
+            ->whereKeyNot($blueprint->id)
+            ->exists();
+
+        if ($exists) {
+            throw ValidationException::withMessages(['slug' => 'Another AI connector in this company already uses that slug.']);
+        }
     }
 }

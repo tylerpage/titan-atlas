@@ -40,6 +40,10 @@ function destroyBlueprint(blueprint) {
 function shareBlueprint(blueprintId) {
     router.post(route('admin.ai-connectors.share', blueprintId));
 }
+
+function shareBlueprintGlobally(blueprintId) {
+    router.post(route('admin.ai-connectors.share-global', blueprintId));
+}
 </script>
 
 <template>
@@ -48,7 +52,7 @@ function shareBlueprint(blueprintId) {
             <div>
                 <h1 class="text-3xl font-semibold">AI Connectors</h1>
                 <p class="mt-2 text-sm text-slate-600">
-                    Reusable connector templates shared across dashboards. Each dashboard connection keeps its own credentials.
+                    Reusable connector templates shared across dashboards and companies. Each dashboard connection keeps its own credentials.
                 </p>
             </div>
         </div>
@@ -93,18 +97,26 @@ function shareBlueprint(blueprintId) {
                             <h2 class="text-lg font-semibold">{{ blueprint.label }}</h2>
                             <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700">{{ blueprint.status }}</span>
                             <span
-                                v-if="blueprint.is_shared"
+                                v-if="blueprint.is_global"
+                                class="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-800"
+                            >
+                                Global
+                            </span>
+                            <span
+                                v-else-if="blueprint.is_shared"
                                 class="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-800"
                             >
                                 Shared
                             </span>
                         </div>
                         <p class="mt-1 text-sm text-slate-500">
-                            {{ blueprint.company?.name }} · {{ blueprint.slug }}
+                            <span v-if="blueprint.is_global">All companies</span>
+                            <span v-else>{{ blueprint.company?.name }}</span>
+                            · {{ blueprint.slug }}
                             · {{ blueprint.streams_count }} streams
                             · {{ blueprint.connections_count }} connection{{ blueprint.connections_count === 1 ? '' : 's' }}
                         </p>
-                        <p v-if="blueprint.dashboard && !blueprint.is_shared" class="mt-1 text-xs text-slate-500">
+                        <p v-if="blueprint.dashboard && !blueprint.is_shared && !blueprint.is_global" class="mt-1 text-xs text-slate-500">
                             Created on {{ blueprint.dashboard.name }}
                         </p>
                     </div>
@@ -116,18 +128,33 @@ function shareBlueprint(blueprintId) {
                             View
                         </Link>
                         <Link
+                            v-if="blueprint.chat_url"
+                            :href="blueprint.chat_url"
+                            class="rounded-lg border border-primary px-3 py-2 text-sm text-primary hover:bg-primary/5"
+                        >
+                            Continue in AI chat
+                        </Link>
+                        <Link
                             :href="route('admin.ai-connectors.edit', blueprint.id)"
                             class="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50"
                         >
                             Edit
                         </Link>
                         <button
-                            v-if="!blueprint.is_shared"
+                            v-if="!blueprint.is_shared && !blueprint.is_global"
                             type="button"
                             class="rounded-lg border border-sky-300 px-3 py-2 text-sm text-sky-800 hover:bg-sky-50"
                             @click="shareBlueprint(blueprint.id)"
                         >
                             Share company-wide
+                        </button>
+                        <button
+                            v-if="!blueprint.is_global"
+                            type="button"
+                            class="rounded-lg border border-violet-300 px-3 py-2 text-sm text-violet-800 hover:bg-violet-50"
+                            @click="shareBlueprintGlobally(blueprint.id)"
+                        >
+                            Share globally
                         </button>
                         <button
                             type="button"

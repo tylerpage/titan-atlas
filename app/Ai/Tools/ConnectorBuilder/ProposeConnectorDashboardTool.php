@@ -53,7 +53,7 @@ class ProposeConnectorDashboardTool extends ConnectorBuilderTool
         }
 
         $connectionId = $this->context->connection?->id
-            ?? $this->context->blueprint->connection_id;
+            ?? $this->context->blueprint->connections()->latest()->value('id');
 
         $startDate = Carbon::now()->subDays(29)->startOfDay();
         $endDate = Carbon::now()->endOfDay();

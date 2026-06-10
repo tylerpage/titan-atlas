@@ -33,6 +33,15 @@ function submit() {
                 </Link>
             </p>
             <h1 class="text-3xl font-semibold">Edit AI connector</h1>
+            <div class="mt-3">
+                <Link
+                    v-if="blueprint.chat_url"
+                    :href="blueprint.chat_url"
+                    class="inline-flex rounded-lg bg-primary px-4 py-2 text-sm text-white hover:bg-primary-hover"
+                >
+                    Continue in AI chat
+                </Link>
+            </div>
         </div>
 
         <form class="mx-auto max-w-xl space-y-6 rounded-xl border border-slate-200 bg-white p-8 shadow-sm" @submit.prevent="submit">
