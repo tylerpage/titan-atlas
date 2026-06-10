@@ -16,6 +16,11 @@ class DynamicHttpClient
     /** @var array<string, array{token: string, expires_at: int}> */
     protected static array $tokenCache = [];
 
+    public static function resetTokenCache(): void
+    {
+        self::$tokenCache = [];
+    }
+
     public function __construct(protected DynamicConnectorReadOnlyGuard $readOnlyGuard) {}
 
     /**
@@ -270,7 +275,7 @@ class DynamicHttpClient
         }
 
         $tokenRequest = DynamicConnectorAuth::tokenRequest($auth);
-        $method = $this->readOnlyGuard->normalizeHttpMethod($tokenRequest['method'] ?? 'POST');
+        $method = (string) ($tokenRequest['method'] ?? 'POST');
         $path = (string) ($tokenRequest['path'] ?? '/oauth/token');
         $body = is_array($tokenRequest['body'] ?? null) ? $tokenRequest['body'] : [];
         $headers = is_array($tokenRequest['headers'] ?? null) ? $tokenRequest['headers'] : [];

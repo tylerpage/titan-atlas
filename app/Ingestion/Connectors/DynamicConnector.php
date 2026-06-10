@@ -10,6 +10,7 @@ use App\Ingestion\Connectors\Dynamic\DynamicHttpClient;
 use App\Models\Connection;
 use App\Models\ConnectorBlueprint;
 use App\Models\ConnectorBlueprintStream;
+use App\Support\DynamicConnectorAuth;
 use Illuminate\Support\Arr;
 
 class DynamicConnector extends AbstractConnector implements FanOutSyncConnector
@@ -142,7 +143,11 @@ class DynamicConnector extends AbstractConnector implements FanOutSyncConnector
      */
     public function probeConnection(ConnectorBlueprint $blueprint, array $credentials): array
     {
-        if ($blueprint->testEndpoint() !== null) {
+        $testEndpoint = $blueprint->testEndpoint();
+        $authConfig = $blueprint->auth_config ?? [];
+        $testEndpointIsTokenUrl = DynamicConnectorAuth::testEndpointConflictsWithTokenRequest($authConfig, $testEndpoint);
+
+        if ($testEndpoint !== null && ! $testEndpointIsTokenUrl) {
             $testRequest = $blueprint->sync_config['test_request'] ?? null;
 
             if (is_array($testRequest)) {
@@ -150,7 +155,7 @@ class DynamicConnector extends AbstractConnector implements FanOutSyncConnector
                     blueprint: $blueprint,
                     credentials: $credentials,
                     method: (string) ($testRequest['method'] ?? 'GET'),
-                    path: (string) ($testRequest['path'] ?? $blueprint->testEndpoint()),
+                    path: (string) ($testRequest['path'] ?? $testEndpoint),
                     queryParams: is_array($testRequest['query_params'] ?? null) ? $testRequest['query_params'] : [],
                     headers: is_array($testRequest['headers'] ?? null) ? $testRequest['headers'] : [],
                     body: is_array($testRequest['body'] ?? null) ? $testRequest['body'] : [],
@@ -162,7 +167,7 @@ class DynamicConnector extends AbstractConnector implements FanOutSyncConnector
                 blueprint: $blueprint,
                 credentials: $credentials,
                 method: 'GET',
-                path: $blueprint->testEndpoint(),
+                path: $testEndpoint,
             );
         }
 

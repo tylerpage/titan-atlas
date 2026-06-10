@@ -7,6 +7,7 @@ use App\Enums\ConnectorBuilderSessionStatus;
 use App\Enums\ConnectorType;
 use App\Enums\UserRole;
 use App\Ingestion\Connectors\DynamicConnector;
+use App\Ingestion\Connectors\Dynamic\DynamicHttpClient;
 use App\Models\ClientDashboard;
 use App\Models\Company;
 use App\Models\Connection;
@@ -25,6 +26,13 @@ use Tests\TestCase;
 class DynamicConnectorTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        DynamicHttpClient::resetTokenCache();
+    }
 
     public function test_dynamic_connector_validates_fetches_and_transforms_hubspot_like_blueprint(): void
     {
@@ -310,6 +318,157 @@ class DynamicConnectorTest extends TestCase
 
             return false;
         });
+    }
+
+    public function test_connection_probe_uses_post_for_token_even_when_token_request_method_is_get(): void
+    {
+        Http::fake([
+            'https://shop.example.com/api/oauth/token*' => function ($request) {
+                if ($request->method() !== 'POST') {
+                    return Http::response(['error' => 'Method Not Allowed'], 405);
+                }
+
+                return Http::response(['access_token' => 'shopware-token', 'expires_in' => 600], 200);
+            },
+            'https://shop.example.com/api/order*' => Http::response([
+                'data' => [['id' => 'order-1', 'orderDateTime' => '2026-06-01T12:00:00+00:00']],
+            ], 200),
+        ]);
+
+        $dashboard = ClientDashboard::query()->create([
+            'company_id' => Company::query()->create(['name' => 'Shop Co', 'slug' => 'shop-co-probe'])->id,
+            'name' => 'Shopware',
+            'slug' => 'shopware-probe',
+        ]);
+
+        $blueprint = ConnectorBlueprint::query()->create([
+            'company_id' => $dashboard->company_id,
+            'client_dashboard_id' => $dashboard->id,
+            'slug' => 'shopware-probe',
+            'label' => 'Shopware',
+            'status' => ConnectorBlueprintStatus::Ready,
+            'auth_config' => [
+                'type' => 'oauth2_client_credentials',
+                'token_url' => '/api/oauth/token',
+                'token_request' => [
+                    'method' => 'GET',
+                ],
+            ],
+            'credential_schema' => [
+                ['key' => 'client_id', 'label' => 'Client ID', 'type' => 'text'],
+                ['key' => 'client_secret', 'label' => 'Client Secret', 'type' => 'password'],
+            ],
+            'sync_config' => [
+                'base_url' => 'https://shop.example.com',
+                'test_endpoint' => '/api/order?limit=1',
+            ],
+        ]);
+
+        ConnectorBlueprintStream::query()->create([
+            'connector_blueprint_id' => $blueprint->id,
+            'stream_key' => 'orders',
+            'resource_type' => 'shopware_order',
+            'path_template' => '/api/order',
+            'response_mapping' => [
+                'records_path' => 'data',
+                'id_path' => 'id',
+                'date_path' => 'orderDateTime',
+            ],
+        ]);
+
+        $connection = Connection::query()->create([
+            'client_dashboard_id' => $dashboard->id,
+            'connector_type' => ConnectorType::Dynamic,
+            'connector_blueprint_id' => $blueprint->id,
+            'name' => 'Shopware',
+            'encrypted_credentials' => [
+                'client_id' => 'integration-id',
+                'client_secret' => 'integration-secret',
+            ],
+        ]);
+
+        $validation = app(DynamicConnector::class)->validateCredentials($connection);
+
+        $this->assertTrue($validation->valid);
+
+        Http::assertSent(fn ($request) => $request->url() === 'https://shop.example.com/api/oauth/token'
+            && $request->method() === 'POST');
+    }
+
+    public function test_connection_probe_skips_get_on_token_test_endpoint_and_uses_data_stream(): void
+    {
+        Http::fake([
+            'https://shop.example.com/api/oauth/token*' => function ($request) {
+                if ($request->method() !== 'POST') {
+                    return Http::response(['error' => 'Method Not Allowed'], 405);
+                }
+
+                return Http::response(['access_token' => 'shopware-token', 'expires_in' => 600], 200);
+            },
+            'https://shop.example.com/api/order*' => Http::response([
+                'data' => [['id' => 'order-1', 'orderDateTime' => '2026-06-01T12:00:00+00:00']],
+            ], 200),
+        ]);
+
+        $dashboard = ClientDashboard::query()->create([
+            'company_id' => Company::query()->create(['name' => 'Shop Co', 'slug' => 'shop-co-token-test'])->id,
+            'name' => 'Shopware',
+            'slug' => 'shopware-token-test',
+        ]);
+
+        $blueprint = ConnectorBlueprint::query()->create([
+            'company_id' => $dashboard->company_id,
+            'client_dashboard_id' => $dashboard->id,
+            'slug' => 'shopware-token-test',
+            'label' => 'Shopware',
+            'status' => ConnectorBlueprintStatus::Ready,
+            'auth_config' => [
+                'type' => 'oauth2_client_credentials',
+                'token_url' => '/api/oauth/token',
+            ],
+            'credential_schema' => [
+                ['key' => 'client_id', 'label' => 'Client ID', 'type' => 'text'],
+                ['key' => 'client_secret', 'label' => 'Client Secret', 'type' => 'password'],
+            ],
+            'sync_config' => [
+                'base_url' => 'https://shop.example.com',
+                'test_endpoint' => '/api/oauth/token',
+            ],
+        ]);
+
+        ConnectorBlueprintStream::query()->create([
+            'connector_blueprint_id' => $blueprint->id,
+            'stream_key' => 'orders',
+            'resource_type' => 'shopware_order',
+            'path_template' => '/api/order',
+            'response_mapping' => [
+                'records_path' => 'data',
+                'id_path' => 'id',
+                'date_path' => 'orderDateTime',
+            ],
+        ]);
+
+        $connection = Connection::query()->create([
+            'client_dashboard_id' => $dashboard->id,
+            'connector_type' => ConnectorType::Dynamic,
+            'connector_blueprint_id' => $blueprint->id,
+            'name' => 'Shopware',
+            'encrypted_credentials' => [
+                'client_id' => 'integration-id',
+                'client_secret' => 'integration-secret',
+            ],
+        ]);
+
+        $validation = app(DynamicConnector::class)->validateCredentials($connection);
+
+        $this->assertTrue($validation->valid);
+
+        Http::assertSent(fn ($request) => $request->url() === 'https://shop.example.com/api/oauth/token'
+            && $request->method() === 'POST');
+        Http::assertSent(fn ($request) => str_starts_with($request->url(), 'https://shop.example.com/api/order')
+            && $request->method() === 'GET');
+        Http::assertNotSent(fn ($request) => $request->url() === 'https://shop.example.com/api/oauth/token'
+            && $request->method() === 'GET');
     }
 
     public function test_admin_can_open_ai_connector_builder_page(): void

@@ -32,6 +32,30 @@ class DynamicConnectorAuthTest extends TestCase
         $this->assertSame('client_secret', $schema[1]['key']);
     }
 
+    public function test_it_forces_post_for_token_requests_even_when_method_is_get(): void
+    {
+        $tokenRequest = DynamicConnectorAuth::tokenRequest([
+            'type' => 'oauth2_client_credentials',
+            'token_url' => '/api/oauth/token',
+            'token_request' => [
+                'method' => 'GET',
+            ],
+        ]);
+
+        $this->assertSame('POST', $tokenRequest['method']);
+    }
+
+    public function test_it_detects_when_test_endpoint_matches_token_url(): void
+    {
+        $auth = [
+            'type' => 'oauth2_client_credentials',
+            'token_url' => '/api/oauth/token',
+        ];
+
+        $this->assertTrue(DynamicConnectorAuth::testEndpointConflictsWithTokenRequest($auth, '/api/oauth/token'));
+        $this->assertFalse(DynamicConnectorAuth::testEndpointConflictsWithTokenRequest($auth, '/api/order?limit=1'));
+    }
+
     public function test_it_leaves_bearer_auth_config_unchanged(): void
     {
         $auth = [
