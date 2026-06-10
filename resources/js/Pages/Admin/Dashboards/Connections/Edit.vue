@@ -161,9 +161,13 @@ async function testConnection() {
             return;
         }
 
+        const hint = data.debug?.hint ?? data.debug?.graphql_hint;
+
         testStatus.value = {
             type: data.valid ? 'success' : 'error',
-            message: data.message ?? (data.valid ? 'Connection successful.' : 'Connection failed.'),
+            message: !data.valid && hint && !String(data.message ?? '').includes(hint)
+                ? `${data.message ?? 'Connection failed.'} ${hint}`
+                : (data.message ?? (data.valid ? 'Connection successful.' : 'Connection failed.')),
             debug: data.debug ?? null,
         };
 

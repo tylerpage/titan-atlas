@@ -152,6 +152,7 @@ return [
         'top_channels_limit' => (int) env('TITAN_STACKADAPT_TOP_CHANNELS_LIMIT', 10),
         'top_insights_limit' => (int) env('TITAN_STACKADAPT_TOP_INSIGHTS_LIMIT', 15),
         'use_rest_fallback' => (bool) env('TITAN_STACKADAPT_USE_REST_FALLBACK', false),
+        'test_window_days' => (int) env('TITAN_STACKADAPT_TEST_WINDOW_DAYS', 30),
     ],
 
     'google_analytics' => [

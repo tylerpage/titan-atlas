@@ -49,6 +49,27 @@ class StackAdaptConnectorTest extends TestCase
         $this->assertCount(1, $result->debug['advertisers'] ?? []);
     }
 
+    public function test_validate_credentials_allows_advertiser_with_no_recent_delivery_rows(): void
+    {
+        $this->fakeStackAdaptGraphql([
+            'advertisers' => [
+                ['id' => 'adv-1', 'name' => 'Irish Titan'],
+            ],
+            'advertiser_delivery' => [],
+        ]);
+
+        $connection = $this->makeConnection([
+            'graphql_api_key' => 'graphql-key',
+            'advertiser_id' => 'adv-1',
+        ]);
+
+        $result = app(StackAdaptConnector::class)->validateCredentials($connection);
+
+        $this->assertTrue($result->valid);
+        $this->assertStringContainsString('Irish Titan', $result->message ?? '');
+        $this->assertSame(0, $result->debug['delivery_record_count'] ?? null);
+    }
+
     public function test_validate_credentials_confirms_advertiser_access(): void
     {
         $this->fakeStackAdaptGraphql([

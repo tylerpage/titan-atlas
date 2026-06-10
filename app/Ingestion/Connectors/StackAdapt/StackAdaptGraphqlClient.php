@@ -79,6 +79,23 @@ GQL;
         string $toDate,
         ?string $after = null,
     ): array {
+        return $this->advertiserDeliveryProbe($apiKey, $advertiserId, $fromDate, $toDate, $after)['records'];
+    }
+
+    /**
+     * @return array{
+     *     typename: string|null,
+     *     record_count: int,
+     *     records: list<array<string, mixed>>
+     * }
+     */
+    public function advertiserDeliveryProbe(
+        string $apiKey,
+        string $advertiserId,
+        string $fromDate,
+        string $toDate,
+        ?string $after = null,
+    ): array {
         $query = <<<GQL
             query StackAdaptAdvertiserDelivery(
                 \$ids: [ID!]!
@@ -125,7 +142,15 @@ GQL;
             'after' => $after,
         ]);
 
-        return $this->unwrapDeliveryRecords($data['advertiserDelivery'] ?? null);
+        $payload = $data['advertiserDelivery'] ?? null;
+        $typename = is_array($payload) ? (string) ($payload['__typename'] ?? '') : '';
+        $records = $this->unwrapDeliveryRecords($payload);
+
+        return [
+            'typename' => $typename !== '' ? $typename : null,
+            'record_count' => count($records),
+            'records' => $records,
+        ];
     }
 
     /**
@@ -281,16 +306,45 @@ GQL;
         ];
     }
 
-    public function testAdvertiserAccess(string $apiKey, string $advertiserId): void
+    /**
+     * @return array{
+     *     delivery_typename: string,
+     *     delivery_record_count: int,
+     *     delivery_from_date: string,
+     *     delivery_to_date: string
+     * }
+     */
+    public function testAdvertiserAccess(string $apiKey, string $advertiserId): array
     {
-        $end = now()->subDays(max(0, (int) config('titan.stackadapt.data_lag_days', 1)))->toDateString();
-        $start = now()->subDays(7)->toDateString();
+        $lagDays = max(0, (int) config('titan.stackadapt.data_lag_days', 1));
+        $windowDays = max(7, (int) config('titan.stackadapt.test_window_days', 30));
 
-        $records = $this->advertiserDeliveryRecords($apiKey, $advertiserId, $start, $this->exclusiveEndDate($end));
+        $end = now()->subDays($lagDays)->toDateString();
+        $start = now()->subDays($windowDays)->toDateString();
 
-        if ($records === []) {
-            throw new RuntimeException('No StackAdapt delivery data returned for the selected advertiser in the last 7 days.');
+        $probe = $this->advertiserDeliveryProbe(
+            $apiKey,
+            $advertiserId,
+            $start,
+            $this->exclusiveEndDate($end),
+        );
+
+        $typename = $probe['typename'];
+
+        if ($typename === null) {
+            throw new RuntimeException('StackAdapt returned no advertiser delivery payload for the selected advertiser.');
         }
+
+        if (! in_array($typename, ['AdvertiserDeliveryOutcome', 'CampaignDeliveryOutcome'], true)) {
+            throw new RuntimeException('StackAdapt returned unexpected delivery response type: '.$typename.'.');
+        }
+
+        return [
+            'delivery_typename' => $typename,
+            'delivery_record_count' => $probe['record_count'],
+            'delivery_from_date' => $start,
+            'delivery_to_date' => $end,
+        ];
     }
 
     /**

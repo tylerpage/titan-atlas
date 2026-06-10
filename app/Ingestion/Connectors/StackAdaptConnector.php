@@ -67,26 +67,36 @@ class StackAdaptConnector extends AbstractConnector implements FanOutSyncConnect
         }
 
         try {
-            $this->graphql->testAdvertiserAccess($apiKey, $advertiserId);
+            $debug = array_merge($debug, $this->graphql->testAdvertiserAccess($apiKey, $advertiserId));
         } catch (\Throwable $e) {
             if ($this->rest->isEnabled() && ! empty($credentials['rest_api_key'])) {
                 try {
                     $end = now()->subDays(max(0, (int) config('titan.stackadapt.data_lag_days', 1)))->toDateString();
-                    $this->rest->deliveryStats(
+                    $rows = $this->rest->deliveryStats(
                         (string) $credentials['rest_api_key'],
                         $advertiserId,
                         now()->subDays(7)->toDateString(),
                         $end,
                     );
+
+                    if ($rows === []) {
+                        throw new \RuntimeException('REST fallback returned no delivery rows for the selected advertiser.');
+                    }
+
+                    $debug['delivery_record_count'] = count($rows);
+                    $debug['delivery_source'] = 'rest_fallback';
                 } catch (\Throwable $restError) {
                     return ValidationResult::fail(
-                        'Could not query the selected StackAdapt advertiser.',
-                        array_merge($debug, ['hint' => $restError->getMessage()]),
+                        $this->advertiserValidationMessage($restError->getMessage()),
+                        array_merge($debug, [
+                            'hint' => $restError->getMessage(),
+                            'graphql_hint' => $e->getMessage(),
+                        ]),
                     );
                 }
             } else {
                 return ValidationResult::fail(
-                    'Could not query the selected StackAdapt advertiser.',
+                    $this->advertiserValidationMessage($e->getMessage()),
                     array_merge($debug, ['hint' => $e->getMessage()]),
                 );
             }
@@ -94,8 +104,14 @@ class StackAdaptConnector extends AbstractConnector implements FanOutSyncConnect
 
         $label = collect($advertisers)->firstWhere('advertiserId', $advertiserId)['displayName'] ?? $advertiserId;
 
+        $message = 'Connected to StackAdapt advertiser '.$label;
+
+        if (($debug['delivery_record_count'] ?? 0) === 0) {
+            $message .= ' (no delivery rows in the test window; backfill may still return historical data).';
+        }
+
         return ValidationResult::ok(
-            'Connected to StackAdapt advertiser '.$label,
+            $message,
             array_merge($debug, ['display_name' => $label]),
         );
     }
@@ -583,6 +599,11 @@ class StackAdaptConnector extends AbstractConnector implements FanOutSyncConnect
         }
 
         return $this->streams[$index + 1] ?? null;
+    }
+
+    protected function advertiserValidationMessage(string $hint): string
+    {
+        return 'Could not query the selected StackAdapt advertiser. '.$hint;
     }
 
 }
