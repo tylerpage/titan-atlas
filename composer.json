@@ -11,6 +11,7 @@
         "laravel/ai": "^0.7.2",
         "laravel/framework": "^13.8",
         "laravel/horizon": "^5.47",
+        "laravel/reverb": "^1.10",
         "laravel/tinker": "^3.0",
         "league/flysystem-aws-s3-v3": "^3.34",
         "tightenco/ziggy": "^2.6"
@@ -47,7 +48,7 @@
         ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",
-            "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --queue=ai,ingestion,transform,default --tries=1 --timeout=0 --memory=512\" \"php artisan pail --timeout=0\" \"npm run dev\" --names=server,queue,logs,vite --kill-others"
+            "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74,#86efac\" \"php artisan serve\" \"php artisan queue:listen --queue=ai,ingestion,transform,default --tries=1 --timeout=0 --memory=512\" \"php artisan pail --timeout=0\" \"php artisan reverb:start\" \"npm run dev\" --names=server,queue,logs,reverb,vite --kill-others"
         ],
         "share": [
             "npm run build",
@@ -56,7 +57,7 @@
         "dev:share": [
             "Composer\\Config::disableProcessTimeout",
             "@composer share",
-            "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185\" \"php artisan serve --port=8001\" \"php artisan queue:listen --queue=ai,ingestion,transform,default --tries=1 --timeout=0 --memory=512\" \"php artisan pail --timeout=0\" --names=server,queue,logs --kill-others"
+            "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#86efac\" \"php artisan serve --port=8001\" \"php artisan queue:listen --queue=ai,ingestion,transform,default --tries=1 --timeout=0 --memory=512\" \"php artisan pail --timeout=0\" \"php artisan reverb:start\" --names=server,queue,logs,reverb --kill-others"
         ],
         "dev:ngrok": [
             "Composer\\Config::disableProcessTimeout",

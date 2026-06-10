@@ -116,6 +116,7 @@ class DashboardController extends Controller
                 'company_name' => $dashboard->company->name,
             ],
             'connectors' => collect(ConnectorType::cases())
+                ->reject(fn (ConnectorType $type) => $type->isDynamic())
                 ->map(fn (ConnectorType $type) => $type->toConnectorOption())
                 ->values(),
             'defaultConnectorType' => $pendingOAuth->defaultConnectorTypeForDashboard($dashboard->id),

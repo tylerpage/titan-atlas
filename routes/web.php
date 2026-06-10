@@ -3,6 +3,8 @@
 use App\Http\Controllers\Admin\AnalyticsReportController as AdminAnalyticsReportController;
 use App\Http\Controllers\Admin\CompanyController as AdminCompanyController;
 use App\Http\Controllers\Admin\ConnectionController as AdminConnectionController;
+use App\Http\Controllers\Admin\ConnectorBlueprintController as AdminConnectorBlueprintController;
+use App\Http\Controllers\Admin\ConnectorBuilderController as AdminConnectorBuilderController;
 use App\Http\Controllers\Admin\CoverPageBlockController as AdminCoverPageBlockController;
 use App\Http\Controllers\Admin\CoverPageController as AdminCoverPageController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
@@ -86,6 +88,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/dashboards/{dashboard}/edit', [AdminDashboardController::class, 'edit'])->name('dashboards.edit');
         Route::post('/dashboards/{dashboard}', [AdminDashboardController::class, 'update'])->name('dashboards.update');
         Route::get('/dashboards/{dashboard}/connections/create', [AdminDashboardController::class, 'createConnection'])->name('dashboards.connections.create');
+        Route::get('/dashboards/{dashboard}/connections/ai-create/{session?}', [AdminConnectorBuilderController::class, 'aiCreate'])->name('dashboards.connections.ai-create');
+        Route::post('/dashboards/{dashboard}/connector-builder/sessions', [AdminConnectorBuilderController::class, 'sendMessage'])->name('dashboards.connector-builder.sessions.store');
+        Route::get('/dashboards/{dashboard}/connector-builder/sessions/{session}/status', [AdminConnectorBuilderController::class, 'sessionStatus'])->name('dashboards.connector-builder.sessions.status');
         Route::post('/dashboards/{dashboard}/connections', [AdminDashboardController::class, 'storeConnection'])->name('dashboards.connections.store');
         Route::post('/connections/test', [AdminDashboardController::class, 'testConnection'])->name('connections.test');
         Route::get('/google/oauth/redirect', [AdminGoogleOAuthController::class, 'redirect'])->name('google.oauth.redirect');
@@ -97,6 +102,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/connections/{connection}/sync', [AdminConnectionController::class, 'sync'])->name('connections.sync');
         Route::post('/connections/{connection}/backfill', [AdminConnectionController::class, 'backfill'])->name('connections.backfill');
         Route::post('/connections/{connection}/clear-data', [AdminConnectionController::class, 'clearData'])->name('connections.clear-data');
+        Route::get('/connector-blueprints/{blueprint}', [AdminConnectorBlueprintController::class, 'show'])->name('connector-blueprints.show');
+        Route::post('/connector-blueprints/{blueprint}/test', [AdminConnectorBlueprintController::class, 'test'])->name('connector-blueprints.test');
+        Route::post('/connector-blueprints/{blueprint}/activate', [AdminConnectorBlueprintController::class, 'activate'])->name('connector-blueprints.activate');
         Route::get('/dashboards/{dashboard}/cover-pages', [AdminCoverPageController::class, 'index'])->name('dashboards.cover-pages.index');
         Route::get('/dashboards/{dashboard}/cover-pages/create', [AdminCoverPageController::class, 'create'])->name('dashboards.cover-pages.create');
         Route::post('/dashboards/{dashboard}/cover-pages', [AdminCoverPageController::class, 'store'])->name('dashboards.cover-pages.store');

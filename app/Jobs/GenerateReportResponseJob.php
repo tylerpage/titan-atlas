@@ -6,6 +6,7 @@ use App\Enums\AnalyticsReportSessionStatus;
 use App\Models\AnalyticsReportSession;
 use App\Models\ClientDashboard;
 use App\Models\User;
+use App\Services\AI\AiBroadcastService;
 use App\Services\AI\ReportingAgentService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -68,6 +69,8 @@ class GenerateReportResponseJob implements ShouldQueue
                 'role' => 'assistant',
                 'content' => 'Sorry, the reporting assistant timed out or failed. Please try a simpler question or try again.',
             ]);
+
+            app(AiBroadcastService::class)->reportSessionUpdated($session->fresh());
         }
     }
 }

@@ -97,12 +97,20 @@ function formatRelativeTime(isoString) {
         <section class="mb-10">
             <div class="mb-4 flex flex-wrap items-center justify-between gap-4">
                 <h2 class="text-xl font-semibold">Connections</h2>
-                <Link
-                    :href="route('admin.dashboards.connections.create', dashboard.id)"
-                    class="rounded-lg bg-primary px-4 py-2 text-sm text-white hover:bg-primary-hover"
-                >
-                    Add connection
-                </Link>
+                <div class="flex flex-wrap gap-2">
+                    <Link
+                        :href="route('admin.dashboards.connections.ai-create', dashboard.id)"
+                        class="rounded-lg border border-primary px-4 py-2 text-sm text-primary hover:bg-primary/5"
+                    >
+                        New AI Connector
+                    </Link>
+                    <Link
+                        :href="route('admin.dashboards.connections.create', dashboard.id)"
+                        class="rounded-lg bg-primary px-4 py-2 text-sm text-white hover:bg-primary-hover"
+                    >
+                        Add connection
+                    </Link>
+                </div>
             </div>
             <div class="space-y-4">
                 <div

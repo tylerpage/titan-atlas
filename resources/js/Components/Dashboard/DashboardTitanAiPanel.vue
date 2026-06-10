@@ -4,7 +4,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ReportVisualization from '../ReportVisualization.vue';
 import { useAppBranding } from '../../Composables/useAppBranding';
 import { displayMessageContent } from '../../Composables/useTitanAiMessage';
-import { useTitanAiPolling } from '../../Composables/useTitanAiPolling';
+import { useTitanAiSessionWatch } from '../../Composables/useTitanAiSessionWatch';
 
 const { aiName } = useAppBranding();
 
@@ -110,7 +110,7 @@ watch(
         form.preview_end = previewEnd;
 
         if (sessionId && sessionStatus === 'processing') {
-            startPolling();
+            startWatching();
         }
     },
 );
@@ -157,8 +157,9 @@ function reloadSessionData(scrollToBottom = true) {
     });
 }
 
-const { startPolling, stopPolling } = useTitanAiPolling({
+const { startWatching, stopWatching } = useTitanAiSessionWatch({
     isProcessing: () => isProcessing.value,
+    getChannelName: () => (props.session?.id ? `ai.report-session.${props.session.id}` : null),
     getStatusUrl: () => {
         if (!props.session?.id) {
             return null;
@@ -170,7 +171,7 @@ const { startPolling, stopPolling } = useTitanAiPolling({
 });
 
 onMounted(() => {
-    startPolling();
+    startWatching();
     scrollChatToBottom('instant');
 
     removeFinishListener = router.on('finish', () => {
@@ -183,7 +184,7 @@ onMounted(() => {
     });
 });
 onBeforeUnmount(() => {
-    stopPolling();
+    stopWatching();
 
     if (removeFinishListener) {
         removeFinishListener();
@@ -192,9 +193,9 @@ onBeforeUnmount(() => {
 });
 watch(isProcessing, (processing, wasProcessing) => {
     if (processing) {
-        startPolling();
+        startWatching();
     } else {
-        stopPolling();
+        stopWatching();
 
         if (wasProcessing) {
             reloadSessionData(false);
@@ -233,7 +234,7 @@ function submitMessage() {
         onFinish: () => {
             restorePageScroll(pageScrollY);
             pendingPageScrollY = null;
-            startPolling();
+            startWatching();
         },
     });
 }

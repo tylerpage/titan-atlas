@@ -14,6 +14,7 @@ class Connection extends Model
         'client_dashboard_id',
         'name',
         'connector_type',
+        'connector_blueprint_id',
         'encrypted_credentials',
         'sync_status',
         'sync_error',
@@ -50,6 +51,16 @@ class Connection extends Model
     public function clientDashboard(): BelongsTo
     {
         return $this->belongsTo(ClientDashboard::class);
+    }
+
+    public function connectorBlueprint(): BelongsTo
+    {
+        return $this->belongsTo(ConnectorBlueprint::class);
+    }
+
+    public function isDynamic(): bool
+    {
+        return $this->connector_type === ConnectorType::Dynamic;
     }
 
     public function syncRuns(): HasMany

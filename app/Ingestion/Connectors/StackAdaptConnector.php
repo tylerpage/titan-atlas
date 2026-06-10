@@ -455,7 +455,7 @@ class StackAdaptConnector extends AbstractConnector implements FanOutSyncConnect
             'conversions_value' => $this->moneyValue($metrics['conversionRevenue'] ?? 0),
             'roas' => (float) ($metrics['roas'] ?? 0),
             'secondary_conversions' => $this->bigintValue($metrics['secondaryConversionsBigint'] ?? $metrics['secondaryConversions'] ?? 0),
-            'engagements' => $this->bigintValue($metrics['engagements'] ?? 0),
+            'engagement_rate' => (float) ($metrics['engagementRate'] ?? 0),
             'video_starts' => $this->bigintValue($metrics['videoStarts'] ?? 0),
             'video_completions' => $this->bigintValue($metrics['videoCompletions'] ?? 0),
             'audio_starts' => $this->bigintValue($metrics['audioStarts'] ?? 0),
@@ -472,9 +472,11 @@ class StackAdaptConnector extends AbstractConnector implements FanOutSyncConnect
      */
     protected function zeroMetrics(array &$payload): void
     {
-        foreach (['cost', 'impressions', 'clicks', 'conversions', 'conversions_value', 'secondary_conversions', 'engagements', 'video_starts', 'video_completions', 'audio_starts', 'audio_completions'] as $key) {
+        foreach (['cost', 'impressions', 'clicks', 'conversions', 'conversions_value', 'secondary_conversions', 'video_starts', 'video_completions', 'audio_starts', 'audio_completions'] as $key) {
             $payload[$key] = 0;
         }
+
+        $payload['engagement_rate'] = 0;
     }
 
     /**
@@ -483,7 +485,7 @@ class StackAdaptConnector extends AbstractConnector implements FanOutSyncConnect
      */
     protected function addMetrics(array &$target, array $source): void
     {
-        foreach (['cost', 'impressions', 'clicks', 'conversions', 'conversions_value', 'secondary_conversions', 'engagements', 'video_starts', 'video_completions', 'audio_starts', 'audio_completions'] as $key) {
+        foreach (['cost', 'impressions', 'clicks', 'conversions', 'conversions_value', 'secondary_conversions', 'video_starts', 'video_completions', 'audio_starts', 'audio_completions'] as $key) {
             $target[$key] = (float) ($target[$key] ?? 0) + (float) ($source[$key] ?? 0);
         }
     }

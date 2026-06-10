@@ -11,6 +11,7 @@ enum ConnectorType: string
     case GoogleAnalytics = 'google_analytics';
     case Semrush = 'semrush';
     case StackAdapt = 'stackadapt';
+    case Dynamic = 'dynamic';
 
     public function label(): string
     {
@@ -22,6 +23,7 @@ enum ConnectorType: string
             self::GoogleAnalytics => 'Google Analytics 4',
             self::Semrush => 'SEMrush',
             self::StackAdapt => 'StackAdapt',
+            self::Dynamic => 'Dynamic connector',
         };
     }
 
@@ -107,6 +109,7 @@ enum ConnectorType: string
             self::Semrush => [
                 ['key' => 'api_key', 'label' => 'API key', 'type' => 'password'],
             ],
+            self::Dynamic => [],
             self::StackAdapt => [
                 [
                     'key' => 'graphql_api_key',
@@ -145,7 +148,12 @@ enum ConnectorType: string
 
     public function supportsLiveConnectionTest(): bool
     {
-        return in_array($this, [self::Shopify, self::BigCommerce, self::SearchConsole, self::GoogleAnalytics, self::GoogleAds, self::StackAdapt], true);
+        return in_array($this, [self::Shopify, self::BigCommerce, self::SearchConsole, self::GoogleAnalytics, self::GoogleAds, self::StackAdapt, self::Dynamic], true);
+    }
+
+    public function isDynamic(): bool
+    {
+        return $this === self::Dynamic;
     }
 
     public function usesGoogleOAuth(): bool
@@ -185,6 +193,7 @@ enum ConnectorType: string
             self::GoogleAnalytics => self::productName().' syncs GA4 traffic, events, and landing-page metrics. The unified GA4 dashboard also requires a Search Console connection on the same dashboard. Platform setup: enable the Google Analytics Data API and Google Analytics Admin API in Google Cloud, create an OAuth web client, add redirect URI '.route('admin.google.oauth.callback', absolute: true).', and set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET in '.self::productName().'. Then click Connect with Google and choose a GA4 property.',
             self::GoogleAds => self::productName().' syncs Google Ads spend, impressions, clicks, CTR, and conversion value with daily and campaign breakdowns. Platform setup: enable the Google Ads API in Google Cloud, create an OAuth web client, add redirect URI '.route('admin.google.oauth.callback', absolute: true).', set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET, and obtain a developer token from the Google Ads API Center (GOOGLE_ADS_DEVELOPER_TOKEN). Then click Connect with Google and choose an Ads account.',
             self::StackAdapt => self::productName().' syncs StackAdapt programmatic delivery data: daily advertiser spend, campaign performance, channel mix (CTV, native, display, video, audio, and more), plus geo, domain, and device insights. Paste your StackAdapt GraphQL API key, test the connection to list advertisers, then select one advertiser per connection.',
+            self::Dynamic => self::productName().' syncs data from an AI-configured REST API connector. Credentials and endpoints are defined in the connector blueprint.',
             default => null,
         };
     }

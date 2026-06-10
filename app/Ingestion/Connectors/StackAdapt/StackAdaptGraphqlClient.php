@@ -17,7 +17,7 @@ class StackAdaptGraphqlClient
         conversionRevenue
         roas
         secondaryConversionsBigint
-        engagements
+        engagementRate
         videoStarts
         videoCompletions
         audioStarts

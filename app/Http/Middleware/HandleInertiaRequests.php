@@ -50,6 +50,7 @@ class HandleInertiaRequests extends Middleware
                 'name' => config('app.name', 'Atlas'),
                 'ai_name' => config('titan.branding.ai_assistant_name', 'TitanAI'),
             ],
+            'broadcast' => fn () => $this->broadcastConfig(),
             'feedback' => [
                 'reasons' => \App\Enums\FeedbackReason::options(),
                 'pending_count' => $this->pendingFeedbackCount($request),
@@ -79,5 +80,31 @@ class HandleInertiaRequests extends Middleware
             now()->addHour(),
             fn () => Schema::hasTable('feedback_submissions'),
         );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function broadcastConfig(): array
+    {
+        $connection = config('broadcasting.default');
+        $enabled = is_string($connection)
+            && $connection !== ''
+            && ! in_array($connection, ['null', 'log'], true);
+
+        if (! $enabled) {
+            return ['enabled' => false];
+        }
+
+        $reverb = config('broadcasting.connections.reverb', []);
+        $options = $reverb['options'] ?? [];
+
+        return [
+            'enabled' => true,
+            'key' => $reverb['key'] ?? null,
+            'host' => $options['host'] ?? 'localhost',
+            'port' => (int) ($options['port'] ?? 8080),
+            'scheme' => $options['scheme'] ?? 'http',
+        ];
     }
 }

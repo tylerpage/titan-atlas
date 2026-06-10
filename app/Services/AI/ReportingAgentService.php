@@ -18,7 +18,10 @@ use Laravel\Ai\Enums\Lab;
 
 class ReportingAgentService
 {
-    public function __construct(protected SimpleMetricFastPathService $fastPath) {}
+    public function __construct(
+        protected SimpleMetricFastPathService $fastPath,
+        protected AiBroadcastService $broadcasts,
+    ) {}
     /**
      * @return array{session: AnalyticsReportSession}
      */
@@ -68,6 +71,8 @@ class ReportingAgentService
                 'model' => 'fast_path',
                 'saved_report' => true,
             ]);
+
+            $this->broadcasts->reportSessionUpdated($fastPathResult['session']);
 
             return ['session' => $fastPathResult['session']];
         }
@@ -172,8 +177,11 @@ class ReportingAgentService
             'saved_report' => $context->lastSavedReport !== null,
         ]);
 
+        $session = $session->fresh(['messages', 'report']);
+        $this->broadcasts->reportSessionUpdated($session);
+
         return [
-            'session' => $session->fresh(['messages', 'report']),
+            'session' => $session,
             'response' => $text,
             'report' => $context->lastSavedReport?->fresh(),
         ];

@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 
 class TransformConnectionDataService
 {
+    public function __construct(protected BlueprintTransformService $blueprintTransform) {}
     public function transform(
         SyncRun $syncRun,
         ?int $afterPayloadId = null,
@@ -54,10 +55,10 @@ class TransformConnectionDataService
         bool $syncRunCatchUp = false,
         ?int $catchUpAfterPayloadId = null,
     ): TransformChunkResult {
-        $connection->loadMissing('clientDashboard');
+        $connection->loadMissing('clientDashboard', 'connectorBlueprint.streams');
         $dashboard = $connection->clientDashboard;
         $connectionId = $connection->id;
-        $allowedResourceTypes = $this->allowedResourceTypes();
+        $allowedResourceTypes = $this->allowedResourceTypesForConnection($connection);
 
         if ($purgeExisting) {
             MetricSnapshot::query()
@@ -95,7 +96,7 @@ class TransformConnectionDataService
 
                 $written += $this->processPayloadBatch(
                     $dashboard,
-                    $connectionId,
+                    $connection,
                     $payloads,
                     replaceValues: true,
                 );
@@ -113,7 +114,7 @@ class TransformConnectionDataService
 
                 $written += $this->processPayloadBatch(
                     $dashboard,
-                    $connectionId,
+                    $connection,
                     $payloads,
                     replaceValues: false,
                 );
@@ -178,6 +179,23 @@ class TransformConnectionDataService
     }
 
     /**
+     * @return list<string>
+     */
+    protected function allowedResourceTypesForConnection(Connection $connection): array
+    {
+        $base = $this->allowedResourceTypes();
+
+        if ($connection->isDynamic() && $connection->connectorBlueprint) {
+            return array_values(array_unique(array_merge(
+                $base,
+                $this->blueprintTransform->allowedResourceTypes($connection->connectorBlueprint),
+            )));
+        }
+
+        return $base;
+    }
+
+    /**
      * @param  list<string>  $allowedResourceTypes
      */
     protected function catchUpPayloadQuery(
@@ -212,15 +230,16 @@ class TransformConnectionDataService
      */
     protected function processPayloadBatch(
         \App\Models\ClientDashboard $dashboard,
-        int $connectionId,
+        Connection $connection,
         $payloads,
         bool $replaceValues,
     ): int {
         /** @var array<string, array{date: Carbon, key: string, value: float, dimensions: ?array<string, mixed>}> $chunkBuckets */
         $chunkBuckets = [];
+        $connectionId = $connection->id;
 
         foreach ($payloads as $payload) {
-            foreach ($this->extractMetrics($payload->resource_type, $payload->payload, $connectionId) as $metric) {
+            foreach ($this->extractMetrics($connection, $payload->resource_type, $payload->payload, $connectionId) as $metric) {
                 $dimensions = $metric['dimensions'] ?? null;
                 $dimensionHash = MetricDimensions::hash($dimensions);
                 $date = $metric['date']->toDateString();
@@ -319,7 +338,29 @@ class TransformConnectionDataService
      * @param  array<string, mixed>  $payload
      * @return list<array{date: Carbon, key: string, value: float, dimensions?: array<string, mixed>}>
      */
-    protected function extractMetrics(string $resourceType, array $payload, int $connectionId): array
+    protected function extractMetrics(Connection $connection, string $resourceType, array $payload, int $connectionId): array
+    {
+        if ($connection->isDynamic() && $connection->connectorBlueprint) {
+            $blueprintMetrics = $this->blueprintTransform->extractMetrics(
+                $connection->connectorBlueprint,
+                $resourceType,
+                $payload,
+                $connectionId,
+            );
+
+            if ($blueprintMetrics !== []) {
+                return $blueprintMetrics;
+            }
+        }
+
+        return $this->extractBuiltinMetrics($resourceType, $payload, $connectionId);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return list<array{date: Carbon, key: string, value: float, dimensions?: array<string, mixed>}>
+     */
+    protected function extractBuiltinMetrics(string $resourceType, array $payload, int $connectionId): array
     {
         return match ($resourceType) {
             'order' => [[

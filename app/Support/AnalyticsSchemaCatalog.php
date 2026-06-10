@@ -376,6 +376,19 @@ SUMMARY;
                     ],
                 ],
             ],
+            [
+                'connector_type' => 'dynamic',
+                'label' => 'Dynamic connector (AI blueprint)',
+                'resources' => [
+                    [
+                        'name' => 'blueprint_streams',
+                        'titan_resource_type' => '(per blueprint stream)',
+                        'source_api' => 'Configured REST endpoints in connector_blueprint_streams',
+                        'notes' => 'Query connector_blueprints and connector_blueprint_streams for resource_type values and payload field mappings.',
+                        'fact_table_recommendation' => 'raw_connector_payloads',
+                    ],
+                ],
+            ],
         ];
 
         if ($activeTypes === []) {

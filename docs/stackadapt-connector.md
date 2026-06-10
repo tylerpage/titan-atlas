@@ -36,7 +36,7 @@ Sync chunks by date (`chunk_days: 1` default). Campaign delivery paginates acros
 
 - `cost`, `impressions`, `clicks`, `ctr`
 - `conversions`, `conversions_value`, `roas`
-- `secondary_conversions`, `engagements`
+- `secondary_conversions`, `engagement_rate`
 - `video_starts`, `video_completions`, `audio_starts`, `audio_completions` (campaign/channel rows)
 
 Non-aggregatable metrics such as reach and frequency are excluded from v1.

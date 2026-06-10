@@ -5,7 +5,7 @@ import AppLayout from '../../../../Layouts/AppLayout.vue';
 import ReportVisualization from '../../../../Components/ReportVisualization.vue';
 import { useAppBranding } from '../../../../Composables/useAppBranding';
 import { displayMessageContent } from '../../../../Composables/useTitanAiMessage';
-import { useTitanAiPolling } from '../../../../Composables/useTitanAiPolling';
+import { useTitanAiSessionWatch } from '../../../../Composables/useTitanAiSessionWatch';
 
 const { aiName } = useAppBranding();
 
@@ -103,8 +103,9 @@ function reloadSessionData() {
     });
 }
 
-const { startPolling, stopPolling } = useTitanAiPolling({
+const { startWatching, stopWatching } = useTitanAiSessionWatch({
     isProcessing: () => isProcessing.value,
+    getChannelName: () => (props.session?.id ? `ai.report-session.${props.session.id}` : null),
     getStatusUrl: () => {
         if (!props.session?.id) {
             return null;
@@ -116,7 +117,7 @@ const { startPolling, stopPolling } = useTitanAiPolling({
 });
 
 onMounted(() => {
-    startPolling();
+    startWatching();
 
     removeFinishListener = router.on('finish', () => {
         if (pendingPageScrollY === null) {
@@ -128,7 +129,7 @@ onMounted(() => {
     });
 });
 onBeforeUnmount(() => {
-    stopPolling();
+    stopWatching();
 
     if (removeFinishListener) {
         removeFinishListener();
@@ -137,9 +138,9 @@ onBeforeUnmount(() => {
 });
 watch(isProcessing, (processing, wasProcessing) => {
     if (processing) {
-        startPolling();
+        startWatching();
     } else {
-        stopPolling();
+        stopWatching();
 
         if (wasProcessing) {
             reloadSessionData();
@@ -165,7 +166,7 @@ function submitMessage() {
         onSuccess: () => {
             form.message = '';
             nextTick(() => restorePageScroll(pageScrollY));
-            startPolling();
+            startWatching();
         },
         onFinish: () => {
             restorePageScroll(pageScrollY);

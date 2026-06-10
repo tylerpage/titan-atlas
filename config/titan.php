@@ -186,6 +186,19 @@ return [
         'response_timeout_seconds' => (int) env('TITAN_AI_RESPONSE_TIMEOUT', 120),
     ],
 
+    'connector_builder' => [
+        'provider' => env('TITAN_AI_PROVIDER', 'openai'),
+        'model' => env('TITAN_CONNECTOR_BUILDER_MODEL', env('TITAN_AI_MODEL', 'gpt-4o-mini')),
+        'max_steps' => (int) env('TITAN_CONNECTOR_BUILDER_MAX_STEPS', 15),
+        'allowed_auth_types' => ['api_key', 'bearer', 'basic'],
+        'allowed_http_methods' => ['GET'],
+        'read_only_enforced' => true,
+        'max_streams_per_blueprint' => (int) env('TITAN_CONNECTOR_BUILDER_MAX_STREAMS', 8),
+        'http_timeout_seconds' => (int) env('TITAN_CONNECTOR_BUILDER_HTTP_TIMEOUT', 30),
+        'max_response_bytes' => (int) env('TITAN_CONNECTOR_BUILDER_MAX_RESPONSE_BYTES', 5_000_000),
+        'response_timeout_seconds' => (int) env('TITAN_CONNECTOR_BUILDER_RESPONSE_TIMEOUT', 180),
+    ],
+
     'feedback' => [
         'max_attachments' => (int) env('TITAN_FEEDBACK_MAX_ATTACHMENTS', 5),
         'max_attachment_kb' => (int) env('TITAN_FEEDBACK_MAX_ATTACHMENT_KB', 10240),

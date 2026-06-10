@@ -5,7 +5,7 @@ import AppLayout from '../../../Layouts/AppLayout.vue';
 import ReportVisualization from '../../../Components/ReportVisualization.vue';
 import { useAppBranding } from '../../../Composables/useAppBranding';
 import { displayMessageContent } from '../../../Composables/useTitanAiMessage';
-import { useTitanAiPolling } from '../../../Composables/useTitanAiPolling';
+import { useTitanAiSessionWatch } from '../../../Composables/useTitanAiSessionWatch';
 
 const { aiName } = useAppBranding();
 
@@ -67,8 +67,9 @@ function reloadSessionData() {
     });
 }
 
-const { startPolling, stopPolling } = useTitanAiPolling({
+const { startWatching, stopWatching } = useTitanAiSessionWatch({
     isProcessing: () => isProcessing.value,
+    getChannelName: () => (props.session?.id ? `ai.report-session.${props.session.id}` : null),
     getStatusUrl: () => {
         if (!props.session?.id) {
             return null;
@@ -79,12 +80,12 @@ const { startPolling, stopPolling } = useTitanAiPolling({
     onComplete: () => reloadSessionData(),
 });
 
-onMounted(startPolling);
+onMounted(startWatching);
 watch(isProcessing, (processing) => {
     if (processing) {
-        startPolling();
+        startWatching();
     } else {
-        stopPolling();
+        stopWatching();
     }
 });
 
@@ -93,7 +94,7 @@ function submitMessage() {
         preserveScroll: true,
         onSuccess: () => {
             form.message = '';
-            startPolling();
+            startWatching();
         },
     });
 }

@@ -5,6 +5,7 @@ namespace App\Ingestion;
 use App\Contracts\Ingestion\ConnectorInterface;
 use App\Enums\ConnectorType;
 use App\Ingestion\Connectors\BigCommerceConnector;
+use App\Ingestion\Connectors\DynamicConnector;
 use App\Ingestion\Connectors\GoogleAdsConnector;
 use App\Ingestion\Connectors\GoogleAnalyticsConnector;
 use App\Ingestion\Connectors\SearchConsoleConnector;
@@ -28,6 +29,7 @@ class ConnectorRegistry
             ConnectorType::GoogleAnalytics->value => GoogleAnalyticsConnector::class,
             ConnectorType::Semrush->value => SemrushConnector::class,
             ConnectorType::StackAdapt->value => StackAdaptConnector::class,
+            ConnectorType::Dynamic->value => DynamicConnector::class,
         ];
     }
 
