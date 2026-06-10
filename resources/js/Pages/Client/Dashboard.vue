@@ -511,21 +511,19 @@ function sourceMediumLabel(order) {
         </Teleport>
 
         <div class="mb-8 flex flex-wrap items-end justify-between gap-4">
-            <div class="flex items-center gap-4">
+            <div>
                 <img
                     v-if="dashboard.logo_url"
                     :src="dashboard.logo_url"
                     :alt="`${dashboard.name} logo`"
-                    class="h-12 w-auto rounded border border-slate-200 bg-white p-1"
+                    class="mb-3 h-12 w-auto rounded border border-slate-200 bg-white p-1"
                 />
-                <div>
-                    <p class="text-sm text-slate-500">{{ dashboard.company.name }}</p>
-                    <div class="flex flex-wrap items-center gap-3">
-                        <h1 class="text-3xl font-semibold" :style="{ color: dashboard.primary_color }">
-                            {{ dashboard.name }}
-                        </h1>
-                        <DashboardSyncingBadge :show="dashboard.is_syncing" />
-                    </div>
+                <p class="text-sm text-slate-500">{{ dashboard.company.name }}</p>
+                <div class="flex flex-wrap items-center gap-3">
+                    <h1 class="text-3xl font-semibold" :style="{ color: dashboard.primary_color }">
+                        {{ dashboard.name }}
+                    </h1>
+                    <DashboardSyncingBadge :show="dashboard.is_syncing" />
                 </div>
             </div>
 
