@@ -44,6 +44,6 @@ class ConnectorBuilderSession extends Model
 
     public function blueprint(): HasOne
     {
-        return $this->hasOne(ConnectorBlueprint::class);
+        return $this->hasOne(ConnectorBlueprint::class, 'connector_builder_session_id');
     }
 }

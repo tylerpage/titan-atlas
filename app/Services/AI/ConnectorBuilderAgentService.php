@@ -129,7 +129,7 @@ class ConnectorBuilderAgentService
             'connection_id' => $context->connection?->id,
         ]);
 
-        $session = $session->fresh(['messages', 'blueprint.streams', 'blueprint.connection']);
+        $session = $session->fresh(['messages', 'blueprint.streams', 'blueprint.connections']);
         $this->broadcasts->connectorBuilderSessionUpdated($session);
 
         return [

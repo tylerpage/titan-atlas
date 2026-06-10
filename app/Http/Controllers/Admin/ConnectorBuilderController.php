@@ -23,7 +23,7 @@ class ConnectorBuilderController extends Controller
 
         if ($session !== null) {
             abort_unless($session->client_dashboard_id === $dashboard->id, 404);
-            $session->load(['messages', 'blueprint.streams', 'blueprint.connection']);
+            $session->load(['messages', 'blueprint.streams', 'blueprint.connections']);
         }
 
         return Inertia::render('Admin/Dashboards/Connections/AiCreate', [
@@ -35,6 +35,8 @@ class ConnectorBuilderController extends Controller
     public function sessionStatus(ClientDashboard $dashboard, ConnectorBuilderSession $session): JsonResponse
     {
         abort_unless($session->client_dashboard_id === $dashboard->id, 404);
+
+        $session->refresh();
 
         return response()->json([
             'status' => $session->status->value,
@@ -123,12 +125,17 @@ class ConnectorBuilderController extends Controller
                 'path_template' => $stream->path_template,
                 'enabled' => $stream->enabled,
             ])->values()->all(),
-            'connection' => $blueprint->connection ? [
-                'id' => $blueprint->connection->id,
-                'name' => $blueprint->connection->name,
-                'sync_status' => $blueprint->connection->sync_status->value,
-                'sync_error' => $blueprint->connection->sync_error,
+            'connection' => ($connection = $blueprint->connections->first()) ? [
+                'id' => $connection->id,
+                'name' => $connection->name,
+                'sync_status' => $connection->sync_status->value,
+                'sync_error' => $connection->sync_error,
             ] : null,
+            'connections' => $blueprint->connections->map(fn ($item) => [
+                'id' => $item->id,
+                'name' => $item->name,
+                'sync_status' => $item->sync_status->value,
+            ])->values()->all(),
         ];
     }
 }

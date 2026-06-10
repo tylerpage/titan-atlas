@@ -98,11 +98,17 @@ class HandleInertiaRequests extends Middleware
 
         $reverb = config('broadcasting.connections.reverb', []);
         $options = $reverb['options'] ?? [];
+        $host = (string) ($options['host'] ?? 'localhost');
+
+        // When browsing via ngrok/HTTPS tunnel, localhost Reverb is unreachable from the browser.
+        if ($host === 'localhost' && request()->secure()) {
+            return ['enabled' => false];
+        }
 
         return [
             'enabled' => true,
             'key' => $reverb['key'] ?? null,
-            'host' => $options['host'] ?? 'localhost',
+            'host' => $host,
             'port' => (int) ($options['port'] ?? 8080),
             'scheme' => $options['scheme'] ?? 'http',
         ];

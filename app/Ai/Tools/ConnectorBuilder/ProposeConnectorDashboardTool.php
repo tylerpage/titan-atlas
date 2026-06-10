@@ -2,6 +2,7 @@
 
 namespace App\Ai\Tools\ConnectorBuilder;
 
+use App\Agents\ConnectorBuilderAgentContext;
 use App\Enums\ReportVisualizationType;
 use App\Models\AnalyticsReport;
 use App\Services\Analytics\ReportQueryContext;

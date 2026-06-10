@@ -2,6 +2,7 @@
 
 namespace App\Ai\Tools\ConnectorBuilder;
 
+use App\Agents\ConnectorBuilderAgentContext;
 use App\Enums\ConnectorBlueprintStatus;
 use App\Ingestion\Connectors\DynamicConnector;
 use Illuminate\Contracts\JsonSchema\JsonSchema;

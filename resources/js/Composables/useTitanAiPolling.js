@@ -36,7 +36,7 @@ export function useTitanAiPolling({ isProcessing, getStatusUrl, onComplete }) {
                 // Fall back to the next scheduled poll attempt.
             }
         } else {
-            onComplete();
+            schedulePoll();
         }
 
         schedulePoll();

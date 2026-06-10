@@ -28,6 +28,7 @@ const form = useForm({
 const messages = computed(() => props.session?.messages ?? []);
 const blueprint = computed(() => props.session?.blueprint ?? null);
 const isProcessing = computed(() => props.session?.status === 'processing');
+const isFailed = computed(() => props.session?.status === 'failed');
 
 const credentialFields = computed(() => blueprint.value?.credential_schema ?? []);
 const showCredentialForm = computed(() => credentialFields.value.length > 0);
@@ -202,7 +203,10 @@ const error = computed(() => page.props.flash?.error);
         <p v-if="status" class="mb-4 rounded-lg bg-emerald-50 px-4 py-2 text-sm text-emerald-700">{{ status }}</p>
         <p v-if="error" class="mb-4 rounded-lg bg-red-50 px-4 py-2 text-sm text-red-700">{{ error }}</p>
         <p v-if="isProcessing" class="mb-4 rounded-lg bg-slate-100 px-4 py-2 text-sm text-slate-600">
-            Building your connector… this can take a couple of minutes.
+            Building your connector… this can take a couple of minutes. Keep this tab open while the queue worker processes your request.
+        </p>
+        <p v-if="isFailed" class="mb-4 rounded-lg bg-red-50 px-4 py-2 text-sm text-red-700">
+            The connector builder failed on the last request. Send another message to retry, and make sure the queue worker is running (`composer dev:share`).
         </p>
 
         <div class="grid gap-6 lg:grid-cols-5">
@@ -278,15 +282,26 @@ const error = computed(() => page.props.flash?.error);
                             </ul>
                         </div>
 
-                        <div v-if="blueprint.connection">
+                        <div v-if="blueprint.connection || blueprint.connections?.length">
                             <p class="font-medium text-slate-700">Connection</p>
                             <Link
+                                v-if="blueprint.connection"
                                 :href="route('admin.connections.show', blueprint.connection.id)"
                                 class="text-primary hover:underline"
                             >
                                 {{ blueprint.connection.name }}
                             </Link>
-                            <p class="text-slate-500">Sync: {{ blueprint.connection.sync_status }}</p>
+                            <ul v-else class="mt-1 space-y-1">
+                                <li v-for="connection in blueprint.connections" :key="connection.id">
+                                    <Link
+                                        :href="route('admin.connections.show', connection.id)"
+                                        class="text-primary hover:underline"
+                                    >
+                                        {{ connection.name }}
+                                    </Link>
+                                </li>
+                            </ul>
+                            <p v-if="blueprint.connection" class="text-slate-500">Sync: {{ blueprint.connection.sync_status }}</p>
                         </div>
 
                         <Link

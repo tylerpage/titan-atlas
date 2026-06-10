@@ -2,6 +2,7 @@
 
 namespace App\Ai\Tools\ConnectorBuilder;
 
+use App\Agents\ConnectorBuilderAgentContext;
 use App\Services\ConnectorBuilder\ConnectorBlueprintService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Tools\Request;

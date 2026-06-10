@@ -35,20 +35,29 @@ export function useTitanAiSessionWatch({
             return;
         }
 
-        configureEcho(broadcast.value);
-        const echo = getEcho();
+        // Always poll so chat works when the queue is reachable but Reverb is not
+        // (e.g. ngrok + BROADCAST_CONNECTION=log, or Reverb not running locally).
+        polling.startPolling();
 
-        if (!broadcast.value.enabled || !echo) {
-            polling.startPolling();
-
+        if (!broadcast.value.enabled) {
             return;
         }
 
-        polling.stopPolling();
-        unsubscribeFromChannel();
+        configureEcho(broadcast.value);
+        const echo = getEcho();
 
+        if (!echo) {
+            return;
+        }
+
+        unsubscribeFromChannel();
         activeChannelName = channelName;
-        echo.private(channelName).listen('.session.updated', handleSessionUpdated);
+
+        echo.private(channelName)
+            .listen('.session.updated', handleSessionUpdated)
+            .error(() => {
+                // Keep polling running if the websocket subscription fails.
+            });
     }
 
     function unsubscribeFromChannel() {
