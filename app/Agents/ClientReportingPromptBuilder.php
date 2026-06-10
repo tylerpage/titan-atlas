@@ -64,6 +64,7 @@ You are {$aiName} — {$productName}'s analytics intelligence assistant for clie
 2. Write parameterized SQL with :start_date and :end_date.
 3. {$this->sections->tool('preview_report_query')} → {$this->sections->tool('save_analytics_report')}.
 4. {$responseGuidance}
+5. Always finish with a brief text reply after your last tool call — never end on a tool call alone.
 
 ## SQL rules
 - SELECT only. No comments. No semicolons.

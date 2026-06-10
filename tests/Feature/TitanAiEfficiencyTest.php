@@ -387,7 +387,7 @@ SQL;
     {
         config([
             'titan.reporting.max_steps' => 12,
-            'titan.reporting.client_max_steps' => 4,
+            'titan.reporting.client_max_steps' => 8,
         ]);
 
         $context = $this->context();
@@ -396,7 +396,7 @@ SQL;
         $client = ClientReportingAgent::make(context: $context);
 
         $this->assertSame(12, $admin->maxSteps());
-        $this->assertSame(4, $client->maxSteps());
+        $this->assertSame(8, $client->maxSteps());
     }
 
     protected function context(?string $currentMessage = null): ReportingAgentContext

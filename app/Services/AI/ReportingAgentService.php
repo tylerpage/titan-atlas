@@ -11,6 +11,7 @@ use App\Models\AnalyticsReportMessage;
 use App\Models\AnalyticsReportSession;
 use App\Models\ClientDashboard;
 use App\Models\User;
+use App\Support\AgentAssistantTextResolver;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -21,6 +22,7 @@ class ReportingAgentService
     public function __construct(
         protected SimpleMetricFastPathService $fastPath,
         protected AiBroadcastService $broadcasts,
+        protected AgentAssistantTextResolver $assistantText,
     ) {}
     /**
      * @return array{session: AnalyticsReportSession}
@@ -148,7 +150,18 @@ class ReportingAgentService
             model: config('titan.reporting.model', 'gpt-4o-mini'),
         );
 
-        $text = trim($response->text ?: 'I was unable to generate a response.');
+        $text = $this->assistantText->forReporting($response, $context);
+
+        if (trim($response->text) === '') {
+            Log::warning('titan_ai.empty_agent_text', [
+                'session_id' => $session->id,
+                'dashboard_id' => $dashboard->id,
+                'client_mode' => $clientMode,
+                'steps' => $response->steps->count(),
+                'tool_calls' => $response->toolCalls->count(),
+                'saved_report' => $context->lastSavedReport !== null,
+            ]);
+        }
 
         $metadata = $this->buildAssistantMetadata($context);
 

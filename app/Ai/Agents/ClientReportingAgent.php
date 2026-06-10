@@ -35,7 +35,7 @@ class ClientReportingAgent implements Agent, Conversational, HasTools
 
     public function maxSteps(): int
     {
-        return (int) config('titan.reporting.client_max_steps', 6);
+        return (int) config('titan.reporting.client_max_steps', 8);
     }
 
     public function instructions(): Stringable|string

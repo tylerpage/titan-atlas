@@ -12,6 +12,7 @@ import SearchConsoleDashboardPanel from '../../Components/Dashboard/SearchConsol
 import GoogleAnalyticsDashboardPanel from '../../Components/Dashboard/GoogleAnalyticsDashboardPanel.vue';
 import GoogleAdsDashboardPanel from '../../Components/Dashboard/GoogleAdsDashboardPanel.vue';
 import StackAdaptDashboardPanel from '../../Components/Dashboard/StackAdaptDashboardPanel.vue';
+import DynamicConnectorDashboardPanel from '../../Components/Dashboard/DynamicConnectorDashboardPanel.vue';
 import RevenueLineChart from '../../Components/RevenueLineChart.vue';
 import { useAppBranding } from '../../Composables/useAppBranding';
 
@@ -256,7 +257,8 @@ const showSearchConsoleView = computed(() => isDataTab.value && props.connectorD
 const showGoogleAnalyticsView = computed(() => isDataTab.value && props.connectorData?.kind === 'google_analytics');
 const showGoogleAdsView = computed(() => isDataTab.value && props.connectorData?.kind === 'google_ads');
 const showStackAdaptView = computed(() => isDataTab.value && props.connectorData?.kind === 'stackadapt');
-const showConnectorView = computed(() => showCommerceView.value || showSearchConsoleView.value || showGoogleAnalyticsView.value || showGoogleAdsView.value || showStackAdaptView.value);
+const showDynamicView = computed(() => isDataTab.value && props.connectorData?.kind === 'dynamic');
+const showConnectorView = computed(() => showCommerceView.value || showSearchConsoleView.value || showGoogleAnalyticsView.value || showGoogleAdsView.value || showStackAdaptView.value || showDynamicView.value);
 const showLegacyWidgets = computed(() => isDataTab.value && (!hasConnections.value || (!showConnectorView.value && hasConnections.value)));
 const showTabFilters = computed(() => isDataTab.value);
 const shareStatus = ref(null);
@@ -993,13 +995,25 @@ function sourceMediumLabel(order) {
             :comparing="comparing"
         />
 
+        <DynamicConnectorDashboardPanel
+            v-else-if="showDynamicView"
+            :connector-data="connectorData"
+            :connection-name="activeConnection?.name ?? ''"
+            :primary-color="dashboard.primary_color"
+        />
+
         <div
             v-else-if="hasConnections && activeConnection"
             class="rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm"
         >
             <h2 class="text-lg font-semibold">{{ activeConnection.connector_label }}</h2>
             <p class="mt-2 text-sm text-slate-500">
-                Connector-specific reporting for {{ activeConnection.name }} is coming soon.
+                <template v-if="activeConnection.connector_type === 'dynamic'">
+                    No analytics dashboard has been built for {{ activeConnection.name }} yet.
+                </template>
+                <template v-else>
+                    Connector-specific reporting for {{ activeConnection.name }} is coming soon.
+                </template>
             </p>
         </div>
 

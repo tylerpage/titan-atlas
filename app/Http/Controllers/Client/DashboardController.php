@@ -10,6 +10,7 @@ use App\Models\Connection;
 use App\Models\CoverPage;
 use App\Services\Analytics\CommerceDashboardService;
 use App\Services\Analytics\ConnectorDashboardCache;
+use App\Services\Analytics\DynamicConnectorDashboardService;
 use App\Services\Analytics\GoogleAdsDashboardService;
 use App\Services\Analytics\GoogleAnalyticsDashboardService;
 use App\Services\Analytics\SearchConsoleDashboardService;
@@ -33,6 +34,7 @@ class DashboardController extends Controller
         GoogleAnalyticsDashboardService $googleAnalytics,
         GoogleAdsDashboardService $googleAds,
         StackAdaptDashboardService $stackAdapt,
+        DynamicConnectorDashboardService $dynamicConnector,
         CoverPageDataResolver $coverPages,
         ClientDashboardTabDataService $tabData,
         ConnectorDashboardCache $connectorCache,
@@ -41,7 +43,7 @@ class DashboardController extends Controller
 
         $dashboard->load([
             'company',
-            'connections' => fn ($q) => $q->where('is_active', true)->orderBy('name'),
+            'connections' => fn ($q) => $q->where('is_active', true)->orderBy('name')->with('connectorBlueprint'),
             'coverPages',
         ]);
 
@@ -110,6 +112,7 @@ class DashboardController extends Controller
                 $googleAnalytics,
                 $googleAds,
                 $stackAdapt,
+                $dynamicConnector,
                 $dateRange,
                 $customRange,
                 $comparison,
@@ -171,7 +174,9 @@ class DashboardController extends Controller
                 'id' => $connection->id,
                 'name' => $connection->name,
                 'connector_type' => $connection->connector_type->value,
-                'connector_label' => $connection->connector_type->label(),
+                'connector_label' => $connection->isDynamic()
+                    ? ($connection->connectorBlueprint?->label ?? $connection->connector_type->label())
+                    : $connection->connector_type->label(),
                 'is_commerce' => $connection->connector_type->isCommerce(),
             ])->values(),
             'selectedConnectionId' => $selectedConnection?->id,
@@ -215,6 +220,7 @@ class DashboardController extends Controller
         GoogleAnalyticsDashboardService $googleAnalytics,
         GoogleAdsDashboardService $googleAds,
         StackAdaptDashboardService $stackAdapt,
+        DynamicConnectorDashboardService $dynamicConnector,
         string $dateRange,
         ?array $customRange,
         DateComparison $comparison,
@@ -250,6 +256,13 @@ class DashboardController extends Controller
                 $comparison,
             ),
             $connection->connector_type === ConnectorType::StackAdapt => fn () => $stackAdapt->dataFor(
+                $dashboard,
+                $connection,
+                $dateRange,
+                $customRange,
+                $comparison,
+            ),
+            $connection->connector_type === ConnectorType::Dynamic => fn () => $dynamicConnector->dataFor(
                 $dashboard,
                 $connection,
                 $dateRange,

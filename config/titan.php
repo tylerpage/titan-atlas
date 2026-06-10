@@ -177,7 +177,7 @@ return [
         'provider' => env('TITAN_AI_PROVIDER', 'openai'),
         'model' => env('TITAN_AI_MODEL', 'gpt-4o-mini'),
         'max_steps' => (int) env('TITAN_AI_MAX_STEPS', 8),
-        'client_max_steps' => (int) env('TITAN_AI_CLIENT_MAX_STEPS', 4),
+        'client_max_steps' => (int) env('TITAN_AI_CLIENT_MAX_STEPS', 8),
         'max_history_messages' => (int) env('TITAN_AI_MAX_HISTORY_MESSAGES', 12),
         'preview_cache_ttl_seconds' => (int) env('TITAN_AI_PREVIEW_CACHE_TTL', 60),
         'fast_path_enabled' => env('TITAN_AI_FAST_PATH_ENABLED', true),

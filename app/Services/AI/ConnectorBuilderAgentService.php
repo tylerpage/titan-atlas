@@ -10,6 +10,7 @@ use App\Models\ClientDashboard;
 use App\Models\ConnectorBuilderMessage;
 use App\Models\ConnectorBuilderSession;
 use App\Models\User;
+use App\Support\AgentAssistantTextResolver;
 use App\Support\DynamicConnectorReadOnlyGuard;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -20,6 +21,7 @@ class ConnectorBuilderAgentService
     public function __construct(
         protected DynamicConnectorReadOnlyGuard $readOnlyGuard,
         protected AiBroadcastService $broadcasts,
+        protected AgentAssistantTextResolver $assistantText,
     ) {}
     /**
      * @return array{session: ConnectorBuilderSession}
@@ -116,7 +118,17 @@ class ConnectorBuilderAgentService
             model: config('titan.connector_builder.model', 'gpt-4o-mini'),
         );
 
-        $text = trim($response->text ?: 'I was unable to generate a response.');
+        $text = $this->assistantText->forConnectorBuilder($response, $context);
+
+        if (trim($response->text) === '') {
+            Log::warning('connector_builder.empty_agent_text', [
+                'session_id' => $session->id,
+                'dashboard_id' => $dashboard->id,
+                'steps' => $response->steps->count(),
+                'tool_calls' => $response->toolCalls->count(),
+                'connection_id' => $context->connection?->id,
+            ]);
+        }
         $metadata = $this->buildAssistantMetadata($context);
 
         $this->storeMessage($session, 'assistant', $text, $metadata);
