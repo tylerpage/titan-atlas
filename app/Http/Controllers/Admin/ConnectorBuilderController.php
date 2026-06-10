@@ -186,23 +186,36 @@ class ConnectorBuilderController extends Controller
      */
     protected function serializeDashboardSpec(ConnectorBlueprint $blueprint, ClientDashboard $dashboard): array
     {
-        $spec = $blueprint->dashboard_spec ?? [];
+        $layouts = app(ConnectorBlueprintDashboardVersionService::class);
+        $layoutSpec = $layouts->currentSpec($blueprint, $dashboard);
+        $templateSpec = is_array($blueprint->dashboard_spec) ? $blueprint->dashboard_spec : [];
 
-        if ($spec === []) {
+        if ($layoutSpec === null && $templateSpec === []) {
             return [];
         }
 
-        $savedDashboardId = $spec['saved_dashboard_id'] ?? null;
+        $spec = array_merge($templateSpec, $layoutSpec ?? []);
 
-        if ($savedDashboardId) {
-            $spec['saved_dashboard_url'] = route('client.dashboard.saved.show', [
-                'dashboard' => $dashboard->slug,
-                'board' => $savedDashboardId,
-            ]);
+        $savedDashboardId = $layoutSpec['saved_dashboard_id'] ?? null;
+
+        if (is_numeric($savedDashboardId)) {
+            $boardExists = \App\Models\SavedDashboard::query()
+                ->where('client_dashboard_id', $dashboard->id)
+                ->whereKey((int) $savedDashboardId)
+                ->exists();
+
+            if ($boardExists) {
+                $spec['saved_dashboard_url'] = route('client.dashboard.saved.show', [
+                    'dashboard' => $dashboard->slug,
+                    'board' => (int) $savedDashboardId,
+                ]);
+            } else {
+                unset($spec['saved_dashboard_url']);
+            }
         }
 
-        $spec['versions'] = app(ConnectorBlueprintDashboardVersionService::class)
-            ->listForBlueprint($blueprint, $dashboard);
+        $spec['versions'] = $layouts->listForBlueprint($blueprint, $dashboard);
+        $spec['has_dashboard_layout'] = $layoutSpec !== null && is_numeric($layoutSpec['saved_dashboard_id'] ?? null);
 
         return $spec;
     }

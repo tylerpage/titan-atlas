@@ -13,6 +13,7 @@ use App\Models\Company;
 use App\Models\ConnectorBlueprint;
 use App\Services\ConnectorBuilder\AiConnectorService;
 use App\Services\ConnectorBuilder\ConnectorBuilderResumeService;
+use App\Services\ConnectorBuilder\ConnectorBlueprintDashboardVersionService;
 use App\Services\ConnectorBuilder\CreateDynamicConnectionService;
 use App\Support\DynamicConnectorBaseUrl;
 use Illuminate\Http\RedirectResponse;
@@ -156,6 +157,7 @@ class AiConnectorController extends Controller
         ConnectorBlueprint $blueprint,
         AiConnectorService $connectors,
         CreateDynamicConnectionService $creator,
+        ConnectorBlueprintDashboardVersionService $layouts,
     ): RedirectResponse {
         if (! $connectors->isAvailableForDashboard($blueprint, $dashboard)) {
             abort(404);
@@ -168,11 +170,20 @@ class AiConnectorController extends Controller
             blueprint: $blueprint,
             name: $validated['name'],
             credentials: $validated['credentials'],
+            user: $request->user(),
         );
+
+        $status = 'Connection "'.$connection->name.'" added. Backfill queued.';
+
+        if ($layouts->currentSpec($blueprint, $dashboard) !== null) {
+            $status .= ' Connector dashboard widgets are ready on the client Data tab.';
+        } elseif ($layouts->hasWidgetTemplate($blueprint)) {
+            $status .= ' Dashboard widget auto-build did not complete — use Build dashboard widgets on the connection page.';
+        }
 
         return redirect()
             ->route('admin.connections.show', $connection)
-            ->with('status', 'Connection "'.$connection->name.'" added. Backfill queued.');
+            ->with('status', $status);
     }
 
     public function testConnection(

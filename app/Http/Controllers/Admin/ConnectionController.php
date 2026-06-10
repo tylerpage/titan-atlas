@@ -10,9 +10,11 @@ use App\Http\Requests\Admin\TestExistingConnectionRequest;
 use App\Http\Requests\Admin\UpdateConnectionRequest;
 use App\Jobs\Ingestion\SyncConnectionJob;
 use App\Models\Connection;
+use App\Models\SavedDashboard;
 use App\Support\DynamicConnectorCredentials;
 use App\Services\Admin\ConnectionService;
 use App\Services\Admin\TestConnectionService;
+use App\Services\ConnectorBuilder\ConnectorBlueprintDashboardVersionService;
 use App\Services\ConnectorBuilder\RebuildConnectorDashboardService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -200,15 +202,37 @@ class ConnectionController extends Controller
         $credentialFields = $connection->isDynamic()
             ? DynamicConnectorCredentials::fields($blueprint)
             : $connection->connector_type->credentialFields();
-        $dashboardSpec = is_array($blueprint?->dashboard_spec) ? $blueprint->dashboard_spec : [];
-        $savedDashboardId = $dashboardSpec['saved_dashboard_id'] ?? null;
+
+        $layouts = app(ConnectorBlueprintDashboardVersionService::class);
+        $layoutSpec = $blueprint !== null
+            ? $layouts->currentSpec($blueprint, $connection->clientDashboard)
+            : null;
+        $hasWidgetTemplate = $blueprint !== null && $layouts->hasWidgetTemplate($blueprint);
+        $hasDashboardLayout = $layoutSpec !== null && is_numeric($layoutSpec['saved_dashboard_id'] ?? null);
+        $connectorDashboard = null;
         $savedDashboardUrl = null;
 
-        if (is_numeric($savedDashboardId)) {
-            $savedDashboardUrl = route('client.dashboard.saved.show', [
-                $connection->clientDashboard->slug,
-                (int) $savedDashboardId,
-            ]);
+        if ($hasDashboardLayout) {
+            $savedDashboardId = (int) $layoutSpec['saved_dashboard_id'];
+            $boardExists = SavedDashboard::query()
+                ->where('client_dashboard_id', $connection->clientDashboard->id)
+                ->whereKey($savedDashboardId)
+                ->exists();
+
+            if ($boardExists) {
+                $savedDashboardUrl = route('client.dashboard.saved.show', [
+                    $connection->clientDashboard->slug,
+                    $savedDashboardId,
+                ]);
+
+                $connectorDashboard = [
+                    'title' => $layoutSpec['title'] ?? ($blueprint->label.' Dashboard'),
+                    'saved_dashboard_id' => $savedDashboardId,
+                    'saved_dashboard_url' => $savedDashboardUrl,
+                    'widget_count' => count($layoutSpec['widgets'] ?? $blueprint->dashboard_spec['widgets'] ?? []),
+                    'report_count' => count($layoutSpec['created_report_ids'] ?? []),
+                ];
+            }
         }
 
         return [
@@ -233,13 +257,9 @@ class ConnectionController extends Controller
                 'label' => $blueprint->label,
                 'slug' => $blueprint->slug,
             ] : null,
-            'connector_dashboard' => $blueprint && $savedDashboardUrl ? [
-                'title' => $dashboardSpec['title'] ?? ($blueprint->label.' Dashboard'),
-                'saved_dashboard_id' => (int) $savedDashboardId,
-                'saved_dashboard_url' => $savedDashboardUrl,
-                'widget_count' => count($dashboardSpec['widgets'] ?? []),
-                'report_count' => count($dashboardSpec['created_report_ids'] ?? []),
-            ] : null,
+            'has_dashboard_layout' => $hasDashboardLayout && $connectorDashboard !== null,
+            'can_build_dashboard' => $connection->isDynamic() && $blueprint !== null && $hasWidgetTemplate,
+            'connector_dashboard' => $connectorDashboard,
             'dashboard' => [
                 'id' => $connection->clientDashboard->id,
                 'name' => $connection->clientDashboard->name,

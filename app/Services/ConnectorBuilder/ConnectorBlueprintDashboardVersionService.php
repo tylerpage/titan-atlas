@@ -39,16 +39,14 @@ class ConnectorBlueprintDashboardVersionService
     ): ?ConnectorBlueprintDashboardVersion {
         $this->assertSameDashboard($blueprint, $dashboard);
 
-        $spec = $blueprint->dashboard_spec ?? [];
+        $spec = $this->currentSpec($blueprint, $dashboard)
+            ?? (is_array($blueprint->dashboard_spec) ? $blueprint->dashboard_spec : []);
 
         if ($spec === []) {
             return null;
         }
 
-        $nextVersion = ((int) ConnectorBlueprintDashboardVersion::query()
-            ->where('connector_blueprint_id', $blueprint->id)
-            ->where('client_dashboard_id', $dashboard->id)
-            ->max('version_number')) + 1;
+        $nextVersion = $this->nextVersionNumber($blueprint, $dashboard);
 
         return ConnectorBlueprintDashboardVersion::query()->create([
             'connector_blueprint_id' => $blueprint->id,
@@ -57,6 +55,72 @@ class ConnectorBlueprintDashboardVersionService
             'dashboard_spec' => $spec,
             'created_by' => $user->id,
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function currentSpec(ConnectorBlueprint $blueprint, ClientDashboard $dashboard): ?array
+    {
+        $versions = ConnectorBlueprintDashboardVersion::query()
+            ->where('connector_blueprint_id', $blueprint->id)
+            ->where('client_dashboard_id', $dashboard->id)
+            ->orderByDesc('version_number')
+            ->get();
+
+        foreach ($versions as $version) {
+            $spec = is_array($version->dashboard_spec) ? $version->dashboard_spec : [];
+
+            if (is_numeric($spec['saved_dashboard_id'] ?? null)) {
+                return $spec;
+            }
+        }
+
+        $spec = is_array($blueprint->dashboard_spec) ? $blueprint->dashboard_spec : [];
+
+        if (! is_numeric($spec['saved_dashboard_id'] ?? null)) {
+            return null;
+        }
+
+        $ownerId = $spec['client_dashboard_id'] ?? $blueprint->client_dashboard_id;
+
+        if ($ownerId !== null && (int) $ownerId !== (int) $dashboard->id) {
+            return null;
+        }
+
+        if ($blueprint->client_dashboard_id !== null
+            && (int) $blueprint->client_dashboard_id !== (int) $dashboard->id) {
+            return null;
+        }
+
+        return $spec;
+    }
+
+    /**
+     * @param  array<string, mixed>  $spec
+     */
+    public function recordCurrent(
+        ConnectorBlueprint $blueprint,
+        ClientDashboard $dashboard,
+        User $user,
+        array $spec,
+    ): ConnectorBlueprintDashboardVersion {
+        $this->assertSameDashboard($blueprint, $dashboard);
+
+        return ConnectorBlueprintDashboardVersion::query()->create([
+            'connector_blueprint_id' => $blueprint->id,
+            'client_dashboard_id' => $dashboard->id,
+            'version_number' => $this->nextVersionNumber($blueprint, $dashboard),
+            'dashboard_spec' => $spec,
+            'created_by' => $user->id,
+        ]);
+    }
+
+    public function hasWidgetTemplate(ConnectorBlueprint $blueprint): bool
+    {
+        $widgets = $blueprint->dashboard_spec['widgets'] ?? [];
+
+        return is_array($widgets) && $widgets !== [];
     }
 
     public function revert(
@@ -146,5 +210,13 @@ class ConnectorBlueprintDashboardVersionService
                 'dashboard' => 'This blueprint can only manage dashboards for its owning client dashboard.',
             ]);
         }
+    }
+
+    protected function nextVersionNumber(ConnectorBlueprint $blueprint, ClientDashboard $dashboard): int
+    {
+        return ((int) ConnectorBlueprintDashboardVersion::query()
+            ->where('connector_blueprint_id', $blueprint->id)
+            ->where('client_dashboard_id', $dashboard->id)
+            ->max('version_number')) + 1;
     }
 }

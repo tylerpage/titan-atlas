@@ -20,6 +20,7 @@ use App\Models\RawConnectorPayload;
 use App\Models\SavedDashboard;
 use App\Models\SavedDashboardBlock;
 use App\Models\User;
+use App\Services\ConnectorBuilder\ConnectorBlueprintDashboardVersionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Ai\Tools\Request;
 use Tests\TestCase;
@@ -81,8 +82,10 @@ class ProposeConnectorDashboardToolTest extends TestCase
         $this->assertSame('stat_card', AnalyticsReport::query()->first()->visualization_type->value);
 
         $blueprint->refresh();
-        $this->assertSame(2, count($blueprint->dashboard_spec['created_report_ids'] ?? []));
-        $this->assertSame(SavedDashboard::query()->value('id'), $blueprint->dashboard_spec['saved_dashboard_id']);
+        $currentSpec = app(ConnectorBlueprintDashboardVersionService::class)->currentSpec($blueprint, $dashboard);
+        $this->assertSame(2, count($currentSpec['created_report_ids'] ?? []));
+        $this->assertSame(SavedDashboard::query()->value('id'), $currentSpec['saved_dashboard_id']);
+        $this->assertSame(2, count($blueprint->dashboard_spec['widgets'] ?? []));
         $this->assertNotNull($context->lastDashboardSpec);
     }
 

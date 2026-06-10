@@ -31,8 +31,20 @@ function clearConnectionData() {
 
 const rebuildForm = useForm({});
 
+const showConnectorDashboardSection = computed(() => (
+    props.connection.connector_type === 'dynamic' && props.connection.connector_blueprint
+));
+
+const buildDashboardLabel = computed(() => (
+    props.connection.has_dashboard_layout ? 'Rebuild widgets' : 'Build dashboard widgets'
+));
+
 function rebuildDashboard() {
-    if (!confirm('Rebuild connector dashboard widgets with corrected SQL for synced payload fields?')) {
+    const message = props.connection.has_dashboard_layout
+        ? 'Rebuild connector dashboard widgets with corrected SQL for synced payload fields?'
+        : 'Build connector dashboard widgets for this client dashboard using the blueprint template?';
+
+    if (!confirm(message)) {
         return;
     }
 
@@ -137,22 +149,41 @@ function formatDateTime(isoString) {
         </p>
 
         <section
-            v-if="connection.connector_dashboard"
+            v-if="showConnectorDashboardSection"
             class="mb-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
         >
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <div>
                     <h2 class="text-lg font-semibold">Connector dashboard</h2>
-                    <p class="mt-1 text-sm text-slate-600">
-                        {{ connection.connector_dashboard.title }}
-                        · {{ connection.connector_dashboard.widget_count }} widget(s)
-                    </p>
-                    <p class="mt-2 text-sm text-slate-500">
-                        Saved dashboards live on the client dashboard Saved tab, not on this connection page.
-                    </p>
+                    <template v-if="connection.has_dashboard_layout && connection.connector_dashboard">
+                        <p class="mt-1 text-sm text-slate-600">
+                            {{ connection.connector_dashboard.title }}
+                            · {{ connection.connector_dashboard.widget_count }} widget(s)
+                        </p>
+                        <p class="mt-2 text-sm text-slate-500">
+                            Widgets appear on this client dashboard Data tab and Saved tab.
+                        </p>
+                    </template>
+                    <template v-else-if="connection.can_build_dashboard">
+                        <p class="mt-1 text-sm text-slate-600">
+                            No dashboard has been built for this client dashboard yet.
+                        </p>
+                        <p class="mt-2 text-sm text-slate-500">
+                            Build widgets from the shared blueprint template to populate the client Data tab.
+                        </p>
+                    </template>
+                    <template v-else>
+                        <p class="mt-1 text-sm text-slate-600">
+                            This connector has no dashboard widget template yet.
+                        </p>
+                        <p class="mt-2 text-sm text-slate-500">
+                            Define widgets in the connector builder before building a client dashboard.
+                        </p>
+                    </template>
                 </div>
                 <div class="flex flex-wrap gap-2">
                     <a
+                        v-if="connection.connector_dashboard?.saved_dashboard_url"
                         :href="connection.connector_dashboard.saved_dashboard_url"
                         class="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50"
                         target="_blank"
@@ -161,12 +192,13 @@ function formatDateTime(isoString) {
                         Open saved dashboard
                     </a>
                     <button
+                        v-if="connection.can_build_dashboard"
                         type="button"
                         class="rounded-lg bg-primary px-4 py-2 text-sm text-white hover:bg-primary-hover disabled:opacity-50"
                         :disabled="rebuildForm.processing"
                         @click="rebuildDashboard"
                     >
-                        {{ rebuildForm.processing ? 'Rebuilding…' : 'Rebuild widgets' }}
+                        {{ rebuildForm.processing ? 'Working…' : buildDashboardLabel }}
                     </button>
                 </div>
             </div>

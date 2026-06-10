@@ -206,7 +206,23 @@ class ProposeConnectorDashboardTool extends ConnectorBuilderTool
             'client_dashboard_id' => $this->context->dashboard->id,
         ];
 
-        $this->context->blueprint->update(['dashboard_spec' => $dashboardSpec]);
+        $this->versions->recordCurrent(
+            $this->context->blueprint,
+            $this->context->dashboard,
+            $this->context->user,
+            $dashboardSpec,
+        );
+
+        $existingSpec = is_array($this->context->blueprint->dashboard_spec)
+            ? $this->context->blueprint->dashboard_spec
+            : [];
+
+        $this->context->blueprint->update([
+            'dashboard_spec' => array_merge($existingSpec, [
+                'widgets' => $normalizedWidgets,
+                'title' => $title,
+            ]),
+        ]);
         $this->context->lastDashboardSpec = $dashboardSpec;
 
         return $this->json([
@@ -238,7 +254,11 @@ class ProposeConnectorDashboardTool extends ConnectorBuilderTool
             }
         }
 
-        $existingId = $this->context->blueprint->dashboard_spec['saved_dashboard_id'] ?? null;
+        $currentSpec = $this->versions->currentSpec(
+            $this->context->blueprint,
+            $this->context->dashboard,
+        );
+        $existingId = $currentSpec['saved_dashboard_id'] ?? null;
 
         if (is_numeric($existingId)) {
             $board = SavedDashboard::query()

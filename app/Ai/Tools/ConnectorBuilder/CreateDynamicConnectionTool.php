@@ -54,6 +54,7 @@ class CreateDynamicConnectionTool extends ConnectorBuilderTool
                 blueprint: $this->context->blueprint,
                 name: $request->string('name')->toString() ?: $this->context->blueprint->label,
                 credentials: $credentials,
+                user: $this->context->user,
             );
 
             $this->context->connection = $connection;

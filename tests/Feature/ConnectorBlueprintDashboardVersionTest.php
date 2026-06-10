@@ -21,6 +21,7 @@ use App\Models\ConnectorBuilderSession;
 use App\Models\SavedDashboard;
 use App\Models\SavedDashboardBlock;
 use App\Models\User;
+use App\Services\ConnectorBuilder\ConnectorBlueprintDashboardVersionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Ai\Tools\Request;
 use Tests\TestCase;
@@ -60,8 +61,17 @@ class ConnectorBlueprintDashboardVersionTest extends TestCase
             ]],
         ]));
 
-        $this->assertSame(1, ConnectorBlueprintDashboardVersion::query()->count());
-        $this->assertSame('Old Dashboard', ConnectorBlueprintDashboardVersion::query()->value('dashboard_spec')['title']);
+        $blueprint->refresh();
+
+        $this->assertSame(2, ConnectorBlueprintDashboardVersion::query()->count());
+        $this->assertSame(
+            'Old Dashboard',
+            ConnectorBlueprintDashboardVersion::query()->where('version_number', 1)->value('dashboard_spec')['title'],
+        );
+        $this->assertSame(
+            'Shopware Dashboard',
+            app(ConnectorBlueprintDashboardVersionService::class)->currentSpec($blueprint, $dashboard)['title'],
+        );
     }
 
     public function test_revert_dashboard_restores_prior_version(): void

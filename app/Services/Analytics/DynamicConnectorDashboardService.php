@@ -7,12 +7,14 @@ use App\Models\ClientDashboard;
 use App\Models\Connection;
 use App\Models\SavedDashboard;
 use App\Services\Client\SavedDashboardService;
+use App\Services\ConnectorBuilder\ConnectorBlueprintDashboardVersionService;
 
 class DynamicConnectorDashboardService
 {
     public function __construct(
         protected SavedDashboardService $savedDashboards,
         protected WidgetDataService $widgets,
+        protected ConnectorBlueprintDashboardVersionService $layouts,
     ) {}
 
     /**
@@ -32,15 +34,15 @@ class DynamicConnectorDashboardService
 
         $connection->loadMissing('connectorBlueprint');
         $blueprint = $connection->connectorBlueprint;
-        $spec = is_array($blueprint?->dashboard_spec) ? $blueprint->dashboard_spec : [];
-        $savedDashboardId = $spec['saved_dashboard_id'] ?? null;
 
-        if (! is_numeric($savedDashboardId)) {
+        if ($blueprint === null) {
             return null;
         }
 
-        if ($blueprint?->client_dashboard_id !== null
-            && (int) $blueprint->client_dashboard_id !== (int) $dashboard->id) {
+        $spec = $this->layouts->currentSpec($blueprint, $dashboard) ?? [];
+        $savedDashboardId = $spec['saved_dashboard_id'] ?? null;
+
+        if (! is_numeric($savedDashboardId)) {
             return null;
         }
 

@@ -17,7 +17,10 @@ return new class extends Migration
             $table->foreignId('created_by')->constrained('users')->cascadeOnDelete();
             $table->timestamps();
 
-            $table->unique(['connector_blueprint_id', 'version_number']);
+            $table->unique(
+                ['connector_blueprint_id', 'client_dashboard_id', 'version_number'],
+                'cbdv_blueprint_dashboard_version_unique',
+            );
         });
     }
 
