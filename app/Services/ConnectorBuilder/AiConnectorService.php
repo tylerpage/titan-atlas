@@ -102,6 +102,24 @@ class AiConnectorService
         return $blueprint->fresh(['streams', 'connections', 'dashboard', 'company']);
     }
 
+    public function normalizeGlobalScope(ConnectorBlueprint $blueprint): ConnectorBlueprint
+    {
+        if (! $blueprint->isGlobal()) {
+            return $blueprint;
+        }
+
+        if ($blueprint->client_dashboard_id === null && $blueprint->company_id === null) {
+            return $blueprint;
+        }
+
+        $blueprint->update([
+            'client_dashboard_id' => null,
+            'company_id' => null,
+        ]);
+
+        return $blueprint->fresh(['streams', 'connections', 'dashboard', 'company']);
+    }
+
     public function startGlobalBuilder(User $user, ClientDashboard $sandboxDashboard): ConnectorBuilderSession
     {
         return ConnectorBuilderSession::query()->create([
@@ -140,7 +158,7 @@ class AiConnectorService
                 : $blueprint->status,
         ]);
 
-        return $blueprint->fresh(['streams', 'connections', 'dashboard', 'company']);
+        return $this->normalizeGlobalScope($blueprint->fresh(['streams', 'connections', 'dashboard', 'company']));
     }
 
     public function delete(ConnectorBlueprint $blueprint): void

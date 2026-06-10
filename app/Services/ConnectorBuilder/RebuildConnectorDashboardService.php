@@ -14,7 +14,10 @@ use Laravel\Ai\Tools\Request;
 
 class RebuildConnectorDashboardService
 {
-    public function __construct(protected ConnectorBlueprintDashboardVersionService $versions) {}
+    public function __construct(
+        protected ConnectorBlueprintDashboardVersionService $versions,
+        protected AiConnectorService $connectors,
+    ) {}
 
     /**
      * @return array<string, mixed>
@@ -30,6 +33,8 @@ class RebuildConnectorDashboardService
                 'connection' => 'This connection is not linked to an AI connector blueprint.',
             ]);
         }
+
+        $blueprint = $this->connectors->normalizeGlobalScope($blueprint);
 
         $session = $blueprint->connector_builder_session_id
             ? ConnectorBuilderSession::query()->find($blueprint->connector_builder_session_id)

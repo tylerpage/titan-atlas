@@ -88,7 +88,8 @@ class ConnectorBlueprintDashboardVersionService
             return null;
         }
 
-        if ($blueprint->client_dashboard_id !== null
+        if (! $blueprint->isGlobal()
+            && $blueprint->client_dashboard_id !== null
             && (int) $blueprint->client_dashboard_id !== (int) $dashboard->id) {
             return null;
         }
@@ -205,9 +206,13 @@ class ConnectorBlueprintDashboardVersionService
 
     protected function assertSameDashboard(ConnectorBlueprint $blueprint, ClientDashboard $dashboard): void
     {
+        if ($blueprint->isGlobal() || $blueprint->isShared()) {
+            return;
+        }
+
         if ($blueprint->client_dashboard_id !== null && $blueprint->client_dashboard_id !== $dashboard->id) {
             throw ValidationException::withMessages([
-                'dashboard' => 'Share this AI connector template before building dashboards on other client dashboards.',
+                'dashboard' => 'Share this AI connector template company-wide before building dashboards on other client dashboards.',
             ]);
         }
     }
