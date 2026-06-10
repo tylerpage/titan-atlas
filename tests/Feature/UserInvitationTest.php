@@ -184,6 +184,8 @@ class UserInvitationTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->component('Admin/Users/Index')
                 ->has('pendingInvitations', 1)
+                ->has('companies', 1)
+                ->has('roles')
                 ->where('pendingInvitations.0.email', 'pending@example.com')
                 ->where('pendingInvitations.0.is_expired', true)
             );

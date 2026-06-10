@@ -19,6 +19,7 @@ class UserController extends Controller
     public function index(): Response
     {
         return Inertia::render('Admin/Users/Index', [
+            ...$this->formOptions(),
             'users' => User::query()
                 ->with(['companies:id,name'])
                 ->orderBy('name')
