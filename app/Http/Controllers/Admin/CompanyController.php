@@ -45,7 +45,6 @@ class CompanyController extends Controller
             'users' => fn ($q) => $q->orderBy('name'),
             'invitations' => fn ($q) => $q
                 ->whereNull('accepted_at')
-                ->where('expires_at', '>', now())
                 ->latest(),
         ]);
 
@@ -72,6 +71,7 @@ class CompanyController extends Controller
                     'role' => $invitation->role,
                     'dashboard_ids' => $invitation->dashboard_ids ?? [],
                     'expires_at' => $invitation->expires_at?->toIso8601String(),
+                    'is_expired' => $invitation->isExpired(),
                 ])->values(),
             ],
             'roles' => collect(UserRole::cases())

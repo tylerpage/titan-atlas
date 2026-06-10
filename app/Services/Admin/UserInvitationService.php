@@ -56,9 +56,9 @@ class UserInvitationService
 
     public function resend(UserInvitation $invitation): UserInvitation
     {
-        if (! $invitation->isPending()) {
+        if ($invitation->accepted_at !== null) {
             throw ValidationException::withMessages([
-                'invitation' => 'This invitation is no longer pending.',
+                'invitation' => 'This invitation has already been accepted.',
             ]);
         }
 

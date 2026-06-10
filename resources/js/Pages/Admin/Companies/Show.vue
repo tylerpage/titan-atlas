@@ -16,6 +16,7 @@ const props = defineProps({
 
 const page = usePage();
 const deleteError = computed(() => page.props.errors?.company);
+const status = computed(() => page.props.flash?.status);
 
 const deleteForm = useForm({});
 
@@ -93,6 +94,10 @@ function formatExpiry(isoString) {
                 </Link>
             </div>
         </div>
+
+        <p v-if="status" class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+            {{ status }}
+        </p>
 
         <p v-if="deleteError" class="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
             {{ deleteError }}
@@ -217,6 +222,7 @@ function formatExpiry(isoString) {
                             <th class="px-4 py-3 font-medium">Email</th>
                             <th class="px-4 py-3 font-medium">Role</th>
                             <th class="px-4 py-3 font-medium">Expires</th>
+                            <th class="px-4 py-3 font-medium">Status</th>
                             <th class="px-4 py-3 font-medium">Actions</th>
                         </tr>
                     </thead>
@@ -226,9 +232,17 @@ function formatExpiry(isoString) {
                             <td class="px-4 py-3 capitalize">{{ invitation.role }}</td>
                             <td class="px-4 py-3 text-slate-600">{{ formatExpiry(invitation.expires_at) }}</td>
                             <td class="px-4 py-3">
+                                <span
+                                    class="rounded-full px-2 py-0.5 text-xs font-medium"
+                                    :class="invitation.is_expired ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'"
+                                >
+                                    {{ invitation.is_expired ? 'Expired' : 'Pending' }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3">
                                 <div class="flex gap-3">
                                     <button type="button" class="text-primary hover:underline" @click="resendInvitation(invitation.id)">
-                                        Resend
+                                        Resend email
                                     </button>
                                     <button type="button" class="text-red-700 hover:underline" @click="revokeInvitation(invitation.id)">
                                         Revoke

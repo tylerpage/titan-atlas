@@ -137,4 +137,55 @@ class UserInvitationTest extends TestCase
 
         Mail::assertSent(UserInvitationMail::class);
     }
+
+    public function test_admin_can_resend_expired_invitation(): void
+    {
+        Mail::fake();
+
+        $admin = User::factory()->create(['role' => UserRole::Admin]);
+        $company = Company::query()->create(['name' => 'Acme', 'slug' => 'acme']);
+
+        $invitation = UserInvitation::query()->create([
+            'company_id' => $company->id,
+            'email' => 'invitee@example.com',
+            'role' => UserRole::Client->value,
+            'token' => str_repeat('c', 64),
+            'invited_by' => $admin->id,
+            'dashboard_ids' => [],
+            'expires_at' => now()->subDay(),
+        ]);
+
+        $this->actingAs($admin)
+            ->post(route('admin.companies.invitations.resend', [$company, $invitation]))
+            ->assertRedirect();
+
+        Mail::assertSent(UserInvitationMail::class);
+        $this->assertTrue($invitation->fresh()->expires_at->isFuture());
+    }
+
+    public function test_users_index_lists_pending_invitations(): void
+    {
+        $admin = User::factory()->create(['role' => UserRole::Admin]);
+        $company = Company::query()->create(['name' => 'Acme', 'slug' => 'acme']);
+
+        UserInvitation::query()->create([
+            'company_id' => $company->id,
+            'email' => 'pending@example.com',
+            'role' => UserRole::Client->value,
+            'token' => str_repeat('d', 64),
+            'invited_by' => $admin->id,
+            'dashboard_ids' => [],
+            'expires_at' => now()->subDay(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.users.index'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Admin/Users/Index')
+                ->has('pendingInvitations', 1)
+                ->where('pendingInvitations.0.email', 'pending@example.com')
+                ->where('pendingInvitations.0.is_expired', true)
+            );
+    }
 }

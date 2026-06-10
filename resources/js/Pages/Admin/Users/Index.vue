@@ -7,10 +7,27 @@ defineProps({
         type: Array,
         required: true,
     },
+    pendingInvitations: {
+        type: Array,
+        default: () => [],
+    },
 });
 
 const page = usePage();
 const deleteError = page.props.errors?.user;
+const status = page.props.flash?.status;
+
+function formatExpiry(isoString) {
+    return new Date(isoString).toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+    });
+}
+
+function resendInvitation(companyId, invitationId) {
+    router.post(route('admin.companies.invitations.resend', [companyId, invitationId]));
+}
 
 function impersonate(userId) {
     router.post(route('admin.impersonate.store', userId));
@@ -32,9 +49,63 @@ function impersonate(userId) {
             </Link>
         </div>
 
+        <p v-if="status" class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+            {{ status }}
+        </p>
+
         <p v-if="deleteError" class="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
             {{ deleteError }}
         </p>
+
+        <section v-if="pendingInvitations.length > 0" class="mb-10">
+            <h2 class="mb-4 text-xl font-semibold">Pending invitations</h2>
+            <p class="mb-4 text-sm text-slate-600">
+                Users who were invited by email but have not accepted yet. Resend to deliver a fresh invitation link.
+            </p>
+            <div class="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-slate-50 text-left">
+                        <tr>
+                            <th class="px-4 py-3 font-medium">Email</th>
+                            <th class="px-4 py-3 font-medium">Company</th>
+                            <th class="px-4 py-3 font-medium">Role</th>
+                            <th class="px-4 py-3 font-medium">Expires</th>
+                            <th class="px-4 py-3 font-medium">Status</th>
+                            <th class="px-4 py-3 font-medium">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="invitation in pendingInvitations" :key="invitation.id" class="border-t border-slate-100">
+                            <td class="px-4 py-3">{{ invitation.email }}</td>
+                            <td class="px-4 py-3">
+                                <Link :href="route('admin.companies.show', invitation.company_id)" class="text-primary hover:underline">
+                                    {{ invitation.company_name }}
+                                </Link>
+                            </td>
+                            <td class="px-4 py-3 capitalize">{{ invitation.role }}</td>
+                            <td class="px-4 py-3 text-slate-600">{{ formatExpiry(invitation.expires_at) }}</td>
+                            <td class="px-4 py-3">
+                                <span
+                                    class="rounded-full px-2 py-0.5 text-xs font-medium"
+                                    :class="invitation.is_expired ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'"
+                                >
+                                    {{ invitation.is_expired ? 'Expired' : 'Pending' }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3">
+                                <button
+                                    type="button"
+                                    class="text-primary hover:underline"
+                                    @click="resendInvitation(invitation.company_id, invitation.id)"
+                                >
+                                    Resend email
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
 
         <div class="overflow-hidden rounded-xl border border-slate-200 bg-white">
             <table class="min-w-full text-sm">

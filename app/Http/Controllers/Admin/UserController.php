@@ -8,6 +8,7 @@ use App\Http\Requests\Admin\UpdateUserRequest;
 use App\Models\ClientDashboard;
 use App\Models\Company;
 use App\Models\User;
+use App\Models\UserInvitation;
 use App\Services\Admin\UserManagementService;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -32,6 +33,21 @@ class UserController extends Controller
                         'name' => $company->name,
                     ])->values(),
                 ]),
+            'pendingInvitations' => UserInvitation::query()
+                ->with('company:id,name')
+                ->whereNull('accepted_at')
+                ->latest()
+                ->get()
+                ->map(fn (UserInvitation $invitation) => [
+                    'id' => $invitation->id,
+                    'email' => $invitation->email,
+                    'role' => $invitation->role,
+                    'company_id' => $invitation->company_id,
+                    'company_name' => $invitation->company->name,
+                    'expires_at' => $invitation->expires_at?->toIso8601String(),
+                    'is_expired' => $invitation->isExpired(),
+                ])
+                ->values(),
         ]);
     }
 
