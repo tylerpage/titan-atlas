@@ -8,9 +8,21 @@ class JsonPayloadSql
 {
     public static function text(string $column, string $key): string
     {
+        if (DB::connection()->getDriverName() === 'pgsql' && $key === 'date') {
+            return self::dateColumn($column);
+        }
+
         return match (DB::connection()->getDriverName()) {
             'pgsql' => self::pgsqlText($column, $key),
             default => "json_extract({$column}, '$.{$key}')",
+        };
+    }
+
+    public static function dateColumn(string $column = 'payload'): string
+    {
+        return match (DB::connection()->getDriverName()) {
+            'pgsql' => self::payloadDateColumn($column),
+            default => self::text($column, 'date'),
         };
     }
 
@@ -52,5 +64,14 @@ class JsonPayloadSql
         $segments = explode('.', $key);
 
         return "{$column}#>>'{".implode(',', $segments)."}'";
+    }
+
+    private static function payloadDateColumn(string $column): string
+    {
+        if (str_ends_with($column, '.payload')) {
+            return substr($column, 0, -strlen('payload')).'payload_date';
+        }
+
+        return 'payload_date';
     }
 }

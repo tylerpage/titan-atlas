@@ -26,4 +26,17 @@ class JsonPayloadSqlTest extends TestCase
 
         $this->assertSame($sql, JsonPayloadSql::normalizeSql($sql));
     }
+
+    public function test_date_column_uses_json_extract_on_sqlite(): void
+    {
+        $this->assertSame(
+            "json_extract(payload, '$.date')",
+            JsonPayloadSql::dateColumn('payload'),
+        );
+
+        $this->assertSame(
+            "json_extract(r.payload, '$.date')",
+            JsonPayloadSql::dateColumn('r.payload'),
+        );
+    }
 }

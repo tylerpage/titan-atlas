@@ -104,6 +104,7 @@ class RawConnectorPayloadDedupeTest extends TestCase
 
         $payload = RawConnectorPayload::query()->where('connection_id', $connection->id)->first();
         $this->assertSame(125.0, (float) $payload->payload['total']);
+        $this->assertSame('2024-06-01', $payload->payload_date?->toDateString());
     }
 
     public function test_commerce_dashboard_counts_deduped_orders_only(): void

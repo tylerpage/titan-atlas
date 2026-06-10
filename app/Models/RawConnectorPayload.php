@@ -13,6 +13,7 @@ class RawConnectorPayload extends Model
         'resource_type',
         'external_id',
         'payload',
+        'payload_date',
         'payload_hash',
         'fetched_at',
     ];
@@ -21,6 +22,7 @@ class RawConnectorPayload extends Model
     {
         return [
             'payload' => 'array',
+            'payload_date' => 'date',
             'fetched_at' => 'datetime',
         ];
     }

@@ -5,6 +5,7 @@ namespace App\Services\Ingestion;
 use App\Models\Connection;
 use App\Models\RawConnectorPayload;
 use App\Models\SyncRun;
+use Carbon\Carbon;
 
 class RawConnectorPayloadWriter
 {
@@ -15,6 +16,7 @@ class RawConnectorPayloadWriter
     {
         $externalId = $record['external_id'] ?? null;
         $payloadHash = hash('sha256', json_encode($record['payload']));
+        $payloadDate = $this->resolvePayloadDate($record['payload']);
 
         if ($externalId === null || $externalId === '') {
             RawConnectorPayload::query()->create([
@@ -23,6 +25,7 @@ class RawConnectorPayloadWriter
                 'resource_type' => $record['resource_type'],
                 'external_id' => null,
                 'payload' => $record['payload'],
+                'payload_date' => $payloadDate,
                 'payload_hash' => $payloadHash,
                 'fetched_at' => now(),
             ]);
@@ -49,11 +52,26 @@ class RawConnectorPayloadWriter
             [
                 'sync_run_id' => $syncRun->id,
                 'payload' => $record['payload'],
+                'payload_date' => $payloadDate,
                 'payload_hash' => $payloadHash,
                 'fetched_at' => now(),
             ],
         );
 
         return true;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    protected function resolvePayloadDate(array $payload): ?string
+    {
+        $date = $payload['date'] ?? null;
+
+        if ($date === null || $date === '') {
+            return null;
+        }
+
+        return Carbon::parse((string) $date)->toDateString();
     }
 }
