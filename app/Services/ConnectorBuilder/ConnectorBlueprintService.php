@@ -95,6 +95,7 @@ class ConnectorBlueprintService
                     'path_template' => (string) ($stream['path_template'] ?? '/'),
                     'query_params' => $stream['query_params'] ?? [],
                     'request_body' => $stream['request_body'] ?? null,
+                    'request_body_format' => (string) ($stream['request_body_format'] ?? 'json'),
                     'headers' => $stream['headers'] ?? [],
                     'pagination' => $stream['pagination'] ?? ['type' => 'none'],
                     'response_mapping' => $stream['response_mapping'] ?? [

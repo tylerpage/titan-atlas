@@ -117,6 +117,7 @@ class ConnectorBuilderController extends Controller
             'label' => $blueprint->label,
             'status' => $blueprint->status->value,
             'original_prompt' => $blueprint->original_prompt,
+            'auth_config' => $blueprint->auth_config ?? [],
             'credential_schema' => $blueprint->credential_schema ?? [],
             'sync_config' => $blueprint->sync_config ?? [],
             'transform_config' => $blueprint->transform_config ?? [],
@@ -125,6 +126,7 @@ class ConnectorBuilderController extends Controller
             'streams' => $blueprint->streams->map(fn ($stream) => [
                 'stream_key' => $stream->stream_key,
                 'resource_type' => $stream->resource_type,
+                'http_method' => $stream->http_method,
                 'path_template' => $stream->path_template,
                 'enabled' => $stream->enabled,
             ])->values()->all(),

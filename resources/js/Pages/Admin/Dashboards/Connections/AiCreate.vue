@@ -4,6 +4,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import AppLayout from '../../../../Layouts/AppLayout.vue';
 import CredentialFieldLabel from '../../../../Components/CredentialFieldLabel.vue';
 import { displayMessageContent } from '../../../../Composables/useTitanAiMessage';
+import { copyAiConnectorDetails } from '../../../../Composables/useAiConnectorClipboard';
 import { useTitanAiSessionWatch } from '../../../../Composables/useTitanAiSessionWatch';
 
 const props = defineProps({
@@ -51,6 +52,8 @@ const statusBadgeClass = computed(() => {
 
 let pendingPageScrollY = null;
 let removeFinishListener = null;
+const messagesContainer = ref(null);
+const copiedDetails = ref(false);
 
 function restorePageScroll(scrollY) {
     if (scrollY == null) {
@@ -62,7 +65,22 @@ function restorePageScroll(scrollY) {
     requestAnimationFrame(() => requestAnimationFrame(restore));
 }
 
-function reloadSessionData() {
+function scrollChatToBottom(behavior = 'smooth') {
+    nextTick(() => {
+        const container = messagesContainer.value;
+
+        if (!container) {
+            return;
+        }
+
+        container.scrollTo({
+            top: container.scrollHeight,
+            behavior,
+        });
+    });
+}
+
+function reloadSessionData(scrollToBottom = true) {
     const pageScrollY = window.scrollY;
     pendingPageScrollY = pageScrollY;
     const reloadData = {};
@@ -79,6 +97,10 @@ function reloadSessionData() {
         onFinish: () => {
             restorePageScroll(pageScrollY);
             pendingPageScrollY = null;
+
+            if (scrollToBottom) {
+                scrollChatToBottom('instant');
+            }
         },
     });
 }
@@ -98,6 +120,7 @@ const { startWatching, stopWatching } = useTitanAiSessionWatch({
 
 onMounted(() => {
     startWatching();
+    scrollChatToBottom('instant');
 
     removeFinishListener = router.on('finish', () => {
         if (pendingPageScrollY !== null) {
@@ -119,14 +142,21 @@ onBeforeUnmount(() => {
 watch(isProcessing, (processing, wasProcessing) => {
     if (processing) {
         startWatching();
+        scrollChatToBottom('instant');
     } else {
         stopWatching();
 
         if (wasProcessing) {
-            reloadSessionData();
+            reloadSessionData(false);
+            scrollChatToBottom();
         }
     }
 });
+
+watch(
+    () => messages.value.length,
+    () => scrollChatToBottom('instant'),
+);
 
 function submitMessage() {
     if (form.processing || isProcessing.value || !form.message.trim()) {
@@ -143,7 +173,10 @@ function submitMessage() {
         onSuccess: () => {
             form.message = '';
             form.credentials = {};
-            nextTick(() => restorePageScroll(pageScrollY));
+            nextTick(() => {
+                restorePageScroll(pageScrollY);
+                scrollChatToBottom('instant');
+            });
             startWatching();
         },
     });
@@ -183,6 +216,19 @@ function exportDevTasks(format) {
     navigator.clipboard.writeText(content);
 }
 
+async function copyConnectorDetails() {
+    const copied = await copyAiConnectorDetails(blueprint.value);
+
+    if (!copied) {
+        return;
+    }
+
+    copiedDetails.value = true;
+    setTimeout(() => {
+        copiedDetails.value = false;
+    }, 2000);
+}
+
 const status = computed(() => page.props.flash?.status);
 const error = computed(() => page.props.flash?.error);
 </script>
@@ -220,7 +266,7 @@ const error = computed(() => page.props.flash?.error);
 
         <div class="grid gap-6 lg:grid-cols-5">
             <div class="flex flex-col rounded-xl border border-slate-200 bg-white shadow-sm lg:col-span-3">
-                <div class="flex-1 space-y-4 overflow-y-auto p-5" style="min-height: 400px; max-height: 560px;">
+                <div ref="messagesContainer" class="flex-1 space-y-4 overflow-y-auto p-5" style="min-height: 400px; max-height: 560px;">
                     <div v-if="messages.length === 0" class="text-sm text-slate-500">
                         <span v-if="isResuming">
                             Tell the agent what to change. For example: "Add an orders stream" or "Switch auth to OAuth2 client credentials."
@@ -267,9 +313,19 @@ const error = computed(() => page.props.flash?.error);
                 <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                     <div class="mb-4 flex items-center justify-between gap-2">
                         <h2 class="text-lg font-semibold">Blueprint</h2>
-                        <span v-if="blueprint" class="rounded-full px-2 py-0.5 text-xs capitalize" :class="statusBadgeClass">
-                            {{ blueprint.status.replace('_', ' ') }}
-                        </span>
+                        <div class="flex items-center gap-2">
+                            <button
+                                v-if="blueprint"
+                                type="button"
+                                class="text-xs text-slate-600 underline hover:text-slate-900"
+                                @click="copyConnectorDetails"
+                            >
+                                {{ copiedDetails ? 'Copied!' : 'Copy for AI' }}
+                            </button>
+                            <span v-if="blueprint" class="rounded-full px-2 py-0.5 text-xs capitalize" :class="statusBadgeClass">
+                                {{ blueprint.status.replace('_', ' ') }}
+                            </span>
+                        </div>
                     </div>
 
                     <div v-if="!blueprint" class="text-sm text-slate-500">

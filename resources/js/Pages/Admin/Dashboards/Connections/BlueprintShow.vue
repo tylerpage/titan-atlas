@@ -1,6 +1,8 @@
 <script setup>
 import { Link, router } from '@inertiajs/vue3';
+import { ref } from 'vue';
 import AppLayout from '../../../../Layouts/AppLayout.vue';
+import { copyAiConnectorDetails } from '../../../../Composables/useAiConnectorClipboard';
 
 const props = defineProps({
     dashboard: {
@@ -16,6 +18,21 @@ const props = defineProps({
         required: true,
     },
 });
+
+const copiedDetails = ref(false);
+
+async function copyConnectorDetails() {
+    const copied = await copyAiConnectorDetails(props.blueprint);
+
+    if (!copied) {
+        return;
+    }
+
+    copiedDetails.value = true;
+    setTimeout(() => {
+        copiedDetails.value = false;
+    }, 2000);
+}
 
 function testBlueprint() {
     router.post(route('admin.connector-blueprints.test', props.blueprint.id));
@@ -77,6 +94,13 @@ function exportDevTasks() {
             >
                 Edit
             </Link>
+            <button
+                type="button"
+                class="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50"
+                @click="copyConnectorDetails"
+            >
+                {{ copiedDetails ? 'Copied!' : 'Copy details for AI' }}
+            </button>
             <button
                 type="button"
                 class="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50"

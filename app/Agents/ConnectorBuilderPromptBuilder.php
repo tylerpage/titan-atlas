@@ -54,7 +54,7 @@ You are {$productName}'s connector builder assistant. Help admins create dynamic
 - auth_config: see OAuth guidance above, or { type: api_key|bearer|basic, ... token_request? }
 - credential_schema: [{ key, label, type, help }]
 - sync_config: { base_url, test_endpoint?, test_request? }
-- streams: [{ stream_key, resource_type, path_template, http_method?, request_body?, query_params, pagination, response_mapping }]
+- streams: [{ stream_key, resource_type, path_template, http_method?, request_body?, request_body_format?, query_params, pagination, response_mapping }]
 - transform_config: { resource_type: { metrics: [{ key, value_path, date_path?, dimensions? }] } }
 - dashboard_spec: { widgets: [{ prompt, sql, visualization_type, visualization_config? }] }
 

@@ -81,20 +81,11 @@ class DynamicConnector extends AbstractConnector implements FanOutSyncConnector
             return new FetchResult(records: [], hasMore: false);
         }
 
-        $queryParams = array_merge(
-            $stream->query_params ?? [],
-            $this->paginationQueryParams($stream, $state),
-        );
-
-        $response = $this->client->request(
+        $response = $this->executeStreamRequest(
             blueprint: $blueprint,
             credentials: $credentials,
-            method: $stream->http_method ?? 'GET',
-            path: $stream->path_template,
-            queryParams: $queryParams,
-            headers: $stream->headers ?? [],
-            body: $stream->request_body ?? [],
-            bodyFormat: (string) ($stream->response_mapping['body_format'] ?? 'json'),
+            stream: $stream,
+            state: $state,
         );
 
         $mapping = $stream->response_mapping ?? [];
@@ -163,6 +154,17 @@ class DynamicConnector extends AbstractConnector implements FanOutSyncConnector
                 );
             }
 
+            $matchingStream = $this->streamForTestEndpoint($blueprint, $testEndpoint);
+
+            if ($matchingStream !== null && strtoupper((string) $matchingStream->http_method) === 'POST') {
+                return $this->executeStreamRequest(
+                    blueprint: $blueprint,
+                    credentials: $credentials,
+                    stream: $matchingStream,
+                    probe: true,
+                );
+            }
+
             return $this->client->request(
                 blueprint: $blueprint,
                 credentials: $credentials,
@@ -177,18 +179,115 @@ class DynamicConnector extends AbstractConnector implements FanOutSyncConnector
             throw new \RuntimeException('Blueprint has no enabled streams to test.');
         }
 
-        $queryParams = array_merge($stream->query_params ?? [], ['limit' => 1]);
+        return $this->executeStreamRequest(
+            blueprint: $blueprint,
+            credentials: $credentials,
+            stream: $stream,
+            probe: true,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $credentials
+     * @param  array{stream: string, page: int, after: ?string, fan_out: bool}|null  $state
+     * @return array<string, mixed>
+     */
+    protected function executeStreamRequest(
+        ConnectorBlueprint $blueprint,
+        array $credentials,
+        ConnectorBlueprintStream $stream,
+        ?array $state = null,
+        bool $probe = false,
+    ): array {
+        $request = $this->buildStreamRequest($stream, $state, $probe);
 
         return $this->client->request(
             blueprint: $blueprint,
             credentials: $credentials,
-            method: $stream->http_method ?? 'GET',
-            path: $stream->path_template,
-            queryParams: $queryParams,
-            headers: $stream->headers ?? [],
-            body: $stream->request_body ?? [],
-            bodyFormat: (string) ($stream->response_mapping['body_format'] ?? 'json'),
+            method: $request['method'],
+            path: $request['path'],
+            queryParams: $request['queryParams'],
+            headers: $request['headers'],
+            body: $request['body'],
+            bodyFormat: $request['bodyFormat'],
         );
+    }
+
+    /**
+     * @param  array{stream: string, page: int, after: ?string, fan_out: bool}|null  $state
+     * @return array{
+     *     method: string,
+     *     path: string,
+     *     queryParams: array<string, mixed>,
+     *     headers: array<string, mixed>,
+     *     body: array<string, mixed>,
+     *     bodyFormat: string
+     * }
+     */
+    protected function buildStreamRequest(
+        ConnectorBlueprintStream $stream,
+        ?array $state,
+        bool $probe,
+    ): array {
+        $method = strtoupper((string) ($stream->http_method ?? 'GET'));
+        $pagination = $stream->pagination ?? [];
+        $paginationLocation = (string) ($pagination['location'] ?? ($method === 'POST' ? 'body' : 'query'));
+        $queryParams = $stream->query_params ?? [];
+        $body = $stream->request_body ?? [];
+
+        if ($probe) {
+            $limitParam = (string) ($pagination['limit_param'] ?? 'limit');
+
+            if ($paginationLocation === 'body') {
+                $body[$limitParam] = 1;
+
+                if (($pagination['type'] ?? null) === 'page') {
+                    $body[(string) ($pagination['page_param'] ?? 'page')] = 1;
+                }
+            } else {
+                $queryParams = array_merge($queryParams, [$limitParam => 1]);
+            }
+        } elseif ($state !== null) {
+            $paginationParams = $this->paginationParams($stream, $state);
+
+            if ($paginationLocation === 'body') {
+                $body = array_merge($body, $paginationParams);
+            } else {
+                $queryParams = array_merge($queryParams, $paginationParams);
+            }
+        }
+
+        return [
+            'method' => $method,
+            'path' => $stream->path_template,
+            'queryParams' => $queryParams,
+            'headers' => $stream->headers ?? [],
+            'body' => $body,
+            'bodyFormat' => $this->streamRequestBodyFormat($stream),
+        ];
+    }
+
+    protected function streamRequestBodyFormat(ConnectorBlueprintStream $stream): string
+    {
+        if (is_string($stream->request_body_format) && $stream->request_body_format !== '') {
+            return $stream->request_body_format;
+        }
+
+        return (string) ($stream->response_mapping['request_body_format']
+            ?? $stream->response_mapping['body_format']
+            ?? 'json');
+    }
+
+    protected function streamForTestEndpoint(ConnectorBlueprint $blueprint, string $testEndpoint): ?ConnectorBlueprintStream
+    {
+        $blueprint->loadMissing('streams');
+
+        return $blueprint->streams
+            ->where('enabled', true)
+            ->first(fn (ConnectorBlueprintStream $stream) => DynamicConnectorAuth::pathsMatch(
+                $stream->path_template,
+                $testEndpoint,
+            ));
     }
 
     protected function blueprintFor(Connection $connection): ?ConnectorBlueprint
@@ -270,12 +369,16 @@ class DynamicConnector extends AbstractConnector implements FanOutSyncConnector
      * @param  array{stream: string, page: int, after: ?string, fan_out: bool}  $state
      * @return array<string, mixed>
      */
-    protected function paginationQueryParams(ConnectorBlueprintStream $stream, array $state): array
+    protected function paginationParams(ConnectorBlueprintStream $stream, array $state): array
     {
         $pagination = $stream->pagination ?? [];
         $type = $pagination['type'] ?? 'none';
 
         return match ($type) {
+            'page' => [
+                ($pagination['limit_param'] ?? 'limit') => (int) ($pagination['page_size'] ?? 100),
+                ($pagination['page_param'] ?? 'page') => $state['page'],
+            ],
             'offset' => [
                 ($pagination['limit_param'] ?? 'limit') => (int) ($pagination['page_size'] ?? 100),
                 ($pagination['offset_param'] ?? 'offset') => max(0, ($state['page'] - 1) * (int) ($pagination['page_size'] ?? 100)),
@@ -286,6 +389,25 @@ class DynamicConnector extends AbstractConnector implements FanOutSyncConnector
             ], fn ($value) => $value !== null && $value !== ''),
             default => [],
         };
+    }
+
+    /**
+     * @deprecated Use paginationParams()
+     *
+     * @param  array{stream: string, page: int, after: ?string, fan_out: bool}  $state
+     * @return array<string, mixed>
+     */
+    protected function paginationQueryParams(ConnectorBlueprintStream $stream, array $state): array
+    {
+        $pagination = $stream->pagination ?? [];
+        $method = strtoupper((string) ($stream->http_method ?? 'GET'));
+        $location = (string) ($pagination['location'] ?? ($method === 'POST' ? 'body' : 'query'));
+
+        if ($location === 'body') {
+            return [];
+        }
+
+        return $this->paginationParams($stream, $state);
     }
 
     /**
@@ -304,7 +426,7 @@ class DynamicConnector extends AbstractConnector implements FanOutSyncConnector
         $pageSize = (int) ($pagination['page_size'] ?? 100);
 
         return match ($type) {
-            'offset' => $recordCount >= $pageSize
+            'page', 'offset' => $recordCount >= $pageSize
                 ? ['stream' => $state['stream'], 'page' => $state['page'] + 1, 'after' => null, 'fan_out' => $state['fan_out']]
                 : null,
             'cursor' => $this->nextCursorPage($state, $response, $pagination, $recordCount, $pageSize),

@@ -15,6 +15,7 @@ class ConnectorBlueprintStream extends Model
         'path_template',
         'query_params',
         'request_body',
+        'request_body_format',
         'headers',
         'pagination',
         'response_mapping',

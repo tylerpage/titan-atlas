@@ -240,6 +240,22 @@ OAuth2 client-credentials (supported):
 
 OAuth2 authorization-code / user-consent flows (NOT supported — record dev tasks):
 - Browser redirects, refresh tokens managed by a human login, or Shopify-style app installs
+
+POST read/search streams (supported — do NOT record dev tasks):
+- Use http_method = POST with request_body JSON for read-only search endpoints (e.g. Shopware /api/search/order)
+- Set request_body_format = json and pagination.type = page with pagination.location = body for Shopware page/limit filters
+- Example Shopware orders stream:
+  {
+    "stream_key": "orders",
+    "resource_type": "shopware_order",
+    "http_method": "POST",
+    "path_template": "/api/search/order",
+    "request_body": { "filter": [], "sort": [{ "field": "orderDateTime", "order": "DESC" }] },
+    "request_body_format": "json",
+    "pagination": { "type": "page", "location": "body", "page_param": "page", "limit_param": "limit", "page_size": 50 },
+    "response_mapping": { "records_path": "data", "id_path": "id", "date_path": "orderDateTime" }
+  }
+- sync_config.test_endpoint should match the POST stream path OR use sync_config.test_request with method POST and a minimal JSON body
 GUIDANCE;
     }
 }
