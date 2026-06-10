@@ -129,6 +129,10 @@ class TransformConnectionDataService
         $hasMore = $stoppedEarly && $lastPayloadId !== null
             && $this->hasMorePayloads($connectionId, $lastPayloadId);
 
+        if ($lastPayloadId !== null) {
+            $connection->update(['last_transformed_payload_id' => $lastPayloadId]);
+        }
+
         return new TransformChunkResult($written, $hasMore, $lastPayloadId);
     }
 

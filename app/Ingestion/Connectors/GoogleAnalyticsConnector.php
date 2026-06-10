@@ -6,6 +6,8 @@ use App\Contracts\Ingestion\FanOutSyncConnector;
 use App\Data\Ingestion\FetchResult;
 use App\Data\Ingestion\ValidationResult;
 use App\Enums\ConnectorType;
+use App\Ingestion\Connectors\Concerns\WalksSyncDateChunks;
+use App\Support\SyncDateChunkWalker;
 use App\Ingestion\Connectors\GoogleAnalytics\GoogleAnalyticsAdminClient;
 use App\Ingestion\Connectors\GoogleAnalytics\GoogleAnalyticsDataClient;
 use App\Models\Connection;
@@ -13,6 +15,8 @@ use Carbon\Carbon;
 
 class GoogleAnalyticsConnector extends AbstractConnector implements FanOutSyncConnector
 {
+    use WalksSyncDateChunks;
+
     /** @var list<string> */
     protected array $streams = ['traffic_daily', 'traffic_channel', 'events_daily', 'landing_page'];
 
@@ -92,14 +96,8 @@ class GoogleAnalyticsConnector extends AbstractConnector implements FanOutSyncCo
         $state = $this->decodeCursor($cursor, $connection);
         $chunkDays = max(1, (int) config('titan.google_analytics.chunk_days', 7));
         $rowLimit = max(1, (int) config('titan.google_analytics.row_limit', 5000));
-
-        $start = Carbon::parse($state['start_date']);
-        $rangeEnd = Carbon::parse($state['end_date']);
-        $chunkEnd = $start->copy()->addDays($chunkDays - 1);
-
-        if ($chunkEnd->gt($rangeEnd)) {
-            $chunkEnd = $rangeEnd->copy();
-        }
+        [$chunkStart, $chunkEnd] = SyncDateChunkWalker::currentChunkBounds($state, $chunkDays);
+        [$progressFrom, $progressThrough] = $this->chunkProgressDates($state, $chunkDays);
 
         $dimensions = $this->dimensionsForStream($state['stream']);
         $metrics = $this->metricsForStream($state['stream']);
@@ -107,7 +105,7 @@ class GoogleAnalyticsConnector extends AbstractConnector implements FanOutSyncCo
         $rows = $this->client->runReport(
             $refreshToken,
             $propertyId,
-            $start->toDateString(),
+            $chunkStart->toDateString(),
             $chunkEnd->toDateString(),
             $dimensions,
             $metrics,
@@ -121,39 +119,32 @@ class GoogleAnalyticsConnector extends AbstractConnector implements FanOutSyncCo
             $nextState = $state;
             $nextState['start_row'] += $rowLimit;
 
-            return $this->result($records, $this->encodeCursor($nextState), true);
+            return $this->result($records, $this->encodeCursor($nextState), true, $progressFrom, $progressThrough);
         }
 
-        $nextStart = $chunkEnd->copy()->addDay();
+        $nextState = SyncDateChunkWalker::nextDateChunkState($state, $chunkDays);
 
-        if ($nextStart->lte($rangeEnd)) {
-            $nextState = $state;
-            $nextState['start_date'] = $nextStart->toDateString();
-            $nextState['start_row'] = 0;
-
-            return $this->result($records, $this->encodeCursor($nextState), true);
+        if ($nextState !== null) {
+            return $this->result($records, $this->encodeCursor($nextState), true, $progressFrom, $progressThrough);
         }
 
         if (! empty($state['fan_out'])) {
-            return $this->result($records, null, false);
+            return $this->result($records, null, false, $progressFrom, $progressThrough);
         }
 
         $nextStream = $this->nextStream($state['stream']);
 
         if ($nextStream !== null) {
-            [$rangeStart, $rangeEndDate] = $this->resolveDateRange($connection);
-
-            $nextState = [
-                'stream' => $nextStream,
-                'start_date' => $rangeStart->toDateString(),
-                'end_date' => $rangeEndDate->toDateString(),
-                'start_row' => 0,
-            ];
-
-            return $this->result($records, $this->encodeCursor($nextState), true);
+            return $this->result(
+                $records,
+                $this->encodeCursor($this->nextStreamCursorState($connection, $nextStream, $state)),
+                true,
+                $progressFrom,
+                $progressThrough,
+            );
         }
 
-        return $this->result($records, null, false);
+        return $this->result($records, null, false, $progressFrom, $progressThrough);
     }
 
     public function syncStreams(): array
@@ -164,14 +155,13 @@ class GoogleAnalyticsConnector extends AbstractConnector implements FanOutSyncCo
     public function initialSyncCursor(Connection $connection, string $stream, bool $fanOut = false): string
     {
         [$start, $end] = $this->resolveDateRange($connection);
+        $walk = SyncDateChunkWalker::walkForConnection($connection);
 
-        return $this->encodeCursor([
+        return $this->encodeCursor(SyncDateChunkWalker::initialState($start, $end, $walk, [
             'stream' => $stream,
-            'start_date' => $start->toDateString(),
-            'end_date' => $end->toDateString(),
             'start_row' => 0,
             'fan_out' => $fanOut,
-        ]);
+        ]));
     }
 
     /**
@@ -182,26 +172,28 @@ class GoogleAnalyticsConnector extends AbstractConnector implements FanOutSyncCo
         if ($cursor !== null && str_starts_with($cursor, 'ga4:')) {
             $decoded = json_decode(substr($cursor, 4), true);
 
-            if (is_array($decoded)
-                && isset($decoded['stream'], $decoded['start_date'], $decoded['end_date'], $decoded['start_row'])) {
-                return [
+            if (is_array($decoded) && isset($decoded['stream'])) {
+                return SyncDateChunkWalker::mergeDecodedState([
                     'stream' => (string) $decoded['stream'],
-                    'start_date' => (string) $decoded['start_date'],
-                    'end_date' => (string) $decoded['end_date'],
-                    'start_row' => max(0, (int) $decoded['start_row']),
+                    'start_date' => (string) ($decoded['start_date'] ?? ''),
+                    'end_date' => (string) ($decoded['end_date'] ?? ''),
+                    'range_start' => (string) ($decoded['range_start'] ?? ''),
+                    'range_end' => (string) ($decoded['range_end'] ?? ''),
+                    'chunk_end' => (string) ($decoded['chunk_end'] ?? ''),
+                    'walk' => (string) ($decoded['walk'] ?? ''),
+                    'start_row' => max(0, (int) ($decoded['start_row'] ?? 0)),
                     'fan_out' => (bool) ($decoded['fan_out'] ?? false),
-                ];
+                ], $connection);
             }
         }
 
         [$start, $end] = $this->resolveDateRange($connection);
+        $walk = SyncDateChunkWalker::walkForConnection($connection);
 
-        return [
+        return SyncDateChunkWalker::initialState($start, $end, $walk, [
             'stream' => $this->streams[0],
-            'start_date' => $start->toDateString(),
-            'end_date' => $end->toDateString(),
             'start_row' => 0,
-        ];
+        ]);
     }
 
     /**
@@ -377,15 +369,4 @@ class GoogleAnalyticsConnector extends AbstractConnector implements FanOutSyncCo
         return $this->streams[$index + 1] ?? null;
     }
 
-    /**
-     * @param  list<array{resource_type: string, external_id: string, payload: array<string, mixed>}>  $records
-     */
-    protected function result(array $records, ?string $nextCursor, bool $hasMore): FetchResult
-    {
-        return new FetchResult(
-            records: $records,
-            nextCursor: $nextCursor,
-            hasMore: $hasMore,
-        );
-    }
 }

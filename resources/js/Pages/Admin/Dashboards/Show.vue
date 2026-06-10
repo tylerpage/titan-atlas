@@ -133,6 +133,10 @@ function formatRelativeTime(isoString) {
                             <p v-if="connection.last_synced_at" class="text-sm text-slate-500">
                                 Last synced {{ formatRelativeTime(connection.last_synced_at) }}
                             </p>
+                            <p v-if="connection.data_through_date" class="text-sm text-slate-500">
+                                Data through {{ connection.data_through_date }}
+                                <span v-if="connection.data_from_date"> (from {{ connection.data_from_date }})</span>
+                            </p>
                             <p v-if="connection.sync_error" class="mt-1 text-sm text-red-600">
                                 {{ connection.sync_error }}
                             </p>
@@ -174,6 +178,7 @@ function formatRelativeTime(isoString) {
                             <li v-for="run in connection.sync_runs" :key="run.id">
                                 {{ run.type }} · {{ run.status }}
                                 · fetched {{ run.records_fetched }}, written {{ run.records_written }}
+                                <span v-if="run.progress_through_date"> · through {{ run.progress_through_date }}</span>
                             </li>
                         </ul>
                     </div>

@@ -6,6 +6,8 @@ use App\Contracts\Ingestion\FanOutSyncConnector;
 use App\Data\Ingestion\FetchResult;
 use App\Data\Ingestion\ValidationResult;
 use App\Enums\ConnectorType;
+use App\Ingestion\Connectors\Concerns\WalksSyncDateChunks;
+use App\Support\SyncDateChunkWalker;
 use App\Ingestion\Connectors\StackAdapt\StackAdaptGraphqlClient;
 use App\Ingestion\Connectors\StackAdapt\StackAdaptRestClient;
 use App\Models\Connection;
@@ -13,6 +15,8 @@ use Carbon\Carbon;
 
 class StackAdaptConnector extends AbstractConnector implements FanOutSyncConnector
 {
+    use WalksSyncDateChunks;
+
     /** @var list<string> */
     protected array $streams = [
         'spend_daily',
@@ -108,16 +112,10 @@ class StackAdaptConnector extends AbstractConnector implements FanOutSyncConnect
 
         $state = $this->decodeCursor($cursor, $connection);
         $chunkDays = max(1, (int) config('titan.stackadapt.chunk_days', 1));
+        [$chunkStart, $chunkEnd] = SyncDateChunkWalker::currentChunkBounds($state, $chunkDays);
+        [$progressFrom, $progressThrough] = $this->chunkProgressDates($state, $chunkDays);
 
-        $start = Carbon::parse($state['start_date']);
-        $rangeEnd = Carbon::parse($state['end_date']);
-        $chunkEnd = $start->copy()->addDays($chunkDays - 1);
-
-        if ($chunkEnd->gt($rangeEnd)) {
-            $chunkEnd = $rangeEnd->copy();
-        }
-
-        $fromDate = $start->toDateString();
+        $fromDate = $chunkStart->toDateString();
         $toDate = $this->graphql->exclusiveEndDate($chunkEnd->toDateString());
 
         $nextPageCursor = null;
@@ -135,38 +133,34 @@ class StackAdaptConnector extends AbstractConnector implements FanOutSyncConnect
             $nextState = $state;
             $nextState['page_cursor'] = $nextPageCursor;
 
-            return $this->result($records, $this->encodeCursor($nextState), true);
+            return $this->result($records, $this->encodeCursor($nextState), true, $progressFrom, $progressThrough);
         }
 
-        $nextStart = $chunkEnd->copy()->addDay();
+        $nextState = SyncDateChunkWalker::nextDateChunkState($state, $chunkDays);
 
-        if ($nextStart->lte($rangeEnd)) {
-            $nextState = $state;
-            $nextState['start_date'] = $nextStart->toDateString();
+        if ($nextState !== null) {
             unset($nextState['page_cursor']);
 
-            return $this->result($records, $this->encodeCursor($nextState), true);
+            return $this->result($records, $this->encodeCursor($nextState), true, $progressFrom, $progressThrough);
         }
 
         if (! empty($state['fan_out'])) {
-            return $this->result($records, null, false);
+            return $this->result($records, null, false, $progressFrom, $progressThrough);
         }
 
         $nextStream = $this->nextStream($state['stream']);
 
         if ($nextStream !== null) {
-            [$rangeStart, $rangeEndDate] = $this->resolveDateRange($connection);
-
-            $nextState = [
-                'stream' => $nextStream,
-                'start_date' => $rangeStart->toDateString(),
-                'end_date' => $rangeEndDate->toDateString(),
-            ];
-
-            return $this->result($records, $this->encodeCursor($nextState), true);
+            return $this->result(
+                $records,
+                $this->encodeCursor($this->nextStreamCursorState($connection, $nextStream, $state)),
+                true,
+                $progressFrom,
+                $progressThrough,
+            );
         }
 
-        return $this->result($records, null, false);
+        return $this->result($records, null, false, $progressFrom, $progressThrough);
     }
 
     public function syncStreams(): array
@@ -177,13 +171,12 @@ class StackAdaptConnector extends AbstractConnector implements FanOutSyncConnect
     public function initialSyncCursor(Connection $connection, string $stream, bool $fanOut = false): string
     {
         [$start, $end] = $this->resolveDateRange($connection);
+        $walk = SyncDateChunkWalker::walkForConnection($connection);
 
-        return $this->encodeCursor([
+        return $this->encodeCursor(SyncDateChunkWalker::initialState($start, $end, $walk, [
             'stream' => $stream,
-            'start_date' => $start->toDateString(),
-            'end_date' => $end->toDateString(),
             'fan_out' => $fanOut,
-        ]);
+        ]));
     }
 
     /**
@@ -524,25 +517,27 @@ class StackAdaptConnector extends AbstractConnector implements FanOutSyncConnect
         if ($cursor !== null && str_starts_with($cursor, 'sa:')) {
             $decoded = json_decode(substr($cursor, 3), true);
 
-            if (is_array($decoded)
-                && isset($decoded['stream'], $decoded['start_date'], $decoded['end_date'])) {
-                return [
+            if (is_array($decoded) && isset($decoded['stream'])) {
+                return SyncDateChunkWalker::mergeDecodedState([
                     'stream' => (string) $decoded['stream'],
-                    'start_date' => (string) $decoded['start_date'],
-                    'end_date' => (string) $decoded['end_date'],
+                    'start_date' => (string) ($decoded['start_date'] ?? ''),
+                    'end_date' => (string) ($decoded['end_date'] ?? ''),
+                    'range_start' => (string) ($decoded['range_start'] ?? ''),
+                    'range_end' => (string) ($decoded['range_end'] ?? ''),
+                    'chunk_end' => (string) ($decoded['chunk_end'] ?? ''),
+                    'walk' => (string) ($decoded['walk'] ?? ''),
                     'page_cursor' => $decoded['page_cursor'] ?? null,
                     'fan_out' => (bool) ($decoded['fan_out'] ?? false),
-                ];
+                ], $connection);
             }
         }
 
         [$start, $end] = $this->resolveDateRange($connection);
+        $walk = SyncDateChunkWalker::walkForConnection($connection);
 
-        return [
+        return SyncDateChunkWalker::initialState($start, $end, $walk, [
             'stream' => $this->streams[0],
-            'start_date' => $start->toDateString(),
-            'end_date' => $end->toDateString(),
-        ];
+        ]);
     }
 
     /**
@@ -590,15 +585,4 @@ class StackAdaptConnector extends AbstractConnector implements FanOutSyncConnect
         return $this->streams[$index + 1] ?? null;
     }
 
-    /**
-     * @param  list<array{resource_type: string, external_id: string, payload: array<string, mixed>}>  $records
-     */
-    protected function result(array $records, ?string $nextCursor, bool $hasMore): FetchResult
-    {
-        return new FetchResult(
-            records: $records,
-            nextCursor: $nextCursor,
-            hasMore: $hasMore,
-        );
-    }
 }

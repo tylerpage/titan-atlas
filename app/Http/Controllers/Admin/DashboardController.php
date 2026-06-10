@@ -198,12 +198,16 @@ class DashboardController extends Controller
                 'sync_status' => $connection->sync_status->value,
                 'sync_error' => $connection->sync_error,
                 'last_synced_at' => $connection->last_synced_at?->toIso8601String(),
+                'data_from_date' => $connection->data_from_date?->toDateString(),
+                'data_through_date' => $connection->data_through_date?->toDateString(),
                 'sync_runs' => $connection->syncRuns->map(fn ($run) => [
                     'id' => $run->id,
                     'type' => $run->type->value,
                     'status' => $run->status->value,
                     'records_fetched' => $run->records_fetched,
                     'records_written' => $run->records_written,
+                    'progress_from_date' => $run->progress_from_date?->toDateString(),
+                    'progress_through_date' => $run->progress_through_date?->toDateString(),
                 ])->values(),
             ])->values(),
             'widget_placements' => $dashboard->widgetPlacements->map(fn ($widget) => [

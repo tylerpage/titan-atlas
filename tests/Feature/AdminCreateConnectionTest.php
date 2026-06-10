@@ -34,7 +34,7 @@ class AdminCreateConnectionTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('Admin/Dashboards/Connections/Create')
-                ->has('connectors', 6)
+                ->has('connectors', 7)
             );
     }
 

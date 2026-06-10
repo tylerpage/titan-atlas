@@ -16,6 +16,8 @@ class SyncRun extends Model
         'status',
         'records_fetched',
         'records_written',
+        'progress_from_date',
+        'progress_through_date',
         'error_code',
         'error_message',
         'error_payload',
@@ -29,6 +31,8 @@ class SyncRun extends Model
             'type' => SyncRunType::class,
             'status' => SyncStatus::class,
             'error_payload' => 'array',
+            'progress_from_date' => 'date',
+            'progress_through_date' => 'date',
             'started_at' => 'datetime',
             'finished_at' => 'datetime',
         ];

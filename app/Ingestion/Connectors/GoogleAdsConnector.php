@@ -6,12 +6,16 @@ use App\Contracts\Ingestion\FanOutSyncConnector;
 use App\Data\Ingestion\FetchResult;
 use App\Data\Ingestion\ValidationResult;
 use App\Enums\ConnectorType;
+use App\Ingestion\Connectors\Concerns\WalksSyncDateChunks;
+use App\Support\SyncDateChunkWalker;
 use App\Ingestion\Connectors\GoogleAds\GoogleAdsApiClient;
 use App\Models\Connection;
 use Carbon\Carbon;
 
 class GoogleAdsConnector extends AbstractConnector implements FanOutSyncConnector
 {
+    use WalksSyncDateChunks;
+
     /** @var list<string> */
     protected array $streams = ['spend_daily', 'campaign_daily'];
 
@@ -67,52 +71,41 @@ class GoogleAdsConnector extends AbstractConnector implements FanOutSyncConnecto
 
         $state = $this->decodeCursor($cursor, $connection);
         $chunkDays = max(1, (int) config('titan.google_ads.chunk_days', 7));
-
-        $start = Carbon::parse($state['start_date']);
-        $rangeEnd = Carbon::parse($state['end_date']);
-        $chunkEnd = $start->copy()->addDays($chunkDays - 1);
-
-        if ($chunkEnd->gt($rangeEnd)) {
-            $chunkEnd = $rangeEnd->copy();
-        }
+        [$chunkStart, $chunkEnd] = SyncDateChunkWalker::currentChunkBounds($state, $chunkDays);
+        [$progressFrom, $progressThrough] = $this->chunkProgressDates($state, $chunkDays);
 
         $query = $this->queryForStream(
             $state['stream'],
-            $start->toDateString(),
+            $chunkStart->toDateString(),
             $chunkEnd->toDateString(),
         );
 
         $rows = $this->client->searchStream($refreshToken, $customerId, $query, $loginCustomerId);
         $records = $this->normalizeRows($state['stream'], $rows);
 
-        $nextStart = $chunkEnd->copy()->addDay();
+        $nextState = SyncDateChunkWalker::nextDateChunkState($state, $chunkDays);
 
-        if ($nextStart->lte($rangeEnd)) {
-            $nextState = $state;
-            $nextState['start_date'] = $nextStart->toDateString();
-
-            return $this->result($records, $this->encodeCursor($nextState), true);
+        if ($nextState !== null) {
+            return $this->result($records, $this->encodeCursor($nextState), true, $progressFrom, $progressThrough);
         }
 
         if (! empty($state['fan_out'])) {
-            return $this->result($records, null, false);
+            return $this->result($records, null, false, $progressFrom, $progressThrough);
         }
 
         $nextStream = $this->nextStream($state['stream']);
 
         if ($nextStream !== null) {
-            [$rangeStart, $rangeEndDate] = $this->resolveDateRange($connection);
-
-            $nextState = [
-                'stream' => $nextStream,
-                'start_date' => $rangeStart->toDateString(),
-                'end_date' => $rangeEndDate->toDateString(),
-            ];
-
-            return $this->result($records, $this->encodeCursor($nextState), true);
+            return $this->result(
+                $records,
+                $this->encodeCursor($this->nextStreamCursorState($connection, $nextStream, $state)),
+                true,
+                $progressFrom,
+                $progressThrough,
+            );
         }
 
-        return $this->result($records, null, false);
+        return $this->result($records, null, false, $progressFrom, $progressThrough);
     }
 
     public function syncStreams(): array
@@ -123,13 +116,12 @@ class GoogleAdsConnector extends AbstractConnector implements FanOutSyncConnecto
     public function initialSyncCursor(Connection $connection, string $stream, bool $fanOut = false): string
     {
         [$start, $end] = $this->resolveDateRange($connection);
+        $walk = SyncDateChunkWalker::walkForConnection($connection);
 
-        return $this->encodeCursor([
+        return $this->encodeCursor(SyncDateChunkWalker::initialState($start, $end, $walk, [
             'stream' => $stream,
-            'start_date' => $start->toDateString(),
-            'end_date' => $end->toDateString(),
             'fan_out' => $fanOut,
-        ]);
+        ]));
     }
 
     /**
@@ -154,24 +146,26 @@ class GoogleAdsConnector extends AbstractConnector implements FanOutSyncConnecto
         if ($cursor !== null && str_starts_with($cursor, 'gads:')) {
             $decoded = json_decode(substr($cursor, 5), true);
 
-            if (is_array($decoded)
-                && isset($decoded['stream'], $decoded['start_date'], $decoded['end_date'])) {
-                return [
+            if (is_array($decoded) && isset($decoded['stream'])) {
+                return SyncDateChunkWalker::mergeDecodedState([
                     'stream' => (string) $decoded['stream'],
-                    'start_date' => (string) $decoded['start_date'],
-                    'end_date' => (string) $decoded['end_date'],
+                    'start_date' => (string) ($decoded['start_date'] ?? ''),
+                    'end_date' => (string) ($decoded['end_date'] ?? ''),
+                    'range_start' => (string) ($decoded['range_start'] ?? ''),
+                    'range_end' => (string) ($decoded['range_end'] ?? ''),
+                    'chunk_end' => (string) ($decoded['chunk_end'] ?? ''),
+                    'walk' => (string) ($decoded['walk'] ?? ''),
                     'fan_out' => (bool) ($decoded['fan_out'] ?? false),
-                ];
+                ], $connection);
             }
         }
 
         [$start, $end] = $this->resolveDateRange($connection);
+        $walk = SyncDateChunkWalker::walkForConnection($connection);
 
-        return [
+        return SyncDateChunkWalker::initialState($start, $end, $walk, [
             'stream' => $this->streams[0],
-            'start_date' => $start->toDateString(),
-            'end_date' => $end->toDateString(),
-        ];
+        ]);
     }
 
     /**
@@ -295,12 +289,4 @@ class GoogleAdsConnector extends AbstractConnector implements FanOutSyncConnecto
     /**
      * @param  list<array{resource_type: string, external_id: string, payload: array<string, mixed>}>  $records
      */
-    protected function result(array $records, ?string $nextCursor, bool $hasMore): FetchResult
-    {
-        return new FetchResult(
-            records: $records,
-            nextCursor: $nextCursor,
-            hasMore: $hasMore,
-        );
-    }
 }

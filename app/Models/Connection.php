@@ -20,6 +20,9 @@ class Connection extends Model
         'last_synced_at',
         'backfill_started_at',
         'backfill_completed_at',
+        'data_from_date',
+        'data_through_date',
+        'last_transformed_payload_id',
         'settings',
         'is_active',
     ];
@@ -39,6 +42,8 @@ class Connection extends Model
             'last_synced_at' => 'datetime',
             'backfill_started_at' => 'datetime',
             'backfill_completed_at' => 'datetime',
+            'data_from_date' => 'date',
+            'data_through_date' => 'date',
         ];
     }
 

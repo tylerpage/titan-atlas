@@ -11,6 +11,7 @@ use App\Jobs\Ingestion\SyncConnectionJob;
 use App\Jobs\Ingestion\TransformConnectionDataJob;
 use App\Models\Connection;
 use App\Models\SyncRun;
+use App\Support\SyncDateChunkWalker;
 use Throwable;
 
 class SyncConnectionService
@@ -18,6 +19,7 @@ class SyncConnectionService
     public function __construct(
         protected ConnectorRegistry $connectors,
         protected RawConnectorPayloadWriter $payloadWriter,
+        protected SyncProgressRecorder $progressRecorder,
     ) {}
 
     public function sync(
@@ -38,6 +40,7 @@ class SyncConnectionService
 
             $connection->markSyncRunning();
             $syncRun->markRunning();
+            $this->configureDateWalk($connection, $type);
 
             if ($type === SyncRunType::Backfill && $connection->backfill_started_at === null) {
                 $connection->update(['backfill_started_at' => now()]);
@@ -86,9 +89,18 @@ class SyncConnectionService
                     }
                 }
 
+                $chunkDateFrom = $result->chunkDateFrom;
+                $chunkDateThrough = $result->chunkDateThrough;
                 $cursor = $result->nextCursor;
                 $hasMore = $result->hasMore;
                 unset($result);
+
+                $this->progressRecorder->recordChunkDates(
+                    $syncRun,
+                    $connection,
+                    $chunkDateFrom,
+                    $chunkDateThrough,
+                );
                 $pagesProcessed++;
 
                 if ($pagesProcessed % 2 === 0) {
@@ -108,6 +120,8 @@ class SyncConnectionService
                     && ($pagesProcessed >= $maxPages || $elapsedSeconds >= $maxSeconds);
 
                 if ($shouldContinueInNewJob) {
+                    $this->dispatchIncrementalTransform($connection->fresh(), $syncRun);
+
                     SyncConnectionJob::dispatch(
                         $connection,
                         $type,
@@ -135,6 +149,8 @@ class SyncConnectionService
                 }
 
                 if ($remainingStreams > 0) {
+                    $this->dispatchIncrementalTransform($connection->fresh(), $syncRun);
+
                     return $syncRun->fresh();
                 }
 
@@ -146,6 +162,7 @@ class SyncConnectionService
 
             $syncRun->markFinished(SyncStatus::Success, $fetched, $written);
             $connection->markSyncSuccess();
+            $this->clearDateWalk($connection);
 
             if ($type === SyncRunType::Backfill && ! $hasMore) {
                 $connection->update(['backfill_completed_at' => now()]);
@@ -204,5 +221,42 @@ class SyncConnectionService
         }
 
         return $syncRun->fresh();
+    }
+
+    protected function configureDateWalk(Connection $connection, SyncRunType $type): void
+    {
+        $settings = $connection->settings ?? [];
+
+        if (SyncDateChunkWalker::shouldWalkBackward($connection, $type)) {
+            $settings['date_walk'] = 'backward';
+        } else {
+            unset($settings['date_walk']);
+        }
+
+        $connection->update(['settings' => $settings]);
+        $connection->settings = $settings;
+    }
+
+    protected function clearDateWalk(Connection $connection): void
+    {
+        $settings = $connection->settings ?? [];
+        unset($settings['date_walk']);
+
+        if ($settings !== ($connection->settings ?? [])) {
+            $connection->update(['settings' => $settings]);
+        }
+    }
+
+    protected function dispatchIncrementalTransform(Connection $connection, SyncRun $syncRun): void
+    {
+        if (! config('titan.sync.transform_during_sync', true)) {
+            return;
+        }
+
+        TransformConnectionDataJob::dispatch(
+            $syncRun,
+            $connection->last_transformed_payload_id,
+            purgeExisting: false,
+        );
     }
 }

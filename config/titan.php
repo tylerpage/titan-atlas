@@ -78,6 +78,10 @@ return [
         'memory_limit' => env('TITAN_SYNC_MEMORY_LIMIT', '512M'),
         // Dispatch one ingestion job per connector stream so managed queues can scale past 1 worker.
         'stream_fan_out_enabled' => (bool) env('TITAN_SYNC_STREAM_FAN_OUT_ENABLED', true),
+        // Backfills fetch recent dates first so dashboards populate before older history finishes.
+        'backfill_newest_first' => (bool) env('TITAN_SYNC_BACKFILL_NEWEST_FIRST', true),
+        // Queue a transform after each ingestion chunk while a sync is running.
+        'transform_during_sync' => (bool) env('TITAN_SYNC_TRANSFORM_DURING_SYNC', true),
     ],
 
     'transform' => [

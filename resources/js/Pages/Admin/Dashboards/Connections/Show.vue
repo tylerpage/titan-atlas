@@ -85,7 +85,7 @@ function formatDateTime(isoString) {
             </div>
         </div>
 
-        <div class="mb-8 grid gap-4 md:grid-cols-3">
+        <div class="mb-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <p class="text-sm text-slate-500">Sync status</p>
                 <p class="mt-1 text-lg font-semibold capitalize">{{ connection.sync_status }}</p>
@@ -93,6 +93,18 @@ function formatDateTime(isoString) {
             <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <p class="text-sm text-slate-500">Last synced</p>
                 <p class="mt-1 text-lg font-semibold">{{ formatDateTime(connection.last_synced_at) }}</p>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <p class="text-sm text-slate-500">Data coverage</p>
+                <p class="mt-1 text-lg font-semibold">
+                    <template v-if="connection.data_through_date">
+                        Through {{ connection.data_through_date }}
+                    </template>
+                    <template v-else>—</template>
+                </p>
+                <p v-if="connection.data_from_date" class="mt-1 text-sm text-slate-500">
+                    From {{ connection.data_from_date }}
+                </p>
             </div>
             <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <p class="text-sm text-slate-500">Backfill</p>
@@ -118,6 +130,7 @@ function formatDateTime(isoString) {
                             <th class="px-4 py-3 font-medium">Status</th>
                             <th class="px-4 py-3 font-medium">Fetched</th>
                             <th class="px-4 py-3 font-medium">Written</th>
+                            <th class="px-4 py-3 font-medium">Through date</th>
                             <th class="px-4 py-3 font-medium">Finished</th>
                         </tr>
                     </thead>
@@ -127,10 +140,11 @@ function formatDateTime(isoString) {
                             <td class="px-4 py-3 capitalize">{{ run.status }}</td>
                             <td class="px-4 py-3">{{ run.records_fetched }}</td>
                             <td class="px-4 py-3">{{ run.records_written }}</td>
+                            <td class="px-4 py-3 text-slate-600">{{ run.progress_through_date ?? '—' }}</td>
                             <td class="px-4 py-3 text-slate-600">{{ formatDateTime(run.finished_at) }}</td>
                         </tr>
                         <tr v-if="connection.sync_runs.length === 0">
-                            <td colspan="5" class="px-4 py-8 text-center text-slate-500">No sync runs yet.</td>
+                            <td colspan="6" class="px-4 py-8 text-center text-slate-500">No sync runs yet.</td>
                         </tr>
                     </tbody>
                 </table>
