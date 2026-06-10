@@ -70,7 +70,10 @@ class GoogleAnalyticsTransformTest extends TestCase
             'fetched_at' => now(),
         ]);
 
-        app(TransformConnectionDataService::class)->transform($syncRun->fresh(['connection.clientDashboard']));
+        app(TransformConnectionDataService::class)->transform(
+            $syncRun->fresh(['connection.clientDashboard']),
+            purgeExisting: true,
+        );
 
         $this->assertDatabaseHas('metric_snapshots', [
             'client_dashboard_id' => $dashboard->id,
@@ -90,10 +93,9 @@ class GoogleAnalyticsTransformTest extends TestCase
             'metric_value' => 420,
         ]);
 
-        $this->assertDatabaseHas('metric_snapshots', [
+        $this->assertDatabaseMissing('metric_snapshots', [
             'client_dashboard_id' => $dashboard->id,
             'metric_key' => 'event_count',
-            'metric_value' => 12,
         ]);
     }
 }

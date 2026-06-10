@@ -19,6 +19,8 @@ class TransformConnectionDataService
         SyncRun $syncRun,
         ?int $afterPayloadId = null,
         bool $purgeExisting = false,
+        bool $syncRunCatchUp = false,
+        ?int $catchUpAfterPayloadId = null,
     ): TransformChunkResult {
         $syncRun->loadMissing('connection.clientDashboard');
 
@@ -27,6 +29,9 @@ class TransformConnectionDataService
             $afterPayloadId,
             $purgeExisting,
             unlimited: false,
+            syncRun: $syncRunCatchUp ? $syncRun : null,
+            syncRunCatchUp: $syncRunCatchUp,
+            catchUpAfterPayloadId: $catchUpAfterPayloadId,
         );
     }
 
@@ -45,10 +50,14 @@ class TransformConnectionDataService
         ?int $afterPayloadId,
         bool $purgeExisting,
         bool $unlimited,
+        ?SyncRun $syncRun = null,
+        bool $syncRunCatchUp = false,
+        ?int $catchUpAfterPayloadId = null,
     ): TransformChunkResult {
         $connection->loadMissing('clientDashboard');
         $dashboard = $connection->clientDashboard;
         $connectionId = $connection->id;
+        $allowedResourceTypes = $this->allowedResourceTypes();
 
         if ($purgeExisting) {
             MetricSnapshot::query()
@@ -58,61 +67,61 @@ class TransformConnectionDataService
         }
 
         $written = 0;
-        $lastPayloadId = $afterPayloadId;
         $stoppedEarly = false;
         $chunksProcessed = 0;
-        $chunkSize = max(1, (int) config('titan.transform.payloads_per_chunk', 250));
-        $maxChunks = max(1, (int) config('titan.transform.chunks_per_job', 2));
+        $chunkSize = max(1, (int) config('titan.transform.payloads_per_chunk', 750));
+        $maxChunks = max(1, (int) config('titan.transform.chunks_per_job', 3));
         $maxSeconds = max(10, (int) config('titan.transform.max_seconds_per_job', 45));
         $startedAt = microtime(true);
 
-        $query = DedupedRawPayloadQuery::applyToEloquent(
-            RawConnectorPayload::query()->where('connection_id', $connectionId),
-            $connectionId,
-        )->orderBy('id');
-
-        if ($afterPayloadId !== null) {
-            $query->where('id', '>', $afterPayloadId);
-        }
+        $inCatchUp = $syncRunCatchUp && $syncRun !== null;
+        $catchUpCursor = $catchUpAfterPayloadId ?? 0;
+        $incrementalCursor = $afterPayloadId;
+        $lastCatchUpPayloadId = $catchUpAfterPayloadId;
+        $lastIncrementalPayloadId = $afterPayloadId;
 
         while (true) {
-            $pageQuery = clone $query;
+            if ($inCatchUp) {
+                $payloads = $this->catchUpPayloadQuery($connectionId, $syncRun, $afterPayloadId, $allowedResourceTypes)
+                    ->where('id', '>', $catchUpCursor)
+                    ->limit($chunkSize)
+                    ->get(['id', 'resource_type', 'payload']);
 
-            if ($lastPayloadId !== null) {
-                $pageQuery->where('id', '>', $lastPayloadId);
-            }
+                if ($payloads->isEmpty()) {
+                    $inCatchUp = false;
 
-            $payloads = $pageQuery->limit($chunkSize)->get();
-
-            if ($payloads->isEmpty()) {
-                break;
-            }
-
-            /** @var array<string, array{date: Carbon, key: string, value: float, dimensions: ?array<string, mixed>}> $chunkBuckets */
-            $chunkBuckets = [];
-
-            foreach ($payloads as $payload) {
-                foreach ($this->extractMetrics($payload->resource_type, $payload->payload, $connectionId) as $metric) {
-                    $dimensions = $metric['dimensions'] ?? null;
-                    $dimensionHash = MetricDimensions::hash($dimensions);
-                    $date = $metric['date']->toDateString();
-                    $bucketKey = "{$date}|{$metric['key']}|{$dimensionHash}";
-
-                    if (! isset($chunkBuckets[$bucketKey])) {
-                        $chunkBuckets[$bucketKey] = [
-                            'date' => $metric['date'],
-                            'key' => $metric['key'],
-                            'value' => 0.0,
-                            'dimensions' => $dimensions,
-                        ];
-                    }
-
-                    $chunkBuckets[$bucketKey]['value'] += $metric['value'];
+                    continue;
                 }
+
+                $written += $this->processPayloadBatch(
+                    $dashboard,
+                    $connectionId,
+                    $payloads,
+                    replaceValues: true,
+                );
+                $catchUpCursor = $payloads->last()->id;
+                $lastCatchUpPayloadId = $catchUpCursor;
+            } else {
+                $payloads = $this->incrementalPayloadQuery($connectionId, $allowedResourceTypes)
+                    ->when($incrementalCursor !== null, fn ($query) => $query->where('id', '>', $incrementalCursor))
+                    ->limit($chunkSize)
+                    ->get(['id', 'resource_type', 'payload']);
+
+                if ($payloads->isEmpty()) {
+                    break;
+                }
+
+                $written += $this->processPayloadBatch(
+                    $dashboard,
+                    $connectionId,
+                    $payloads,
+                    replaceValues: false,
+                );
+                $incrementalCursor = $payloads->last()->id;
+                $lastIncrementalPayloadId = $incrementalCursor;
+                $connection->update(['last_transformed_payload_id' => $incrementalCursor]);
             }
 
-            $written += $this->persistMetricBuckets($dashboard, $chunkBuckets);
-            $lastPayloadId = $payloads->last()->id;
             $chunksProcessed++;
 
             if ($chunksProcessed % 2 === 0) {
@@ -126,22 +135,119 @@ class TransformConnectionDataService
             }
         }
 
-        $hasMore = $stoppedEarly && $lastPayloadId !== null
-            && $this->hasMorePayloads($connectionId, $lastPayloadId);
+        if ($inCatchUp) {
+            $hasMore = $stoppedEarly && $this->catchUpPayloadQuery(
+                $connectionId,
+                $syncRun,
+                $afterPayloadId,
+                $allowedResourceTypes,
+            )
+                ->where('id', '>', $catchUpCursor)
+                ->exists();
 
-        if ($lastPayloadId !== null) {
-            $connection->update(['last_transformed_payload_id' => $lastPayloadId]);
+            return new TransformChunkResult(
+                $written,
+                $hasMore,
+                $lastCatchUpPayloadId,
+                syncRunCatchUp: true,
+            );
         }
 
-        return new TransformChunkResult($written, $hasMore, $lastPayloadId);
+        $hasMore = $stoppedEarly && $lastIncrementalPayloadId !== null
+            && $this->hasMorePayloads($connectionId, $lastIncrementalPayloadId, $allowedResourceTypes);
+
+        return new TransformChunkResult($written, $hasMore, $lastIncrementalPayloadId);
     }
 
-    protected function hasMorePayloads(int $connectionId, int $afterPayloadId): bool
+    /**
+     * @return list<string>
+     */
+    protected function allowedResourceTypes(): array
+    {
+        return config('titan.transform.resource_types', [
+            'order',
+            'order_line_item',
+            'search_daily',
+            'traffic_daily',
+            'organic_traffic',
+            'ad_spend',
+            'spend_daily',
+            'campaign_daily',
+            'channel_daily',
+        ]);
+    }
+
+    /**
+     * @param  list<string>  $allowedResourceTypes
+     */
+    protected function catchUpPayloadQuery(
+        int $connectionId,
+        SyncRun $syncRun,
+        ?int $maxPayloadId,
+        array $allowedResourceTypes,
+    ) {
+        return RawConnectorPayload::query()
+            ->where('connection_id', $connectionId)
+            ->where('sync_run_id', $syncRun->id)
+            ->when($maxPayloadId !== null, fn ($query) => $query->where('id', '<=', $maxPayloadId))
+            ->whereIn('resource_type', $allowedResourceTypes)
+            ->orderBy('id');
+    }
+
+    /**
+     * @param  list<string>  $allowedResourceTypes
+     */
+    protected function incrementalPayloadQuery(int $connectionId, array $allowedResourceTypes)
     {
         return DedupedRawPayloadQuery::applyToEloquent(
-            RawConnectorPayload::query()->where('connection_id', $connectionId),
+            RawConnectorPayload::query()
+                ->where('connection_id', $connectionId)
+                ->whereIn('resource_type', $allowedResourceTypes),
             $connectionId,
-        )
+        )->orderBy('id');
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, RawConnectorPayload>  $payloads
+     */
+    protected function processPayloadBatch(
+        \App\Models\ClientDashboard $dashboard,
+        int $connectionId,
+        $payloads,
+        bool $replaceValues,
+    ): int {
+        /** @var array<string, array{date: Carbon, key: string, value: float, dimensions: ?array<string, mixed>}> $chunkBuckets */
+        $chunkBuckets = [];
+
+        foreach ($payloads as $payload) {
+            foreach ($this->extractMetrics($payload->resource_type, $payload->payload, $connectionId) as $metric) {
+                $dimensions = $metric['dimensions'] ?? null;
+                $dimensionHash = MetricDimensions::hash($dimensions);
+                $date = $metric['date']->toDateString();
+                $bucketKey = "{$date}|{$metric['key']}|{$dimensionHash}";
+
+                if (! isset($chunkBuckets[$bucketKey])) {
+                    $chunkBuckets[$bucketKey] = [
+                        'date' => $metric['date'],
+                        'key' => $metric['key'],
+                        'value' => 0.0,
+                        'dimensions' => $dimensions,
+                    ];
+                }
+
+                $chunkBuckets[$bucketKey]['value'] += $metric['value'];
+            }
+        }
+
+        return $this->persistMetricBuckets($dashboard, $chunkBuckets, $replaceValues);
+    }
+
+    /**
+     * @param  list<string>  $allowedResourceTypes
+     */
+    protected function hasMorePayloads(int $connectionId, int $afterPayloadId, array $allowedResourceTypes): bool
+    {
+        return $this->incrementalPayloadQuery($connectionId, $allowedResourceTypes)
             ->where('id', '>', $afterPayloadId)
             ->exists();
     }
@@ -149,8 +255,11 @@ class TransformConnectionDataService
     /**
      * @param  array<string, array{date: Carbon, key: string, value: float, dimensions: ?array<string, mixed>}>  $buckets
      */
-    protected function persistMetricBuckets(\App\Models\ClientDashboard $dashboard, array $buckets): int
-    {
+    protected function persistMetricBuckets(
+        \App\Models\ClientDashboard $dashboard,
+        array $buckets,
+        bool $replaceValues = false,
+    ): int {
         if ($buckets === []) {
             return 0;
         }
@@ -183,9 +292,13 @@ class TransformConnectionDataService
             return 0;
         }
 
-        $incrementExpression = match (DB::connection()->getDriverName()) {
-            'pgsql' => 'metric_snapshots.metric_value + EXCLUDED.metric_value',
-            default => 'metric_value + excluded.metric_value',
+        $metricValueExpression = match (DB::connection()->getDriverName()) {
+            'pgsql' => $replaceValues
+                ? 'EXCLUDED.metric_value'
+                : 'metric_snapshots.metric_value + EXCLUDED.metric_value',
+            default => $replaceValues
+                ? 'excluded.metric_value'
+                : 'metric_value + excluded.metric_value',
         };
 
         foreach (array_chunk($rows, 500) as $chunk) {
@@ -193,7 +306,7 @@ class TransformConnectionDataService
                 $chunk,
                 ['client_dashboard_id', 'snapshot_date', 'metric_key', 'dimension_hash'],
                 [
-                    'metric_value' => DB::raw($incrementExpression),
+                    'metric_value' => DB::raw($metricValueExpression),
                     'updated_at' => $timestamp,
                 ],
             );

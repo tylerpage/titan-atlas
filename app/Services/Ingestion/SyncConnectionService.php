@@ -168,7 +168,7 @@ class SyncConnectionService
                 $connection->update(['backfill_completed_at' => now()]);
             }
 
-            TransformConnectionDataJob::dispatch($syncRun);
+            $this->dispatchFinalizeTransform($connection->fresh(), $syncRun);
 
             return $syncRun->fresh();
         } catch (ShopifyRateLimitException $e) {
@@ -253,10 +253,26 @@ class SyncConnectionService
             return;
         }
 
+        if (
+            $syncRun->type === SyncRunType::Backfill
+            && $connection->backfill_completed_at === null
+            && ! config('titan.sync.transform_during_backfill', false)
+        ) {
+            return;
+        }
+
         TransformConnectionDataJob::dispatch(
             $syncRun,
-            $connection->last_transformed_payload_id,
-            purgeExisting: false,
+            readCursorFromConnection: true,
+        );
+    }
+
+    protected function dispatchFinalizeTransform(Connection $connection, SyncRun $syncRun): void
+    {
+        TransformConnectionDataJob::dispatch(
+            $syncRun,
+            syncRunCatchUp: true,
+            readCursorFromConnection: true,
         );
     }
 }

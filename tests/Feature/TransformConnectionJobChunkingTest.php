@@ -49,7 +49,7 @@ class TransformConnectionJobChunkingTest extends TestCase
 
         [$syncRun] = $this->makeSyncRunWithPayloads(3);
 
-        (new TransformConnectionDataJob($syncRun->fresh()))->handle(app(TransformConnectionDataService::class));
+        (new TransformConnectionDataJob($syncRun->fresh(), purgeExisting: true))->handle(app(TransformConnectionDataService::class));
 
         Queue::assertPushed(TransformConnectionDataJob::class, 1);
     }

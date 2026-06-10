@@ -17,7 +17,7 @@ class SearchConsoleTransformTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_transform_emits_search_metrics_from_keyword_and_daily_payloads(): void
+    public function test_transform_emits_search_metrics_from_daily_payloads_and_skips_keywords(): void
     {
         $dashboard = ClientDashboard::query()->create([
             'company_id' => Company::query()->create(['name' => 'Acme', 'slug' => 'acme'])->id,
@@ -74,18 +74,14 @@ class SearchConsoleTransformTest extends TestCase
             'fetched_at' => now(),
         ]);
 
-        app(TransformConnectionDataService::class)->transform($syncRun->fresh(['connection.clientDashboard']));
+        app(TransformConnectionDataService::class)->transform(
+            $syncRun->fresh(['connection.clientDashboard']),
+            purgeExisting: true,
+        );
 
-        $this->assertDatabaseHas('metric_snapshots', [
+        $this->assertDatabaseMissing('metric_snapshots', [
             'client_dashboard_id' => $dashboard->id,
             'metric_key' => 'keyword_rank',
-            'metric_value' => 3.2,
-        ]);
-
-        $this->assertDatabaseHas('metric_snapshots', [
-            'client_dashboard_id' => $dashboard->id,
-            'metric_key' => 'search_clicks',
-            'metric_value' => 12,
         ]);
 
         $dailyClicks = MetricSnapshot::query()

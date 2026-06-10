@@ -2,13 +2,18 @@
 
 namespace App\Services\Analytics;
 
+use App\Enums\ConnectorType;
 use App\Enums\DateComparison;
 use App\Enums\WidgetType;
 use App\Models\ClientDashboard;
+use App\Models\Connection;
 use App\Models\MetricSnapshot;
+use App\Support\DedupedRawPayloadQuery;
+use App\Support\JsonPayloadSql;
 use App\Support\MetricComparison;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class WidgetDataService
 {
@@ -34,7 +39,7 @@ class WidgetDataService
             WidgetType::AdSpend => $this->series($metrics, 'ad_spend', $start, $end),
             WidgetType::OrganicTraffic => $this->organicTrafficSeries($metrics, $start, $end),
             WidgetType::Roas => $this->roas($metrics),
-            WidgetType::TopKeywords => $this->topKeywords($metrics),
+            WidgetType::TopKeywords => $this->topKeywords($dashboard, $start, $end),
             default => ['series' => [], 'total' => 0],
         };
 
@@ -225,25 +230,40 @@ class WidgetDataService
         ];
     }
 
-    /**
-     * @param  Collection<int, MetricSnapshot>  $metrics
-     */
-    protected function topKeywords(Collection $metrics): array
+    protected function topKeywords(ClientDashboard $dashboard, Carbon $start, Carbon $end): array
     {
-        $clicksByKeyword = $metrics
-            ->where('metric_key', 'search_clicks')
-            ->groupBy(fn (MetricSnapshot $row) => (string) ($row->dimensions['keyword'] ?? 'Unknown'))
-            ->map(fn (Collection $rows) => (float) $rows->sum('metric_value'));
+        $connection = Connection::query()
+            ->where('client_dashboard_id', $dashboard->id)
+            ->where('connector_type', ConnectorType::SearchConsole)
+            ->where('is_active', true)
+            ->orderBy('id')
+            ->first();
+
+        if ($connection === null) {
+            return ['items' => []];
+        }
+
+        $rows = DedupedRawPayloadQuery::applyToQueryBuilder(
+            DB::table('raw_connector_payloads'),
+            $connection->id,
+            'keyword',
+        )
+            ->whereRaw(JsonPayloadSql::dateColumn('payload').' >= ?', [$start->toDateString()])
+            ->whereRaw(JsonPayloadSql::dateColumn('payload').' <= ?', [$end->toDateString()])
+            ->selectRaw(JsonPayloadSql::text('payload', 'keyword').' as keyword')
+            ->selectRaw('coalesce(avg('.JsonPayloadSql::real('payload', 'position').'), 0) as position')
+            ->selectRaw('coalesce(sum('.JsonPayloadSql::real('payload', 'clicks').'), 0) as clicks')
+            ->groupByRaw(JsonPayloadSql::text('payload', 'keyword'))
+            ->orderBy('position')
+            ->limit(10)
+            ->get();
 
         return [
-            'items' => $metrics
-                ->where('metric_key', 'keyword_rank')
-                ->sortBy('metric_value')
-                ->take(10)
-                ->map(fn (MetricSnapshot $row) => [
-                    'keyword' => $row->dimensions['keyword'] ?? 'Unknown',
-                    'position' => (float) $row->metric_value,
-                    'clicks' => (float) ($clicksByKeyword[(string) ($row->dimensions['keyword'] ?? 'Unknown')] ?? 0),
+            'items' => $rows
+                ->map(fn ($row) => [
+                    'keyword' => (string) ($row->keyword ?? 'Unknown'),
+                    'position' => (float) $row->position,
+                    'clicks' => (float) $row->clicks,
                 ])
                 ->values()
                 ->all(),

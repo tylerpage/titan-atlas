@@ -97,7 +97,10 @@ class StackAdaptTransformTest extends TestCase
             'fetched_at' => now(),
         ]);
 
-        app(TransformConnectionDataService::class)->transform($syncRun->fresh(['connection.clientDashboard']));
+        app(TransformConnectionDataService::class)->transform(
+            $syncRun->fresh(['connection.clientDashboard']),
+            purgeExisting: true,
+        );
 
         $this->assertDatabaseHas('metric_snapshots', [
             'client_dashboard_id' => $dashboard->id,
@@ -121,16 +124,10 @@ class StackAdaptTransformTest extends TestCase
             ]),
         ]);
 
-        $this->assertDatabaseHas('metric_snapshots', [
+        $this->assertDatabaseMissing('metric_snapshots', [
             'client_dashboard_id' => $dashboard->id,
             'metric_key' => 'ad_spend',
             'metric_value' => 40,
-            'dimensions' => json_encode([
-                'connection_id' => $connection->id,
-                'insight_type' => 'geo',
-                'dimension_key' => 'US',
-                'dimension_label' => 'United States',
-            ]),
         ]);
     }
 }

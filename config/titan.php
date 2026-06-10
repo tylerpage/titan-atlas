@@ -82,15 +82,28 @@ return [
         'backfill_newest_first' => (bool) env('TITAN_SYNC_BACKFILL_NEWEST_FIRST', true),
         // Queue a transform after each ingestion chunk while a sync is running.
         'transform_during_sync' => (bool) env('TITAN_SYNC_TRANSFORM_DURING_SYNC', true),
+        // Skip mid-sync transforms during initial backfill; finalize still runs at sync end.
+        'transform_during_backfill' => (bool) env('TITAN_SYNC_TRANSFORM_DURING_BACKFILL', false),
     ],
 
     'transform' => [
         // Keep each transform job short for hosted workers (e.g. Laravel Cloud ~60s limit).
-        'payloads_per_chunk' => (int) env('TITAN_TRANSFORM_PAYLOADS_PER_CHUNK', 250),
-        'chunks_per_job' => (int) env('TITAN_TRANSFORM_CHUNKS_PER_JOB', 2),
+        'payloads_per_chunk' => (int) env('TITAN_TRANSFORM_PAYLOADS_PER_CHUNK', 750),
+        'chunks_per_job' => (int) env('TITAN_TRANSFORM_CHUNKS_PER_JOB', 3),
         'max_seconds_per_job' => (int) env('TITAN_TRANSFORM_MAX_SECONDS_PER_JOB', 45),
         'job_timeout' => (int) env('TITAN_TRANSFORM_JOB_TIMEOUT', 55),
         'memory_limit' => env('TITAN_TRANSFORM_MEMORY_LIMIT', '512M'),
+        'resource_types' => [
+            'order',
+            'order_line_item',
+            'search_daily',
+            'traffic_daily',
+            'organic_traffic',
+            'ad_spend',
+            'spend_daily',
+            'campaign_daily',
+            'channel_daily',
+        ],
     ],
 
     'semrush' => [

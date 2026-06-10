@@ -8,5 +8,6 @@ readonly class TransformChunkResult
         public int $written,
         public bool $hasMore,
         public ?int $lastPayloadId,
+        public bool $syncRunCatchUp = false,
     ) {}
 }
