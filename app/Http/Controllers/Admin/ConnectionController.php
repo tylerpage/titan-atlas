@@ -13,6 +13,7 @@ use App\Models\Connection;
 use App\Support\DynamicConnectorCredentials;
 use App\Services\Admin\ConnectionService;
 use App\Services\Admin\TestConnectionService;
+use App\Services\ConnectorBuilder\RebuildConnectorDashboardService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -31,6 +32,27 @@ class ConnectionController extends Controller
         return Inertia::render('Admin/Dashboards/Connections/Show', [
             'connection' => $this->serializeConnection($connection),
         ]);
+    }
+
+    public function rebuildDashboard(
+        Connection $connection,
+        RebuildConnectorDashboardService $service,
+    ): RedirectResponse {
+        $connection->loadMissing('clientDashboard');
+
+        try {
+            $result = $service->rebuild($connection, request()->user());
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return back()->withErrors($e->errors());
+        }
+
+        if (! ($result['success'] ?? false)) {
+            return back()->withErrors([
+                'dashboard' => $result['error'] ?? 'Could not rebuild connector dashboard.',
+            ]);
+        }
+
+        return back()->with('status', 'Connector dashboard rebuilt with corrected widget SQL.');
     }
 
     public function edit(Connection $connection): Response
@@ -178,6 +200,16 @@ class ConnectionController extends Controller
         $credentialFields = $connection->isDynamic()
             ? DynamicConnectorCredentials::fields($blueprint)
             : $connection->connector_type->credentialFields();
+        $dashboardSpec = is_array($blueprint?->dashboard_spec) ? $blueprint->dashboard_spec : [];
+        $savedDashboardId = $dashboardSpec['saved_dashboard_id'] ?? null;
+        $savedDashboardUrl = null;
+
+        if (is_numeric($savedDashboardId)) {
+            $savedDashboardUrl = route('client.dashboard.saved.show', [
+                $connection->clientDashboard->slug,
+                (int) $savedDashboardId,
+            ]);
+        }
 
         return [
             'id' => $connection->id,
@@ -201,9 +233,17 @@ class ConnectionController extends Controller
                 'label' => $blueprint->label,
                 'slug' => $blueprint->slug,
             ] : null,
+            'connector_dashboard' => $blueprint && $savedDashboardUrl ? [
+                'title' => $dashboardSpec['title'] ?? ($blueprint->label.' Dashboard'),
+                'saved_dashboard_id' => (int) $savedDashboardId,
+                'saved_dashboard_url' => $savedDashboardUrl,
+                'widget_count' => count($dashboardSpec['widgets'] ?? []),
+                'report_count' => count($dashboardSpec['created_report_ids'] ?? []),
+            ] : null,
             'dashboard' => [
                 'id' => $connection->clientDashboard->id,
                 'name' => $connection->clientDashboard->name,
+                'slug' => $connection->clientDashboard->slug,
                 'company_name' => $connection->clientDashboard->company->name,
             ],
             'sync_runs' => $connection->relationLoaded('syncRuns')

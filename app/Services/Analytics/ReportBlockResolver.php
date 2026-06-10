@@ -46,8 +46,8 @@ class ReportBlockResolver
                 $result,
                 $report->visualization_config ?? [],
             );
-        } catch (\Throwable) {
-            return null;
+        } catch (\Throwable $e) {
+            return $this->errorBlock($report, $titleOverride, $descriptionOverride, $e->getMessage());
         }
 
         $blockType = $report->visualization_type->toBlockType()->value;
@@ -125,6 +125,33 @@ class ReportBlockResolver
             'visualization_type' => $report->visualization_type->value,
             'prompt' => $report->prompt,
             'payload' => $resolved,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function errorBlock(
+        AnalyticsReport $report,
+        ?string $titleOverride,
+        ?string $descriptionOverride,
+        string $message,
+    ): array {
+        $title = $titleOverride ?? $report->prompt;
+
+        return [
+            'type' => 'stat_card',
+            'visualization_type' => ReportVisualizationType::StatCard->value,
+            'title' => $title,
+            'description' => $descriptionOverride,
+            'header' => $title,
+            'text' => 'Unable to load',
+            'tooltip' => $message,
+            'ai_report' => [
+                'id' => $report->id,
+                'prompt' => $report->prompt,
+            ],
+            'report_id' => $report->id,
         ];
     }
 }

@@ -116,6 +116,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/connections/{connection}/sync', [AdminConnectionController::class, 'sync'])->name('connections.sync');
         Route::post('/connections/{connection}/backfill', [AdminConnectionController::class, 'backfill'])->name('connections.backfill');
         Route::post('/connections/{connection}/clear-data', [AdminConnectionController::class, 'clearData'])->name('connections.clear-data');
+        Route::post('/connections/{connection}/rebuild-dashboard', [AdminConnectionController::class, 'rebuildDashboard'])->name('connections.rebuild-dashboard');
         Route::get('/connector-blueprints/{blueprint}', [AdminConnectorBlueprintController::class, 'show'])->name('connector-blueprints.show');
         Route::get('/ai-connectors/{blueprint}', [AdminConnectorBlueprintController::class, 'show'])->name('ai-connectors.show');
         Route::post('/connector-blueprints/{blueprint}/test', [AdminConnectorBlueprintController::class, 'test'])->name('connector-blueprints.test');

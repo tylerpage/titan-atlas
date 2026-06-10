@@ -4,11 +4,15 @@ namespace App\Agents;
 
 use App\Support\DynamicConnectorAuth;
 use App\Support\DynamicConnectorReadOnlyGuard;
+use App\Support\EcommerceConnectorCatalog;
 use App\Support\JsonPayloadSql;
 
 class ConnectorBuilderPromptBuilder
 {
-    public function __construct(protected DynamicConnectorReadOnlyGuard $readOnlyGuard) {}
+    public function __construct(
+        protected DynamicConnectorReadOnlyGuard $readOnlyGuard,
+        protected EcommerceConnectorCatalog $connectorCatalog,
+    ) {}
 
     public function systemPrompt(ConnectorBuilderAgentContext $context): string
     {
@@ -19,6 +23,7 @@ class ConnectorBuilderPromptBuilder
         $oauthGuidance = DynamicConnectorAuth::agentOAuthGuidance();
         $resumeBlock = $this->resumeBlock($context);
         $jsonHint = JsonPayloadSql::promptHint();
+        $catalogSummary = $this->connectorCatalog->agentPromptSummary();
 
         return <<<PROMPT
 You are {$productName}'s connector builder assistant. Help admins create dynamic REST API connectors for dashboard "{$dashboardName}".
@@ -43,6 +48,9 @@ You are {$productName}'s connector builder assistant. Help admins create dynamic
 - Data stored in raw_connector_payloads with configurable resource_type values
 
 {$oauthGuidance}
+
+## Connector catalog
+{$catalogSummary}
 
 ## Not supported in v1 (record dev tasks instead)
 - OAuth2 authorization-code / user-consent / browser redirect flows
@@ -80,15 +88,16 @@ You are {$productName}'s connector builder assistant. Help admins create dynamic
 - ProposeConnectorDashboardTool updates the blueprint saved dashboard board for this dashboard only.
 
 ## Workflow
-1. ResearchConnectorApiTool or use your knowledge
-2. SaveConnectorBlueprintTool
-3. Ask user for credentials; UpdateBlueprintCredentialsTool when provided
-4. TestBlueprintConnectionTool
-5. CreateDynamicConnectionTool
-6. ListBlueprintAnalyticsSchemaTool
-7. ProposeConnectorDashboardTool
-8. RevertConnectorDashboardTool when the admin asks to undo dashboard changes
-9. RecordDevTasksTool only for true blockers
+1. LookupConnectorCatalogTool when the platform matches ecommerce/marketing catalog entries (shopware, magento, woocommerce, miva, etc.)
+2. ResearchConnectorApiTool for gaps or unsupported platforms
+3. SaveConnectorBlueprintTool using catalog blueprint_template when available
+4. Ask user for credentials; UpdateBlueprintCredentialsTool when provided
+5. TestBlueprintConnectionTool
+6. CreateDynamicConnectionTool
+7. ListBlueprintAnalyticsSchemaTool
+8. ProposeConnectorDashboardTool
+9. RevertConnectorDashboardTool when the admin asks to undo dashboard changes
+10. RecordDevTasksTool only for true blockers
 
 Preserve the user's original prompt requirements in dashboard_spec widgets.
 

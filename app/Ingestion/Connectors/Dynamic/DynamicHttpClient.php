@@ -100,6 +100,11 @@ class DynamicHttpClient
     public function extractRecords(array $response, array $mapping): array
     {
         $recordsPath = $mapping['records_path'] ?? 'results';
+
+        if ($recordsPath === '@root' && array_is_list($response)) {
+            return array_values(array_filter($response, fn ($record) => is_array($record)));
+        }
+
         $records = Arr::get($response, $recordsPath, []);
 
         if (! is_array($records)) {

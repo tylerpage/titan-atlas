@@ -13,6 +13,7 @@ use App\Services\Client\SavedDashboardService;
 use App\Services\ConnectorBuilder\ConnectorBlueprintDashboardVersionService;
 use App\Support\BlueprintAnalyticsSchema;
 use App\Support\ConnectorDashboardVisualization;
+use App\Support\ConnectorDashboardWidgetBuilder;
 use Carbon\Carbon;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Validation\ValidationException;
@@ -28,6 +29,7 @@ class ProposeConnectorDashboardTool extends ConnectorBuilderTool
         protected ReportQueryExecutor $executor,
         protected SavedDashboardService $savedDashboards,
         protected ConnectorBlueprintDashboardVersionService $versions,
+        protected ConnectorDashboardWidgetBuilder $widgetBuilder,
     ) {
         parent::__construct($context);
     }
@@ -61,19 +63,6 @@ class ProposeConnectorDashboardTool extends ConnectorBuilderTool
             ]);
         }
 
-        $widgets = $request->array('widgets');
-
-        if ($widgets === []) {
-            $widgets = $this->context->blueprint->dashboard_spec['widgets'] ?? [];
-        }
-
-        if ($widgets === []) {
-            return $this->json([
-                'success' => false,
-                'error' => 'Provide at least one widget.',
-            ]);
-        }
-
         $connectionId = $this->context->connection?->id
             ?? $this->context->blueprint->connections()
                 ->where('client_dashboard_id', $this->context->dashboard->id)
@@ -84,6 +73,23 @@ class ProposeConnectorDashboardTool extends ConnectorBuilderTool
             return $this->json([
                 'success' => false,
                 'error' => 'Create a connection first with CreateDynamicConnectionTool before proposing dashboard widgets.',
+            ]);
+        }
+
+        $widgets = $request->array('widgets');
+
+        if ($widgets === []) {
+            $widgets = $this->context->blueprint->dashboard_spec['widgets'] ?? [];
+        }
+
+        if ($widgets === [] || $request->boolean('rebuild')) {
+            $widgets = $this->widgetBuilder->defaultWidgets($this->context->blueprint, (int) $connectionId);
+        }
+
+        if ($widgets === []) {
+            return $this->json([
+                'success' => false,
+                'error' => 'Provide at least one widget.',
             ]);
         }
 
@@ -109,6 +115,12 @@ class ProposeConnectorDashboardTool extends ConnectorBuilderTool
                 );
 
                 $preview = $this->executor->execute($sql, $queryContext);
+                $vizConfig = $this->widgetBuilder->visualizationConfig(
+                    $vizType,
+                    $widget,
+                    $preview,
+                );
+                $vizConfig['connection_id'] = $widget['connection_id'] ?? $connectionId;
 
                 $report = AnalyticsReport::query()->create([
                     'client_dashboard_id' => $this->context->dashboard->id,
@@ -116,7 +128,7 @@ class ProposeConnectorDashboardTool extends ConnectorBuilderTool
                     'prompt' => (string) ($widget['prompt'] ?? "Widget {$index}"),
                     'sql' => $sql,
                     'visualization_type' => $vizType,
-                    'visualization_config' => $widget['visualization_config'] ?? [],
+                    'visualization_config' => $vizConfig,
                     'model' => config('titan.connector_builder.model'),
                 ]);
 
@@ -263,6 +275,7 @@ class ProposeConnectorDashboardTool extends ConnectorBuilderTool
             'saved_dashboard_title' => $schema->string(),
             'saved_dashboard_description' => $schema->string(),
             'column_span' => $schema->integer(),
+            'rebuild' => $schema->boolean(),
             'widgets' => $schema->array()->items($schema->object([
                 'prompt' => $schema->string(),
                 'sql' => $schema->string(),

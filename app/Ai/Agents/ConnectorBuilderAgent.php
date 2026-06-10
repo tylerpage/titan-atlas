@@ -8,6 +8,7 @@ use App\Ai\Concerns\CapsConnectorBuilderConversationHistory;
 use App\Ai\Tools\ConnectorBuilder\CreateDynamicConnectionTool;
 use App\Ai\Tools\ConnectorBuilder\GetBlueprintStatusTool;
 use App\Ai\Tools\ConnectorBuilder\ListExistingConnectorsTool;
+use App\Ai\Tools\ConnectorBuilder\LookupConnectorCatalogTool;
 use App\Ai\Tools\ConnectorBuilder\ListBlueprintAnalyticsSchemaTool;
 use App\Ai\Tools\ConnectorBuilder\ProposeConnectorDashboardTool;
 use App\Ai\Tools\ConnectorBuilder\RevertConnectorDashboardTool;
@@ -55,6 +56,7 @@ class ConnectorBuilderAgent implements Agent, Conversational, HasTools
 
         return [
             $this->container->makeWith(ListExistingConnectorsTool::class, ['context' => $context]),
+            $this->container->makeWith(LookupConnectorCatalogTool::class, ['context' => $context]),
             $this->container->makeWith(ResearchConnectorApiTool::class, ['context' => $context]),
             $this->container->makeWith(SaveConnectorBlueprintTool::class, ['context' => $context]),
             $this->container->makeWith(UpdateBlueprintCredentialsTool::class, ['context' => $context]),

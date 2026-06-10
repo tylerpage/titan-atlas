@@ -1,5 +1,6 @@
 <script setup>
-import { Link, router, useForm } from '@inertiajs/vue3';
+import { Link, router, useForm, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import AppLayout from '../../../../Layouts/AppLayout.vue';
 
 const props = defineProps({
@@ -8,6 +9,9 @@ const props = defineProps({
         required: true,
     },
 });
+
+const page = usePage();
+const status = computed(() => page.props.flash?.status);
 
 function syncConnection() {
     router.post(route('admin.connections.sync', props.connection.id));
@@ -23,6 +27,16 @@ function clearConnectionData() {
     }
 
     router.post(route('admin.connections.clear-data', props.connection.id));
+}
+
+const rebuildForm = useForm({});
+
+function rebuildDashboard() {
+    if (!confirm('Rebuild connector dashboard widgets with corrected SQL for synced payload fields?')) {
+        return;
+    }
+
+    rebuildForm.post(route('admin.connections.rebuild-dashboard', props.connection.id));
 }
 
 function formatDateTime(isoString) {
@@ -117,6 +131,46 @@ function formatDateTime(isoString) {
         <p v-if="connection.sync_error" class="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
             {{ connection.sync_error }}
         </p>
+
+        <p v-if="status" class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+            {{ status }}
+        </p>
+
+        <section
+            v-if="connection.connector_dashboard"
+            class="mb-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
+        >
+            <div class="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                    <h2 class="text-lg font-semibold">Connector dashboard</h2>
+                    <p class="mt-1 text-sm text-slate-600">
+                        {{ connection.connector_dashboard.title }}
+                        · {{ connection.connector_dashboard.widget_count }} widget(s)
+                    </p>
+                    <p class="mt-2 text-sm text-slate-500">
+                        Saved dashboards live on the client dashboard Saved tab, not on this connection page.
+                    </p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <a
+                        :href="connection.connector_dashboard.saved_dashboard_url"
+                        class="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50"
+                        target="_blank"
+                        rel="noopener"
+                    >
+                        Open saved dashboard
+                    </a>
+                    <button
+                        type="button"
+                        class="rounded-lg bg-primary px-4 py-2 text-sm text-white hover:bg-primary-hover disabled:opacity-50"
+                        :disabled="rebuildForm.processing"
+                        @click="rebuildDashboard"
+                    >
+                        {{ rebuildForm.processing ? 'Rebuilding…' : 'Rebuild widgets' }}
+                    </button>
+                </div>
+            </div>
+        </section>
 
         <section class="rounded-xl border border-slate-200 bg-white shadow-sm">
             <div class="border-b border-slate-100 px-5 py-4">
