@@ -11,6 +11,7 @@ use App\Models\Connection;
 use App\Models\ConnectorBlueprint;
 use App\Models\ConnectorBlueprintStream;
 use App\Support\DynamicConnectorAuth;
+use App\Support\DynamicConnectorBaseUrl;
 use Illuminate\Support\Arr;
 
 class DynamicConnector extends AbstractConnector implements FanOutSyncConnector
@@ -54,6 +55,12 @@ class DynamicConnector extends AbstractConnector implements FanOutSyncConnector
             if ($key && empty($credentials[$key])) {
                 return ValidationResult::fail("Missing required credential: {$key}.");
             }
+        }
+
+        try {
+            DynamicConnectorBaseUrl::assertAvailable($blueprint, $credentials);
+        } catch (\RuntimeException $e) {
+            return ValidationResult::fail($e->getMessage());
         }
 
         try {
@@ -132,8 +139,10 @@ class DynamicConnector extends AbstractConnector implements FanOutSyncConnector
     /**
      * @param  array<string, mixed>  $credentials
      */
-    public function probeConnection(ConnectorBlueprint $blueprint, array $credentials): array
+    public function probeConnection(ConnectorBlueprint $blueprint, array $credentials, ?array $sessionConfig = null): array
     {
+        $credentials = DynamicConnectorBaseUrl::mergeIntoCredentials($credentials, $sessionConfig, $blueprint);
+
         $testEndpoint = $blueprint->testEndpoint();
         $authConfig = $blueprint->auth_config ?? [];
         $testEndpointIsTokenUrl = DynamicConnectorAuth::testEndpointConflictsWithTokenRequest($authConfig, $testEndpoint);

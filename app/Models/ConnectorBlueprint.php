@@ -88,9 +88,9 @@ class ConnectorBlueprint extends Model
             ->all();
     }
 
-    public function baseUrl(): string
+    public function baseUrl(array $credentials = []): string
     {
-        return rtrim((string) ($this->sync_config['base_url'] ?? ''), '/');
+        return \App\Support\DynamicConnectorBaseUrl::resolve($this, $credentials);
     }
 
     public function testEndpoint(): ?string

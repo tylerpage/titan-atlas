@@ -2,7 +2,7 @@
 
 namespace App\Ai\Tools\ConnectorBuilder;
 
-use App\Agents\ConnectorBuilderAgentContext;
+use App\Support\DynamicConnectorBaseUrl;
 use App\Enums\ConnectorBlueprintStatus;
 use App\Ingestion\Connectors\DynamicConnector;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -44,7 +44,11 @@ class TestBlueprintConnectionTool extends ConnectorBuilderTool
         }
 
         try {
-            $response = $this->connector->probeConnection($this->context->blueprint, $credentials);
+            $response = $this->connector->probeConnection(
+                $this->context->blueprint,
+                $credentials,
+                $this->context->session->session_config,
+            );
             $this->context->blueprint->update(['status' => ConnectorBlueprintStatus::Ready]);
             $this->context->lastTestResult = ['success' => true];
 
@@ -76,7 +80,11 @@ class TestBlueprintConnectionTool extends ConnectorBuilderTool
             ]);
         }
 
-        return $this->context->session->fresh()->pending_credentials ?? [];
+        return DynamicConnectorBaseUrl::mergeIntoCredentials(
+            $this->context->session->fresh()->pending_credentials ?? [],
+            $this->context->session->session_config,
+            $this->context->blueprint,
+        );
     }
 
     public function schema(JsonSchema $schema): array

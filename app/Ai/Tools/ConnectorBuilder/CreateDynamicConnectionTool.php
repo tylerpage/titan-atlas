@@ -2,7 +2,7 @@
 
 namespace App\Ai\Tools\ConnectorBuilder;
 
-use App\Agents\ConnectorBuilderAgentContext;
+use App\Support\DynamicConnectorBaseUrl;
 use App\Enums\ConnectorBlueprintStatus;
 use App\Services\ConnectorBuilder\CreateDynamicConnectionService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -34,7 +34,11 @@ class CreateDynamicConnectionTool extends ConnectorBuilderTool
             ]);
         }
 
-        $credentials = $this->context->session->pending_credentials ?? [];
+        $credentials = DynamicConnectorBaseUrl::mergeIntoCredentials(
+            $this->context->session->pending_credentials ?? [],
+            $this->context->session->session_config,
+            $this->context->blueprint,
+        );
 
         if ($credentials === []) {
             return $this->json([

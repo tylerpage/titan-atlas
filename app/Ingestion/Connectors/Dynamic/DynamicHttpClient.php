@@ -41,7 +41,7 @@ class DynamicHttpClient
     ): array {
         $this->assertAllowedMethod($method);
         $url = $this->buildUrl($blueprint, $path, $credentials);
-        $this->assertAllowedHost($blueprint, $url);
+        $this->assertAllowedHost($blueprint, $url, $credentials);
 
         $queryParams = $this->interpolateArray($queryParams, $credentials);
         $headers = $this->interpolateArray($headers, $credentials);
@@ -58,11 +58,15 @@ class DynamicHttpClient
      */
     public function buildUrl(ConnectorBlueprint $blueprint, string $path, array $credentials): string
     {
-        $baseUrl = $blueprint->baseUrl();
+        $baseUrl = $blueprint->baseUrl($credentials);
         $path = $this->interpolateString($path, $credentials);
 
         if (Str::startsWith($path, ['http://', 'https://'])) {
             return $path;
+        }
+
+        if ($baseUrl === '') {
+            throw new \RuntimeException('Connector is missing a base URL for this dashboard.');
         }
 
         return $baseUrl.'/'.ltrim($path, '/');
@@ -187,9 +191,9 @@ class DynamicHttpClient
         $this->readOnlyGuard->assertHttpMethodAllowed($method);
     }
 
-    protected function assertAllowedHost(ConnectorBlueprint $blueprint, string $url): void
+    protected function assertAllowedHost(ConnectorBlueprint $blueprint, string $url, array $credentials): void
     {
-        $allowedHost = parse_url($blueprint->baseUrl(), PHP_URL_HOST);
+        $allowedHost = parse_url($blueprint->baseUrl($credentials), PHP_URL_HOST);
         $requestHost = parse_url($url, PHP_URL_HOST);
 
         if ($allowedHost === null || $requestHost === null) {
@@ -283,7 +287,7 @@ class DynamicHttpClient
         $clientAuth = (string) ($tokenRequest['client_auth'] ?? 'body');
 
         $url = $this->buildUrl($blueprint, $path, $credentials);
-        $this->assertAllowedHost($blueprint, $url);
+        $this->assertAllowedHost($blueprint, $url, $credentials);
 
         $request = Http::timeout((int) config('titan.connector_builder.http_timeout_seconds', 30))
             ->acceptJson()

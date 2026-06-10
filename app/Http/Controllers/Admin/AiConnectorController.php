@@ -14,6 +14,7 @@ use App\Models\ConnectorBlueprint;
 use App\Services\ConnectorBuilder\AiConnectorService;
 use App\Services\ConnectorBuilder\ConnectorBuilderResumeService;
 use App\Services\ConnectorBuilder\CreateDynamicConnectionService;
+use App\Support\DynamicConnectorBaseUrl;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -244,6 +245,7 @@ class AiConnectorController extends Controller
             'status' => $blueprint->status->value,
             'credential_fields' => $blueprint->credential_schema ?? [],
             'sync_config' => $blueprint->sync_config ?? [],
+            'requires_base_url_per_dashboard' => DynamicConnectorBaseUrl::requiresPerDashboard($blueprint),
             'streams_count' => $blueprint->streams->count(),
         ];
     }

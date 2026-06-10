@@ -22,6 +22,9 @@ const form = useForm({
     ),
 });
 
+const showBaseUrlField = props.blueprint.requires_base_url_per_dashboard
+    || !props.blueprint.sync_config?.base_url;
+
 const testing = ref(false);
 const testStatus = ref(null);
 
@@ -93,18 +96,38 @@ function submit() {
                 <input id="name" v-model="form.name" required class="w-full rounded-lg border border-slate-300 px-3 py-2" />
             </div>
 
+            <div v-if="showBaseUrlField">
+                <CredentialFieldLabel
+                    for-id="credential-base-url"
+                    label="API base URL"
+                    help="Root URL for this dashboard's shop or API instance."
+                />
+                <input
+                    id="credential-base-url"
+                    v-model="form.credentials.base_url"
+                    type="url"
+                    required
+                    placeholder="https://your-shop.example.com"
+                    class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                />
+                <p v-if="form.errors['credentials.base_url']" class="mt-1 text-sm text-red-600">
+                    {{ form.errors['credentials.base_url'] }}
+                </p>
+            </div>
+
             <div v-for="field in blueprint.credential_fields" :key="field.key">
-                <label :for="`credential-${field.key}`" class="mb-1 block text-sm font-medium">
-                    <CredentialFieldLabel :field="field" />
-                </label>
+                <CredentialFieldLabel
+                    :for-id="`credential-${field.key}`"
+                    :label="field.label || field.key"
+                    :help="field.help"
+                />
                 <input
                     :id="`credential-${field.key}`"
                     v-model="form.credentials[field.key]"
                     :type="field.type === 'password' ? 'password' : 'text'"
                     required
-                    class="w-full rounded-lg border border-slate-300 px-3 py-2"
+                    class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
                 />
-                <p v-if="field.help" class="mt-1 text-xs text-slate-500">{{ field.help }}</p>
                 <p v-if="form.errors[`credentials.${field.key}`]" class="mt-1 text-sm text-red-600">
                     {{ form.errors[`credentials.${field.key}`] }}
                 </p>

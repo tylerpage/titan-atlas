@@ -28,6 +28,11 @@ const form = useForm({
     message: '',
     session_id: props.session?.id ?? null,
     credentials: {},
+    session_config: {
+        base_url: props.session?.session_config?.base_url
+            ?? props.session?.blueprint?.sync_config?.base_url
+            ?? '',
+    },
 });
 
 const messages = computed(() => props.session?.messages ?? []);
@@ -36,7 +41,8 @@ const isProcessing = computed(() => props.session?.status === 'processing');
 const isFailed = computed(() => props.session?.status === 'failed');
 
 const credentialFields = computed(() => blueprint.value?.credential_schema ?? []);
-const showCredentialForm = computed(() => credentialFields.value.length > 0);
+const showBaseUrlField = computed(() => Boolean(blueprint.value));
+const showCredentialForm = computed(() => showBaseUrlField.value || credentialFields.value.length > 0);
 
 const statusBadgeClass = computed(() => {
     const status = blueprint.value?.status ?? 'draft';
@@ -173,6 +179,9 @@ function submitMessage() {
         onSuccess: () => {
             form.message = '';
             form.credentials = {};
+            form.session_config.base_url = props.session?.session_config?.base_url
+                ?? blueprint.value?.sync_config?.base_url
+                ?? form.session_config.base_url;
             nextTick(() => {
                 restorePageScroll(pageScrollY);
                 scrollChatToBottom('instant');
@@ -187,11 +196,12 @@ function submitCredentials() {
         return;
     }
 
-    const credentialMessage = 'Here are the credentials: ' + credentialFields.value
-        .map((field) => `${field.label} provided`)
-        .join(', ');
+    const credentialMessage = [
+        form.session_config.base_url ? 'Base URL provided' : null,
+        ...credentialFields.value.map((field) => `${field.label || field.key} provided`),
+    ].filter(Boolean).join(', ');
 
-    form.message = credentialMessage;
+    form.message = `Here are the credentials: ${credentialMessage}`;
     submitMessage();
 }
 
@@ -338,9 +348,9 @@ const error = computed(() => page.props.flash?.error);
                             <p class="text-slate-500">{{ blueprint.slug }}</p>
                         </div>
 
-                        <div v-if="blueprint.sync_config?.base_url">
+                        <div v-if="blueprint.sync_config?.base_url || form.session_config.base_url">
                             <p class="font-medium text-slate-700">Base URL</p>
-                            <p class="text-slate-600">{{ blueprint.sync_config.base_url }}</p>
+                            <p class="text-slate-600">{{ form.session_config.base_url || blueprint.sync_config.base_url }}</p>
                         </div>
 
                         <div v-if="blueprint.streams?.length">
@@ -384,11 +394,30 @@ const error = computed(() => page.props.flash?.error);
                 </div>
 
                 <div v-if="showCredentialForm" class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <h2 class="mb-4 text-lg font-semibold">Credentials</h2>
+                    <h2 class="mb-4 text-lg font-semibold">Credentials &amp; testing</h2>
                     <form class="space-y-4" @submit.prevent="submitCredentials">
-                        <div v-for="field in credentialFields" :key="field.key">
-                            <CredentialFieldLabel :field="field" />
+                        <div v-if="showBaseUrlField">
+                            <CredentialFieldLabel
+                                for-id="session-base-url"
+                                label="API base URL"
+                                help="Shop or API root URL for this dashboard. Stored in this chat session for connection testing."
+                            />
                             <input
+                                id="session-base-url"
+                                v-model="form.session_config.base_url"
+                                type="url"
+                                placeholder="https://your-shop.example.com"
+                                class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                            />
+                        </div>
+                        <div v-for="field in credentialFields" :key="field.key">
+                            <CredentialFieldLabel
+                                :for-id="field.key"
+                                :label="field.label || field.key"
+                                :help="field.help"
+                            />
+                            <input
+                                :id="field.key"
                                 v-model="form.credentials[field.key]"
                                 :type="field.type === 'password' ? 'password' : 'text'"
                                 :placeholder="field.placeholder"

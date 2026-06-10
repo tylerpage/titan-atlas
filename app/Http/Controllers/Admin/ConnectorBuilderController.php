@@ -64,6 +64,7 @@ class ConnectorBuilderController extends Controller
             message: $request->string('message')->toString(),
             session: $session,
             credentials: $request->input('credentials'),
+            sessionConfig: $request->input('session_config'),
         );
 
         return redirect()
@@ -96,6 +97,7 @@ class ConnectorBuilderController extends Controller
             'title' => $session->title,
             'status' => $session->status->value,
             'pending_credentials' => array_keys($session->pending_credentials ?? []),
+            'session_config' => $session->session_config ?? [],
             'messages' => $session->messages->map(fn ($message) => [
                 'id' => $message->id,
                 'role' => $message->role,
@@ -120,6 +122,7 @@ class ConnectorBuilderController extends Controller
             'auth_config' => $blueprint->auth_config ?? [],
             'credential_schema' => $blueprint->credential_schema ?? [],
             'sync_config' => $blueprint->sync_config ?? [],
+            'requires_base_url_per_dashboard' => \App\Support\DynamicConnectorBaseUrl::requiresPerDashboard($blueprint),
             'transform_config' => $blueprint->transform_config ?? [],
             'dashboard_spec' => $blueprint->dashboard_spec ?? [],
             'dev_tasks' => $blueprint->dev_tasks ?? [],

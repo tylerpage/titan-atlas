@@ -30,6 +30,7 @@ class ConnectorBuilderAgentService
         string $message,
         ?ConnectorBuilderSession $session = null,
         ?array $credentials = null,
+        ?array $sessionConfig = null,
     ): array {
         $session ??= ConnectorBuilderSession::query()->create([
             'client_dashboard_id' => $dashboard->id,
@@ -40,6 +41,12 @@ class ConnectorBuilderAgentService
 
         if (! $session->title) {
             $session->update(['title' => $this->sessionTitleFromMessage($message)]);
+        }
+
+        if ($sessionConfig !== null && $sessionConfig !== []) {
+            $session->update([
+                'session_config' => array_merge($session->session_config ?? [], $sessionConfig),
+            ]);
         }
 
         if ($credentials !== null && $credentials !== []) {

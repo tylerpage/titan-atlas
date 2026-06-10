@@ -17,6 +17,7 @@ class ConnectorBuilderSession extends Model
         'title',
         'duration_ms',
         'pending_credentials',
+        'session_config',
     ];
 
     protected function casts(): array
@@ -24,6 +25,7 @@ class ConnectorBuilderSession extends Model
         return [
             'status' => ConnectorBuilderSessionStatus::class,
             'pending_credentials' => 'array',
+            'session_config' => 'array',
         ];
     }
 

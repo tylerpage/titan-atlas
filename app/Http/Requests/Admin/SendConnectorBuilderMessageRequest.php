@@ -20,6 +20,8 @@ class SendConnectorBuilderMessageRequest extends FormRequest
             'message' => ['required', 'string', 'max:4000'],
             'session_id' => ['nullable', 'integer', 'exists:connector_builder_sessions,id'],
             'credentials' => ['nullable', 'array'],
+            'session_config' => ['nullable', 'array'],
+            'session_config.base_url' => ['nullable', 'string', 'url', 'max:500'],
         ];
     }
 }
