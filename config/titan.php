@@ -80,6 +80,15 @@ return [
         'stream_fan_out_enabled' => (bool) env('TITAN_SYNC_STREAM_FAN_OUT_ENABLED', true),
     ],
 
+    'transform' => [
+        // Keep each transform job short for hosted workers (e.g. Laravel Cloud ~60s limit).
+        'payloads_per_chunk' => (int) env('TITAN_TRANSFORM_PAYLOADS_PER_CHUNK', 250),
+        'chunks_per_job' => (int) env('TITAN_TRANSFORM_CHUNKS_PER_JOB', 2),
+        'max_seconds_per_job' => (int) env('TITAN_TRANSFORM_MAX_SECONDS_PER_JOB', 45),
+        'job_timeout' => (int) env('TITAN_TRANSFORM_JOB_TIMEOUT', 55),
+        'memory_limit' => env('TITAN_TRANSFORM_MEMORY_LIMIT', '512M'),
+    ],
+
     'semrush' => [
         'resources' => [
             'domain_overview',

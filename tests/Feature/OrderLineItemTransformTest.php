@@ -56,9 +56,9 @@ class OrderLineItemTransformTest extends TestCase
             'fetched_at' => now(),
         ]);
 
-        $written = app(TransformConnectionDataService::class)->transform($syncRun->fresh(['connection.clientDashboard']));
+        $result = app(TransformConnectionDataService::class)->transform($syncRun->fresh(['connection.clientDashboard']));
 
-        $this->assertGreaterThan(0, $written);
+        $this->assertGreaterThan(0, $result->written);
 
         $this->assertDatabaseHas('metric_snapshots', [
             'client_dashboard_id' => $dashboard->id,

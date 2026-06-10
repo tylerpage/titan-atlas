@@ -2,69 +2,144 @@
 
 namespace App\Services\Analytics;
 
+use App\Data\Ingestion\TransformChunkResult;
 use App\Models\Connection;
 use App\Models\MetricSnapshot;
 use App\Models\RawConnectorPayload;
+use App\Models\SyncRun;
 use App\Support\DedupedRawPayloadQuery;
 use App\Support\JsonPayloadSql;
 use App\Support\MetricDimensions;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class TransformConnectionDataService
 {
-    public function transform(\App\Models\SyncRun $syncRun): int
-    {
+    public function transform(
+        SyncRun $syncRun,
+        ?int $afterPayloadId = null,
+        bool $purgeExisting = false,
+    ): TransformChunkResult {
         $syncRun->loadMissing('connection.clientDashboard');
 
-        return $this->rebuildForConnection($syncRun->connection);
+        return $this->processConnection(
+            $syncRun->connection,
+            $afterPayloadId,
+            $purgeExisting,
+            unlimited: false,
+        );
     }
 
     public function rebuildForConnection(Connection $connection): int
     {
+        return $this->processConnection(
+            $connection,
+            afterPayloadId: null,
+            purgeExisting: true,
+            unlimited: true,
+        )->written;
+    }
+
+    protected function processConnection(
+        Connection $connection,
+        ?int $afterPayloadId,
+        bool $purgeExisting,
+        bool $unlimited,
+    ): TransformChunkResult {
         $connection->loadMissing('clientDashboard');
         $dashboard = $connection->clientDashboard;
         $connectionId = $connection->id;
 
-        MetricSnapshot::query()
-            ->where('client_dashboard_id', $dashboard->id)
-            ->whereRaw(JsonPayloadSql::text('dimensions', 'connection_id') . ' = ?', [$connectionId])
-            ->delete();
+        if ($purgeExisting) {
+            MetricSnapshot::query()
+                ->where('client_dashboard_id', $dashboard->id)
+                ->whereRaw(JsonPayloadSql::text('dimensions', 'connection_id') . ' = ?', [$connectionId])
+                ->delete();
+        }
 
         $written = 0;
+        $lastPayloadId = $afterPayloadId;
+        $stoppedEarly = false;
+        $chunksProcessed = 0;
+        $chunkSize = max(1, (int) config('titan.transform.payloads_per_chunk', 250));
+        $maxChunks = max(1, (int) config('titan.transform.chunks_per_job', 2));
+        $maxSeconds = max(10, (int) config('titan.transform.max_seconds_per_job', 45));
+        $startedAt = microtime(true);
 
-        DedupedRawPayloadQuery::applyToEloquent(
+        $query = DedupedRawPayloadQuery::applyToEloquent(
+            RawConnectorPayload::query()->where('connection_id', $connectionId),
+            $connectionId,
+        )->orderBy('id');
+
+        if ($afterPayloadId !== null) {
+            $query->where('id', '>', $afterPayloadId);
+        }
+
+        while (true) {
+            $pageQuery = clone $query;
+
+            if ($lastPayloadId !== null) {
+                $pageQuery->where('id', '>', $lastPayloadId);
+            }
+
+            $payloads = $pageQuery->limit($chunkSize)->get();
+
+            if ($payloads->isEmpty()) {
+                break;
+            }
+
+            /** @var array<string, array{date: Carbon, key: string, value: float, dimensions: ?array<string, mixed>}> $chunkBuckets */
+            $chunkBuckets = [];
+
+            foreach ($payloads as $payload) {
+                foreach ($this->extractMetrics($payload->resource_type, $payload->payload, $connectionId) as $metric) {
+                    $dimensions = $metric['dimensions'] ?? null;
+                    $dimensionHash = MetricDimensions::hash($dimensions);
+                    $date = $metric['date']->toDateString();
+                    $bucketKey = "{$date}|{$metric['key']}|{$dimensionHash}";
+
+                    if (! isset($chunkBuckets[$bucketKey])) {
+                        $chunkBuckets[$bucketKey] = [
+                            'date' => $metric['date'],
+                            'key' => $metric['key'],
+                            'value' => 0.0,
+                            'dimensions' => $dimensions,
+                        ];
+                    }
+
+                    $chunkBuckets[$bucketKey]['value'] += $metric['value'];
+                }
+            }
+
+            $written += $this->persistMetricBuckets($dashboard, $chunkBuckets);
+            $lastPayloadId = $payloads->last()->id;
+            $chunksProcessed++;
+
+            if ($chunksProcessed % 2 === 0) {
+                gc_collect_cycles();
+            }
+
+            if (! $unlimited && ($chunksProcessed >= $maxChunks || (microtime(true) - $startedAt) >= $maxSeconds)) {
+                $stoppedEarly = true;
+
+                break;
+            }
+        }
+
+        $hasMore = $stoppedEarly && $lastPayloadId !== null
+            && $this->hasMorePayloads($connectionId, $lastPayloadId);
+
+        return new TransformChunkResult($written, $hasMore, $lastPayloadId);
+    }
+
+    protected function hasMorePayloads(int $connectionId, int $afterPayloadId): bool
+    {
+        return DedupedRawPayloadQuery::applyToEloquent(
             RawConnectorPayload::query()->where('connection_id', $connectionId),
             $connectionId,
         )
-            ->orderBy('id')
-            ->chunkById(500, function ($payloads) use ($connectionId, $dashboard, &$written) {
-                /** @var array<string, array{date: Carbon, key: string, value: float, dimensions: ?array<string, mixed>}> $chunkBuckets */
-                $chunkBuckets = [];
-
-                foreach ($payloads as $payload) {
-                    foreach ($this->extractMetrics($payload->resource_type, $payload->payload, $connectionId) as $metric) {
-                        $dimensions = $metric['dimensions'] ?? null;
-                        $dimensionHash = MetricDimensions::hash($dimensions);
-                        $date = $metric['date']->toDateString();
-                        $bucketKey = "{$date}|{$metric['key']}|{$dimensionHash}";
-
-                        if (! isset($chunkBuckets[$bucketKey])) {
-                            $chunkBuckets[$bucketKey] = [
-                                'date' => $metric['date'],
-                                'key' => $metric['key'],
-                                'value' => 0.0,
-                                'dimensions' => $dimensions,
-                            ];
-                        }
-
-                        $chunkBuckets[$bucketKey]['value'] += $metric['value'];
-                    }
-                }
-
-                $written += $this->persistMetricBuckets($dashboard, $chunkBuckets);
-            });
-
-        return $written;
+            ->where('id', '>', $afterPayloadId)
+            ->exists();
     }
 
     /**
@@ -72,32 +147,55 @@ class TransformConnectionDataService
      */
     protected function persistMetricBuckets(\App\Models\ClientDashboard $dashboard, array $buckets): int
     {
-        $written = 0;
-
-        foreach ($buckets as $bucket) {
-            $dimensionHash = MetricDimensions::hash($bucket['dimensions']);
-            $snapshot = MetricSnapshot::query()->firstOrCreate(
-                [
-                    'client_dashboard_id' => $dashboard->id,
-                    'snapshot_date' => $bucket['date'],
-                    'metric_key' => $bucket['key'],
-                    'dimension_hash' => $dimensionHash,
-                ],
-                [
-                    'metric_value' => 0,
-                    'currency' => config('titan.currency', 'USD'),
-                    'dimensions' => $bucket['dimensions'],
-                ],
-            );
-
-            if ($bucket['value'] != 0) {
-                $snapshot->increment('metric_value', $bucket['value']);
-            }
-
-            $written++;
+        if ($buckets === []) {
+            return 0;
         }
 
-        return $written;
+        $currency = config('titan.currency', 'USD');
+        $timestamp = now();
+        $rows = [];
+
+        foreach ($buckets as $bucket) {
+            if ($bucket['value'] == 0) {
+                continue;
+            }
+
+            $rows[] = [
+                'client_dashboard_id' => $dashboard->id,
+                'snapshot_date' => $bucket['date']->toDateString(),
+                'metric_key' => $bucket['key'],
+                'dimension_hash' => MetricDimensions::hash($bucket['dimensions']),
+                'metric_value' => $bucket['value'],
+                'currency' => $currency,
+                'dimensions' => $bucket['dimensions'] === null
+                    ? null
+                    : json_encode($bucket['dimensions'], JSON_THROW_ON_ERROR),
+                'created_at' => $timestamp,
+                'updated_at' => $timestamp,
+            ];
+        }
+
+        if ($rows === []) {
+            return 0;
+        }
+
+        $incrementExpression = match (DB::connection()->getDriverName()) {
+            'pgsql' => 'metric_snapshots.metric_value + EXCLUDED.metric_value',
+            default => 'metric_value + excluded.metric_value',
+        };
+
+        foreach (array_chunk($rows, 500) as $chunk) {
+            MetricSnapshot::query()->upsert(
+                $chunk,
+                ['client_dashboard_id', 'snapshot_date', 'metric_key', 'dimension_hash'],
+                [
+                    'metric_value' => DB::raw($incrementExpression),
+                    'updated_at' => $timestamp,
+                ],
+            );
+        }
+
+        return count($rows);
     }
 
     /**
