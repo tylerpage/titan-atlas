@@ -130,18 +130,48 @@ const props = defineProps({
 
 useDashboardSyncPoll(toRef(() => props.dashboard.is_syncing));
 
+const LOADING_OVERLAY_DELAY_MS = 3000;
+
 const isNavigating = ref(false);
+const showLoadingOverlay = ref(false);
+let loadingOverlayTimer = null;
+
+function clearLoadingOverlayTimer() {
+    if (loadingOverlayTimer !== null) {
+        clearTimeout(loadingOverlayTimer);
+        loadingOverlayTimer = null;
+    }
+}
+
+function beginNavigation() {
+    isNavigating.value = true;
+    showLoadingOverlay.value = false;
+    clearLoadingOverlayTimer();
+
+    loadingOverlayTimer = setTimeout(() => {
+        if (isNavigating.value) {
+            showLoadingOverlay.value = true;
+        }
+
+        loadingOverlayTimer = null;
+    }, LOADING_OVERLAY_DELAY_MS);
+}
+
+function endNavigation() {
+    clearLoadingOverlayTimer();
+    isNavigating.value = false;
+    showLoadingOverlay.value = false;
+}
 
 const removeNavigationListeners = [
-    router.on('start', () => {
-        isNavigating.value = true;
-    }),
-    router.on('finish', () => {
-        isNavigating.value = false;
-    }),
+    router.on('start', beginNavigation),
+    router.on('finish', endNavigation),
+    router.on('cancel', endNavigation),
+    router.on('error', endNavigation),
 ];
 
 onUnmounted(() => {
+    clearLoadingOverlayTimer();
     removeNavigationListeners.forEach((removeListener) => removeListener());
 });
 
@@ -497,17 +527,26 @@ function sourceMediumLabel(order) {
 <template>
     <AppLayout :title="dashboard.name">
         <Teleport to="body">
-            <div
-                v-if="isNavigating"
-                class="fixed inset-0 z-[100] flex items-center justify-center bg-white/75 backdrop-blur-[2px]"
-                role="status"
-                aria-live="polite"
-                aria-busy="true"
+            <Transition
+                enter-active-class="transition-opacity duration-200"
+                enter-from-class="opacity-0"
+                enter-to-class="opacity-100"
+                leave-active-class="transition-opacity duration-150"
+                leave-from-class="opacity-100"
+                leave-to-class="opacity-0"
             >
-                <div class="rounded-xl border border-slate-200 bg-white px-6 py-4 shadow-lg">
-                    <p class="text-sm font-medium text-slate-700">Updating dashboard…</p>
+                <div
+                    v-if="showLoadingOverlay"
+                    class="fixed inset-0 z-[100] flex items-center justify-center bg-white/75 backdrop-blur-[2px]"
+                    role="status"
+                    aria-live="polite"
+                    aria-busy="true"
+                >
+                    <div class="rounded-xl border border-slate-200 bg-white px-6 py-4 shadow-lg">
+                        <p class="text-sm font-medium text-slate-700">Updating dashboard…</p>
+                    </div>
                 </div>
-            </div>
+            </Transition>
         </Teleport>
 
         <div class="mb-8 flex flex-wrap items-end justify-between gap-4">
@@ -583,7 +622,7 @@ function sourceMediumLabel(order) {
                     class="rounded-lg bg-primary px-4 py-2 text-sm text-white hover:bg-primary-hover disabled:opacity-50"
                     :disabled="isNavigating"
                 >
-                    {{ isNavigating ? 'Updating…' : 'Apply' }}
+                    {{ showLoadingOverlay ? 'Updating…' : 'Apply' }}
                 </button>
 
                 <button
