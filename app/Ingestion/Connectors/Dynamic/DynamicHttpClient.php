@@ -3,6 +3,8 @@
 namespace App\Ingestion\Connectors\Dynamic;
 
 use App\Models\ConnectorBlueprint;
+use App\Enums\ConnectorApiLogContext;
+use App\Services\Ingestion\ConnectorApiLogService;
 use App\Support\DynamicConnectorAuth;
 use App\Support\DynamicConnectorReadOnlyGuard;
 use Illuminate\Http\Client\PendingRequest;
@@ -21,7 +23,10 @@ class DynamicHttpClient
         self::$tokenCache = [];
     }
 
-    public function __construct(protected DynamicConnectorReadOnlyGuard $readOnlyGuard) {}
+    public function __construct(
+        protected DynamicConnectorReadOnlyGuard $readOnlyGuard,
+        protected ConnectorApiLogService $apiLogs,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $credentials
@@ -48,9 +53,16 @@ class DynamicHttpClient
         $body = $this->interpolateArray($body, $credentials);
 
         $request = $this->baseRequest($blueprint, $credentials, $headers, resolveToken: true);
-        $response = $this->sendRequest($request, strtoupper($method), $url, $queryParams, $body, $bodyFormat);
 
-        return $this->decodeJsonResponse($response);
+        return $this->loggedRequest(
+            blueprint: $blueprint,
+            request: $request,
+            method: strtoupper($method),
+            url: $url,
+            queryParams: $queryParams,
+            body: $body,
+            bodyFormat: $bodyFormat,
+        );
     }
 
     /**
@@ -294,6 +306,8 @@ class DynamicHttpClient
         $url = $this->buildUrl($blueprint, $path, $credentials);
         $this->assertAllowedHost($blueprint, $url, $credentials);
 
+        $startedAt = microtime(true);
+
         $request = Http::timeout((int) config('titan.connector_builder.http_timeout_seconds', 30))
             ->acceptJson()
             ->withHeaders($this->interpolateArray($headers, $credentials));
@@ -314,7 +328,37 @@ class DynamicHttpClient
             $bodyFormat,
         );
 
-        $payload = $this->decodeJsonResponse($response);
+        $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
+
+        try {
+            $payload = $this->decodeJsonResponse($response);
+        } catch (\Throwable $e) {
+            $this->apiLogs->record(
+                blueprint: $blueprint,
+                method: $method,
+                url: $url,
+                queryParams: [],
+                body: $this->interpolateArray($body, $credentials),
+                response: $response,
+                durationMs: $durationMs,
+                errorMessage: $e->getMessage(),
+                context: ConnectorApiLogContext::Token,
+            );
+
+            throw $e;
+        }
+
+        $this->apiLogs->record(
+            blueprint: $blueprint,
+            method: $method,
+            url: $url,
+            queryParams: [],
+            body: $this->interpolateArray($body, $credentials),
+            response: $response,
+            durationMs: $durationMs,
+            context: ConnectorApiLogContext::Token,
+        );
+
         $tokenPath = (string) ($tokenRequest['token_path'] ?? 'access_token');
         $token = Arr::get($payload, $tokenPath);
 
@@ -332,6 +376,57 @@ class DynamicHttpClient
         ];
 
         return $token;
+    }
+
+    /**
+     * @param  array<string, mixed>  $queryParams
+     * @param  array<string, mixed>  $body
+     * @return array<string, mixed>
+     */
+    protected function loggedRequest(
+        ConnectorBlueprint $blueprint,
+        PendingRequest $request,
+        string $method,
+        string $url,
+        array $queryParams,
+        array $body,
+        string $bodyFormat,
+        ?ConnectorApiLogContext $context = null,
+    ): array {
+        $startedAt = microtime(true);
+        $response = $this->sendRequest($request, $method, $url, $queryParams, $body, $bodyFormat);
+        $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
+
+        try {
+            $decoded = $this->decodeJsonResponse($response);
+        } catch (\Throwable $e) {
+            $this->apiLogs->record(
+                blueprint: $blueprint,
+                method: $method,
+                url: $url,
+                queryParams: $queryParams,
+                body: $body,
+                response: $response,
+                durationMs: $durationMs,
+                errorMessage: $e->getMessage(),
+                context: $context,
+            );
+
+            throw $e;
+        }
+
+        $this->apiLogs->record(
+            blueprint: $blueprint,
+            method: $method,
+            url: $url,
+            queryParams: $queryParams,
+            body: $body,
+            response: $response,
+            durationMs: $durationMs,
+            context: $context,
+        );
+
+        return $decoded;
     }
 
     /**

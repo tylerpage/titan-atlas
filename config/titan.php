@@ -199,6 +199,12 @@ return [
         'response_timeout_seconds' => (int) env('TITAN_CONNECTOR_BUILDER_RESPONSE_TIMEOUT', 180),
     ],
 
+    'connector_api_logs' => [
+        'enabled' => (bool) env('TITAN_CONNECTOR_API_LOGS_ENABLED', true),
+        'retention_hours' => (int) env('TITAN_CONNECTOR_API_LOGS_RETENTION_HOURS', 48),
+        'max_body_bytes' => (int) env('TITAN_CONNECTOR_API_LOGS_MAX_BODY_BYTES', 100_000),
+    ],
+
     'feedback' => [
         'max_attachments' => (int) env('TITAN_FEEDBACK_MAX_ATTACHMENTS', 5),
         'max_attachment_kb' => (int) env('TITAN_FEEDBACK_MAX_ATTACHMENT_KB', 10240),

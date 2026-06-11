@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\AnalyticsReportController as AdminAnalyticsReport
 use App\Http\Controllers\Admin\CompanyController as AdminCompanyController;
 use App\Http\Controllers\Admin\ConnectionController as AdminConnectionController;
 use App\Http\Controllers\Admin\AiConnectorController as AdminAiConnectorController;
+use App\Http\Controllers\Admin\ConnectorApiLogController as AdminConnectorApiLogController;
 use App\Http\Controllers\Admin\ConnectorBlueprintController as AdminConnectorBlueprintController;
 use App\Http\Controllers\Admin\ConnectorBuilderController as AdminConnectorBuilderController;
 use App\Http\Controllers\Admin\CoverPageBlockController as AdminCoverPageBlockController;
@@ -62,6 +63,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/feedback/{feedback}', [AdminFeedbackSubmissionController::class, 'update'])->name('feedback.update');
         Route::get('/feedback-attachments/{attachment}/download', [AdminFeedbackSubmissionController::class, 'downloadAttachment'])
             ->name('feedback.attachments.download');
+        Route::get('/connector-api-logs', [AdminConnectorApiLogController::class, 'index'])->name('connector-api-logs.index');
+        Route::get('/connector-api-logs/{connectorApiLog}', [AdminConnectorApiLogController::class, 'show'])->name('connector-api-logs.show');
         Route::get('/companies', [AdminCompanyController::class, 'index'])->name('companies.index');
         Route::get('/companies/create', [AdminCompanyController::class, 'create'])->name('companies.create');
         Route::post('/companies', [AdminCompanyController::class, 'store'])->name('companies.store');

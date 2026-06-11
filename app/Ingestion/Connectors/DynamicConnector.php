@@ -12,6 +12,7 @@ use App\Models\ConnectorBlueprint;
 use App\Models\ConnectorBlueprintStream;
 use App\Support\DynamicConnectorAuth;
 use App\Support\DynamicConnectorBaseUrl;
+use App\Support\ConnectorApiLogScope;
 use Illuminate\Support\Arr;
 
 class DynamicConnector extends AbstractConnector implements FanOutSyncConnector
@@ -64,7 +65,12 @@ class DynamicConnector extends AbstractConnector implements FanOutSyncConnector
         }
 
         try {
-            $this->probeConnection($blueprint, $credentials);
+            ConnectorApiLogScope::run([
+                'connection_id' => $connection->id,
+                'connector_blueprint_id' => $blueprint->id,
+                'connector_type' => $this->type(),
+                'context' => 'test',
+            ], fn () => $this->probeConnection($blueprint, $credentials));
         } catch (\Throwable $e) {
             return ValidationResult::fail('Could not connect to the API.', ['hint' => $e->getMessage()]);
         }
@@ -88,12 +94,19 @@ class DynamicConnector extends AbstractConnector implements FanOutSyncConnector
             return new FetchResult(records: [], hasMore: false);
         }
 
-        $response = $this->executeStreamRequest(
+        $response = ConnectorApiLogScope::run([
+            'connection_id' => $connection->id,
+            'connector_blueprint_id' => $blueprint->id,
+            'connector_type' => $this->type(),
+            'context' => 'sync',
+            'stream_key' => $stream->stream_key,
+            'resource_type' => $stream->resource_type,
+        ], fn () => $this->executeStreamRequest(
             blueprint: $blueprint,
             credentials: $credentials,
             stream: $stream,
             state: $state,
-        );
+        ));
 
         $mapping = $stream->response_mapping ?? [];
         $rawRecords = $this->client->extractRecords($response, $mapping);

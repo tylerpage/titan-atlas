@@ -3,6 +3,7 @@
 namespace App\Ai\Tools\ConnectorBuilder;
 
 use App\Agents\ConnectorBuilderAgentContext;
+use App\Enums\ConnectorType;
 use App\Support\DynamicConnectorBaseUrl;
 use App\Enums\ConnectorBlueprintStatus;
 use App\Ingestion\Connectors\DynamicConnector;
@@ -45,11 +46,15 @@ class TestBlueprintConnectionTool extends ConnectorBuilderTool
         }
 
         try {
-            $response = $this->connector->probeConnection(
+            $response = ConnectorApiLogScope::run([
+                'connector_blueprint_id' => $this->context->blueprint->id,
+                'connector_type' => ConnectorType::Dynamic->value,
+                'context' => 'builder',
+            ], fn () => $this->connector->probeConnection(
                 $this->context->blueprint,
                 $credentials,
                 $this->context->session->session_config,
-            );
+            ));
             $this->context->blueprint->update(['status' => ConnectorBlueprintStatus::Ready]);
             $this->context->lastTestResult = ['success' => true];
 

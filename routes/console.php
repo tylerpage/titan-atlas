@@ -11,6 +11,8 @@ Artisan::command('inspire', function () {
 Schedule::command('titan:sync-connections --type=incremental')
     ->dailyAt(config('titan.sync.daily_at', '02:00'));
 
+Schedule::command('titan:prune-connector-api-logs')->hourly();
+
 if (config('titan.sync.hourly_today', true)) {
     Schedule::command('titan:sync-connections --type=today_hourly')
         ->hourly();
