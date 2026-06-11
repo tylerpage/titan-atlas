@@ -55,12 +55,20 @@ function shareBlueprintGlobally(blueprintId) {
                     Reusable connector templates shared across dashboards and companies. Each dashboard connection keeps its own credentials.
                 </p>
             </div>
-            <Link
-                :href="route('admin.ai-connectors.create')"
-                class="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
-            >
-                Create AI Connector
-            </Link>
+            <div class="flex flex-wrap gap-2">
+                <Link
+                    :href="route('admin.ai-connectors.import')"
+                    class="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50"
+                >
+                    Import
+                </Link>
+                <Link
+                    :href="route('admin.ai-connectors.create')"
+                    class="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
+                >
+                    Create AI Connector
+                </Link>
+            </div>
         </div>
 
         <p v-if="status" class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
@@ -150,6 +158,12 @@ function shareBlueprintGlobally(blueprintId) {
                         >
                             Edit
                         </Link>
+                        <a
+                            :href="route('admin.ai-connectors.export', blueprint.id)"
+                            class="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50"
+                        >
+                            Export
+                        </a>
                         <button
                             v-if="!blueprint.is_shared && !blueprint.is_global"
                             type="button"

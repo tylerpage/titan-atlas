@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\ImportAiConnectorRequest;
 use App\Http\Requests\Admin\StoreAiConnectorConnectionRequest;
 use App\Http\Requests\Admin\StoreGlobalAiConnectorRequest;
 use App\Http\Requests\Admin\TestAiConnectorConnectionRequest;
@@ -12,12 +13,15 @@ use App\Ingestion\ConnectorRegistry;
 use App\Models\ClientDashboard;
 use App\Models\Company;
 use App\Models\ConnectorBlueprint;
+use App\Services\ConnectorBuilder\AiConnectorExportService;
+use App\Services\ConnectorBuilder\AiConnectorImportService;
 use App\Services\ConnectorBuilder\AiConnectorService;
 use App\Services\ConnectorBuilder\ConnectorBuilderResumeService;
 use App\Services\ConnectorBuilder\ConnectorBlueprintDashboardVersionService;
 use App\Services\ConnectorBuilder\CreateDynamicConnectionService;
 use App\Support\DynamicConnectorBaseUrl;
 use Illuminate\Http\RedirectResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -60,6 +64,48 @@ class AiConnectorController extends Controller
             'dashboards' => $dashboards,
             'defaultSandboxDashboardId' => $dashboards->first()['id'] ?? null,
         ]);
+    }
+
+    public function importForm(): Response
+    {
+        $companies = Company::query()
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        return Inertia::render('Admin/AiConnectors/Import', [
+            'companies' => $companies,
+        ]);
+    }
+
+    public function import(
+        ImportAiConnectorRequest $request,
+        AiConnectorImportService $importer,
+    ): RedirectResponse {
+        $package = $this->decodeImportPackage($request);
+
+        $blueprint = $importer->import($package, [
+            'scope' => $request->string('scope')->toString(),
+            'mode' => $request->string('mode')->toString(),
+            'company_id' => $request->integer('company_id') ?: null,
+        ]);
+
+        return redirect()
+            ->route('admin.ai-connectors.show', $blueprint)
+            ->with('status', 'AI connector "'.$blueprint->label.'" imported. Credentials and synced data were not included — add a connection to test.');
+    }
+
+    public function export(
+        ConnectorBlueprint $blueprint,
+        AiConnectorExportService $exporter,
+    ): StreamedResponse {
+        $export = $exporter->export($blueprint);
+        $json = json_encode($export['package'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+
+        return response()->streamDownload(
+            fn () => print($json),
+            $export['filename'],
+            ['Content-Type' => 'application/json'],
+        );
     }
 
     public function store(
@@ -250,6 +296,28 @@ class AiConnectorController extends Controller
             'message' => $result->message,
             'debug' => $result->debug,
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function decodeImportPackage(ImportAiConnectorRequest $request): array
+    {
+        $raw = $request->string('payload')->toString();
+
+        if ($raw === '' && $request->hasFile('file')) {
+            $raw = (string) file_get_contents($request->file('file')->getRealPath());
+        }
+
+        $package = json_decode(trim($raw), true);
+
+        if (! is_array($package)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'payload' => 'Import file must contain valid JSON.',
+            ]);
+        }
+
+        return $package;
     }
 
     /**

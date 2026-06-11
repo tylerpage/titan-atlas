@@ -94,6 +94,12 @@ function exportDevTasks() {
             >
                 Edit
             </Link>
+            <a
+                :href="route('admin.ai-connectors.export', blueprint.id)"
+                class="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50"
+            >
+                Export JSON
+            </a>
             <button
                 type="button"
                 class="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50"
