@@ -55,7 +55,7 @@ class DynamicConnectorDashboardService
         }
 
         [$start, $end] = $this->widgets->resolveDateRange($dashboard, $dateRange, $customRange);
-        $resolved = $this->savedDashboards->resolveBoard($board, $dashboard, $start, $end);
+        $resolved = $this->savedDashboards->resolveBoard($board, $dashboard, $start, $end, $connection);
 
         return [
             'kind' => 'dynamic',

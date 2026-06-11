@@ -5,6 +5,7 @@ namespace App\Ai\Tools\ConnectorBuilder;
 use App\Agents\ConnectorBuilderAgentContext;
 use App\Models\AnalyticsReport;
 use App\Models\ConnectorBlueprintDashboardVersion;
+use App\Models\RawConnectorPayload;
 use App\Models\SavedDashboard;
 use App\Models\SavedDashboardBlock;
 use App\Services\Analytics\ReportQueryContext;
@@ -195,6 +196,10 @@ class ProposeConnectorDashboardTool extends ConnectorBuilderTool
             ->where('client_dashboard_id', $this->context->dashboard->id)
             ->max('version_number');
 
+        $payloadCount = RawConnectorPayload::query()
+            ->where('connection_id', $connectionId)
+            ->count();
+
         $dashboardSpec = [
             'title' => $title,
             'widgets' => $normalizedWidgets,
@@ -204,6 +209,7 @@ class ProposeConnectorDashboardTool extends ConnectorBuilderTool
             'pinned_blocks' => $pinnedBlocks,
             'current_version' => is_numeric($latestVersion) ? (int) $latestVersion : null,
             'client_dashboard_id' => $this->context->dashboard->id,
+            'pending_payload_refresh' => $payloadCount === 0,
         ];
 
         $this->versions->recordCurrent(

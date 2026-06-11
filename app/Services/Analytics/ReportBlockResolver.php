@@ -25,10 +25,14 @@ class ReportBlockResolver
         Carbon $end,
         ?string $titleOverride = null,
         ?string $descriptionOverride = null,
+        ?int $connectionIdOverride = null,
     ): ?array {
         $days = $start->diffInDays($end) + 1;
         $compareEnd = $start->copy()->subDay();
         $compareStart = $compareEnd->copy()->subDays($days - 1);
+
+        $connectionId = $connectionIdOverride
+            ?? ($report->visualization_config['connection_id'] ?? null);
 
         $context = new ReportQueryContext(
             dashboardId: $dashboard->id,
@@ -36,7 +40,7 @@ class ReportBlockResolver
             endDate: $end,
             compareStartDate: $compareStart,
             compareEndDate: $compareEnd,
-            connectionId: $report->visualization_config['connection_id'] ?? null,
+            connectionId: is_numeric($connectionId) ? (int) $connectionId : null,
         );
 
         try {

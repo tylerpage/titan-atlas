@@ -3,6 +3,7 @@
 namespace App\Services\Client;
 
 use App\Models\ClientDashboard;
+use App\Models\Connection;
 use App\Models\SavedDashboard;
 use App\Models\SavedDashboardBlock;
 use App\Models\User;
@@ -97,6 +98,7 @@ class SavedDashboardService
         ClientDashboard $dashboard,
         Carbon $start,
         Carbon $end,
+        ?Connection $connection = null,
     ): array {
         $board->load(['blocks.report']);
 
@@ -105,7 +107,7 @@ class SavedDashboardService
             'title' => $board->title,
             'description' => $board->description,
             'blocks' => $board->blocks
-                ->map(function (SavedDashboardBlock $block) use ($dashboard, $start, $end) {
+                ->map(function (SavedDashboardBlock $block) use ($dashboard, $start, $end, $connection) {
                     $report = $block->report;
 
                     if (! $report) {
@@ -119,6 +121,7 @@ class SavedDashboardService
                         $end,
                         $block->title,
                         $block->description,
+                        $connection?->id,
                     );
 
                     if (! $resolved) {

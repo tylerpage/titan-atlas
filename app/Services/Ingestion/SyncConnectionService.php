@@ -10,6 +10,7 @@ use App\Ingestion\Connectors\Shopify\ShopifyRateLimitException;
 use App\Jobs\Ingestion\SyncConnectionJob;
 use App\Jobs\Ingestion\TransformConnectionDataJob;
 use App\Models\Connection;
+use App\Services\ConnectorBuilder\ConnectorDashboardSyncCoordinator;
 use App\Models\SyncRun;
 use App\Support\SyncDateChunkWalker;
 use Throwable;
@@ -20,6 +21,7 @@ class SyncConnectionService
         protected ConnectorRegistry $connectors,
         protected RawConnectorPayloadWriter $payloadWriter,
         protected SyncProgressRecorder $progressRecorder,
+        protected ConnectorDashboardSyncCoordinator $connectorDashboards,
     ) {}
 
     public function sync(
@@ -169,6 +171,7 @@ class SyncConnectionService
             }
 
             $this->dispatchFinalizeTransform($connection->fresh(), $syncRun);
+            $this->connectorDashboards->afterSuccessfulSync($connection->fresh(), $syncRun->fresh(), $written);
 
             return $syncRun->fresh();
         } catch (ShopifyRateLimitException $e) {

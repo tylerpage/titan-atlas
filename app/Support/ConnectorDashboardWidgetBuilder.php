@@ -23,27 +23,33 @@ class ConnectorDashboardWidgetBuilder
 
         $mapping = $stream->response_mapping ?? [];
         $transform = $blueprint->transform_config[$stream->resource_type] ?? [];
-        $fields = BlueprintAnalyticsSchema::forBlueprint($blueprint, $connectionId)['streams'][0]['payload_fields'] ?? [];
+        $mappedFields = BlueprintAnalyticsSchema::forBlueprint($blueprint, $connectionId)['streams'][0]['payload_fields'] ?? [];
 
-        if ($fields !== []) {
-            return $fields;
+        if ($connectionId !== null) {
+            $payload = RawConnectorPayload::query()
+                ->where('connection_id', $connectionId)
+                ->where('resource_type', $stream->resource_type)
+                ->orderByDesc('fetched_at')
+                ->value('payload');
+
+            if (is_array($payload)) {
+                $sampledFields = $this->flattenPayloadKeys($payload);
+
+                if ($sampledFields !== []) {
+                    return $sampledFields;
+                }
+            }
+        }
+
+        if ($mappedFields !== []) {
+            return $mappedFields;
         }
 
         if ($connectionId === null) {
             return [];
         }
 
-        $payload = RawConnectorPayload::query()
-            ->where('connection_id', $connectionId)
-            ->where('resource_type', $stream->resource_type)
-            ->orderByDesc('fetched_at')
-            ->value('payload');
-
-        if (! is_array($payload)) {
-            return [];
-        }
-
-        return $this->flattenPayloadKeys($payload);
+        return [];
     }
 
     /**
@@ -260,7 +266,7 @@ SQL;
             return $mapped;
         }
 
-        foreach (['orderDateTime', 'date_created', 'created_at', 'orderdate', 'date', 'order_date'] as $candidate) {
+        foreach (['date', 'orderDateTime', 'order_date', 'date_created', 'created_at', 'orderdate'] as $candidate) {
             if (in_array($candidate, $fields, true)) {
                 return $candidate;
             }
