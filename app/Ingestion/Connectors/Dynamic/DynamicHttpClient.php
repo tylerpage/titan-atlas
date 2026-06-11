@@ -62,6 +62,7 @@ class DynamicHttpClient
             queryParams: $queryParams,
             body: $body,
             bodyFormat: $bodyFormat,
+            headers: $headers,
         );
     }
 
@@ -308,9 +309,12 @@ class DynamicHttpClient
 
         $startedAt = microtime(true);
 
+        $tokenHeaders = $this->interpolateArray($headers, $credentials);
+        $tokenBody = $this->interpolateArray($body, $credentials);
+
         $request = Http::timeout((int) config('titan.connector_builder.http_timeout_seconds', 30))
             ->acceptJson()
-            ->withHeaders($this->interpolateArray($headers, $credentials));
+            ->withHeaders($tokenHeaders);
 
         if ($clientAuth === 'basic') {
             $request = $request->withBasicAuth(
@@ -324,7 +328,7 @@ class DynamicHttpClient
             $method,
             $url,
             [],
-            $this->interpolateArray($body, $credentials),
+            $tokenBody,
             $bodyFormat,
         );
 
@@ -338,11 +342,13 @@ class DynamicHttpClient
                 method: $method,
                 url: $url,
                 queryParams: [],
-                body: $this->interpolateArray($body, $credentials),
+                body: $tokenBody,
                 response: $response,
                 durationMs: $durationMs,
                 errorMessage: $e->getMessage(),
                 context: ConnectorApiLogContext::Token,
+                headers: $tokenHeaders,
+                bodyFormat: $bodyFormat,
             );
 
             throw $e;
@@ -353,10 +359,12 @@ class DynamicHttpClient
             method: $method,
             url: $url,
             queryParams: [],
-            body: $this->interpolateArray($body, $credentials),
+            body: $tokenBody,
             response: $response,
             durationMs: $durationMs,
             context: ConnectorApiLogContext::Token,
+            headers: $tokenHeaders,
+            bodyFormat: $bodyFormat,
         );
 
         $tokenPath = (string) ($tokenRequest['token_path'] ?? 'access_token');
@@ -381,6 +389,7 @@ class DynamicHttpClient
     /**
      * @param  array<string, mixed>  $queryParams
      * @param  array<string, mixed>  $body
+     * @param  array<string, mixed>  $headers
      * @return array<string, mixed>
      */
     protected function loggedRequest(
@@ -391,6 +400,7 @@ class DynamicHttpClient
         array $queryParams,
         array $body,
         string $bodyFormat,
+        array $headers = [],
         ?ConnectorApiLogContext $context = null,
     ): array {
         $startedAt = microtime(true);
@@ -410,6 +420,8 @@ class DynamicHttpClient
                 durationMs: $durationMs,
                 errorMessage: $e->getMessage(),
                 context: $context,
+                headers: $headers,
+                bodyFormat: $bodyFormat,
             );
 
             throw $e;
@@ -424,6 +436,8 @@ class DynamicHttpClient
             response: $response,
             durationMs: $durationMs,
             context: $context,
+            headers: $headers,
+            bodyFormat: $bodyFormat,
         );
 
         return $decoded;

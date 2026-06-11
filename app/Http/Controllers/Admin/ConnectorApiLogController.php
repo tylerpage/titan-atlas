@@ -150,8 +150,27 @@ class ConnectorApiLogController extends Controller
             'connector_type' => $log->connector_type,
             'request_query' => $log->request_query ?? [],
             'request_body' => $log->request_body ?? [],
+            'request_headers' => $log->request_headers ?? [],
+            'request_body_format' => $log->request_body_format,
             'response_body' => $responseBody,
+            'response_headers' => $log->response_headers ?? [],
             'formatted_response' => $formattedResponse,
+            'formatted_request_query' => $this->formatJson($log->request_query ?? []),
+            'formatted_request_body' => $this->formatJson($log->request_body ?? []),
+            'formatted_request_headers' => $this->formatJson($log->request_headers ?? []),
+            'formatted_response_headers' => $this->formatJson($log->response_headers ?? []),
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $value
+     */
+    protected function formatJson(array $value): string
+    {
+        if ($value === []) {
+            return '{}';
+        }
+
+        return json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: '{}';
     }
 }

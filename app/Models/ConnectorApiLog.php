@@ -21,7 +21,10 @@ class ConnectorApiLog extends Model
         'resource_type',
         'request_query',
         'request_body',
+        'request_headers',
+        'request_body_format',
         'response_body',
+        'response_headers',
         'error_message',
     ];
 
@@ -31,6 +34,8 @@ class ConnectorApiLog extends Model
             'context' => ConnectorApiLogContext::class,
             'request_query' => 'array',
             'request_body' => 'array',
+            'request_headers' => 'array',
+            'response_headers' => 'array',
         ];
     }
 

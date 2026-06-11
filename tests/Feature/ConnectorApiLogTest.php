@@ -47,6 +47,8 @@ class ConnectorApiLogTest extends TestCase
         $this->assertSame(200, $log->status_code);
         $this->assertStringContainsString('"amount":42', (string) $log->response_body);
         $this->assertStringContainsString('api.example.com', $log->url);
+        $this->assertSame('[redacted bearer token]', $log->request_headers['Authorization'] ?? null);
+        $this->assertNotEmpty($log->response_headers);
     }
 
     public function test_prune_command_deletes_logs_older_than_retention_window(): void
@@ -112,7 +114,11 @@ class ConnectorApiLogTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.connector-api-logs.show', ConnectorApiLog::query()->first()))
             ->assertOk()
-            ->assertInertia(fn ($page) => $page->component('Admin/ConnectorApiLogs/Show'));
+            ->assertInertia(fn ($page) => $page
+                ->component('Admin/ConnectorApiLogs/Show')
+                ->has('log.formatted_request_headers')
+                ->has('log.formatted_request_query')
+                ->has('log.formatted_request_body'));
     }
 
     public function test_logging_can_be_disabled_via_config(): void

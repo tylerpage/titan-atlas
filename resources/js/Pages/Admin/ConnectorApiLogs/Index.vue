@@ -171,7 +171,11 @@ function statusClass(log) {
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="log in logs.data" :key="log.id" class="border-t border-slate-100 align-top">
+                    <tr
+                        v-for="log in logs.data"
+                        :key="log.id"
+                        class="border-t border-slate-100 align-top hover:bg-slate-50"
+                    >
                         <td class="px-4 py-3 text-slate-600">
                             {{ new Date(log.created_at).toLocaleString() }}
                             <p class="text-xs text-slate-400">{{ log.duration_ms }} ms</p>
@@ -182,7 +186,12 @@ function statusClass(log) {
                             <p v-if="log.blueprint" class="text-xs text-slate-500">{{ log.blueprint.label }}</p>
                         </td>
                         <td class="px-4 py-3">
-                            <p class="font-mono text-xs">{{ log.method }} {{ log.url }}</p>
+                            <Link
+                                :href="route('admin.connector-api-logs.show', log.id)"
+                                class="font-mono text-xs text-primary hover:underline"
+                            >
+                                {{ log.method }} {{ log.url }}
+                            </Link>
                             <p v-if="log.stream_key" class="mt-1 text-xs text-slate-500">
                                 Stream: {{ log.stream_key }}
                             </p>
@@ -198,9 +207,9 @@ function statusClass(log) {
                         <td class="px-4 py-3">
                             <Link
                                 :href="route('admin.connector-api-logs.show', log.id)"
-                                class="text-primary hover:underline"
+                                class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm hover:bg-white"
                             >
-                                View raw
+                                View details
                             </Link>
                         </td>
                     </tr>
