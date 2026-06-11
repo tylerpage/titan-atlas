@@ -85,6 +85,12 @@ function formatDateTime(isoString) {
             </div>
             <div class="flex flex-wrap gap-2">
                 <Link
+                    :href="route('admin.gathered-analytics.index', { connection_id: connection.id })"
+                    class="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50"
+                >
+                    Browse data
+                </Link>
+                <Link
                     :href="route('admin.connections.edit', connection.id)"
                     class="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50"
                 >

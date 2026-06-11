@@ -80,6 +80,13 @@ function closeMobileMenu() {
                 </Link>
                 <Link
                     v-if="user.is_admin"
+                    :href="route('admin.gathered-analytics.index')"
+                    class="text-slate-300 hover:text-white"
+                >
+                    Analytics
+                </Link>
+                <Link
+                    v-if="user.is_admin"
                     :href="route('admin.connector-api-logs.index')"
                     class="text-slate-300 hover:text-white"
                 >
@@ -175,6 +182,14 @@ function closeMobileMenu() {
                     @click="closeMobileMenu"
                 >
                     Users
+                </Link>
+                <Link
+                    v-if="user.is_admin"
+                    :href="route('admin.gathered-analytics.index')"
+                    class="rounded-lg px-3 py-2 text-slate-300 hover:bg-slate-800 hover:text-white"
+                    @click="closeMobileMenu"
+                >
+                    Analytics
                 </Link>
                 <Link
                     v-if="user.is_admin"

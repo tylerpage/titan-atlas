@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\AnalyticsReportController as AdminAnalyticsReport
 use App\Http\Controllers\Admin\CompanyController as AdminCompanyController;
 use App\Http\Controllers\Admin\ConnectionController as AdminConnectionController;
 use App\Http\Controllers\Admin\AiConnectorController as AdminAiConnectorController;
+use App\Http\Controllers\Admin\GatheredAnalyticsController as AdminGatheredAnalyticsController;
 use App\Http\Controllers\Admin\ConnectorApiLogController as AdminConnectorApiLogController;
 use App\Http\Controllers\Admin\ConnectorBlueprintController as AdminConnectorBlueprintController;
 use App\Http\Controllers\Admin\ConnectorBuilderController as AdminConnectorBuilderController;
@@ -65,6 +66,9 @@ Route::middleware('auth')->group(function () {
             ->name('feedback.attachments.download');
         Route::get('/connector-api-logs', [AdminConnectorApiLogController::class, 'index'])->name('connector-api-logs.index');
         Route::get('/connector-api-logs/{connectorApiLog}', [AdminConnectorApiLogController::class, 'show'])->name('connector-api-logs.show');
+        Route::get('/gathered-analytics', [AdminGatheredAnalyticsController::class, 'index'])->name('gathered-analytics.index');
+        Route::get('/gathered-analytics/payloads/{payload}', [AdminGatheredAnalyticsController::class, 'showPayload'])->name('gathered-analytics.payloads.show');
+        Route::get('/gathered-analytics/metrics/{metric}', [AdminGatheredAnalyticsController::class, 'showMetric'])->name('gathered-analytics.metrics.show');
         Route::get('/companies', [AdminCompanyController::class, 'index'])->name('companies.index');
         Route::get('/companies/create', [AdminCompanyController::class, 'create'])->name('companies.create');
         Route::post('/companies', [AdminCompanyController::class, 'store'])->name('companies.store');
