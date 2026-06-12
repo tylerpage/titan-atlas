@@ -5,6 +5,7 @@ namespace App\Services\Admin;
 use App\Enums\SyncStatus;
 use App\Ingestion\ConnectorRegistry;
 use App\Models\Connection;
+use App\Services\AI\DashboardAgentMemoryService;
 use App\Models\MetricSnapshot;
 use App\Models\RawConnectorPayload;
 use App\Models\SyncRun;
@@ -65,6 +66,13 @@ class ConnectionService
 
     public function delete(Connection $connection): void
     {
+        $connection->loadMissing('clientDashboard');
+
+        app(DashboardAgentMemoryService::class)->invalidateConnectorType(
+            $connection->clientDashboard,
+            $connection->connector_type->value,
+        );
+
         $this->deleteMetricsForConnection($connection);
         $connection->delete();
     }

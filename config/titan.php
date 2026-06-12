@@ -185,6 +185,12 @@ return [
 
     'ai_perf_logging' => (bool) env('TITAN_AI_PERF_LOGGING', true),
 
+    'agent_memory' => [
+        'enabled' => (bool) env('TITAN_AGENT_MEMORY_ENABLED', true),
+        'max_injected' => (int) env('TITAN_AGENT_MEMORY_MAX_INJECTED', 6),
+        'max_content_chars' => (int) env('TITAN_AGENT_MEMORY_MAX_CHARS', 4000),
+    ],
+
     'reporting' => [
         'provider' => env('TITAN_AI_PROVIDER', 'openai'),
         'model' => env('TITAN_AI_MODEL', 'gpt-4o-mini'),

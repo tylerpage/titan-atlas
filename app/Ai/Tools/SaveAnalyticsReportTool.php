@@ -6,6 +6,7 @@ use App\Agents\ReportingAgentContext;
 use App\Enums\AnalyticsReportSessionStatus;
 use App\Enums\ReportVisualizationType;
 use App\Models\AnalyticsReport;
+use App\Services\AI\DashboardAgentMemoryService;
 use App\Services\Analytics\ReportQueryContext;
 use App\Services\Analytics\ReportQueryExecutor;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -17,6 +18,7 @@ class SaveAnalyticsReportTool extends ReportingTool
     public function __construct(
         ReportingAgentContext $context,
         protected ReportQueryExecutor $executor,
+        protected DashboardAgentMemoryService $memories,
     ) {
         parent::__construct($context);
     }
@@ -59,6 +61,14 @@ class SaveAnalyticsReportTool extends ReportingTool
 
             $this->context->session->update(['status' => AnalyticsReportSessionStatus::Completed]);
             $this->context->lastSavedReport = $report;
+
+            $this->memories->rememberSuccessfulReport(
+                $this->context->dashboard,
+                $this->context->user,
+                $request->string('prompt')->toString(),
+                $sql,
+                $vizType->value,
+            );
 
             return $this->json([
                 'success' => true,

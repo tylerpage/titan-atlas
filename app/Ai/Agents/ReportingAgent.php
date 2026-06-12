@@ -5,18 +5,22 @@ namespace App\Ai\Agents;
 use App\Agents\ReportingAgentContext;
 use App\Agents\ReportingPromptBuilder;
 use App\Ai\Concerns\CapsReportingConversationHistory;
+use App\Ai\Tools\AnalyzeCampaignPerformanceTool;
 use App\Ai\Tools\BuildDashboardSpecTool;
+use App\Ai\Tools\CheckConnectorDataTool;
 use App\Ai\Tools\CreateAnalyticsReportTool;
 use App\Ai\Tools\CreateMetricDefinitionTool;
 use App\Ai\Tools\DescribeConnectorSchemaTool;
 use App\Ai\Tools\ExplainMetricTool;
 use App\Ai\Tools\GenerateDocumentationTool;
 use App\Ai\Tools\ListAnalyticsSchemaTool;
+use App\Ai\Tools\ListDashboardMemoriesTool;
 use App\Ai\Tools\ListMetricDefinitionsTool;
 use App\Ai\Tools\PlaceReportOnCoverPageTool;
 use App\Ai\Tools\PreviewReportQueryTool;
 use App\Ai\Tools\RunDataQualityChecksTool;
 use App\Ai\Tools\SaveAnalyticsReportTool;
+use App\Ai\Tools\SaveDashboardMemoryTool;
 use Illuminate\Contracts\Container\Container;
 use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Contracts\Conversational;
@@ -55,6 +59,10 @@ class ReportingAgent implements Agent, Conversational, HasTools
         $context = $this->context;
 
         return [
+            $this->container->makeWith(AnalyzeCampaignPerformanceTool::class, ['context' => $context]),
+            $this->container->makeWith(CheckConnectorDataTool::class, ['context' => $context]),
+            $this->container->makeWith(ListDashboardMemoriesTool::class, ['context' => $context]),
+            $this->container->makeWith(SaveDashboardMemoryTool::class, ['context' => $context]),
             $this->container->makeWith(ListAnalyticsSchemaTool::class, ['context' => $context]),
             $this->container->makeWith(DescribeConnectorSchemaTool::class, ['context' => $context]),
             $this->container->makeWith(ListMetricDefinitionsTool::class, ['context' => $context]),

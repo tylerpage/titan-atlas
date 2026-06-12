@@ -4,6 +4,7 @@ namespace App\Ai\Tools\ConnectorBuilder;
 
 use App\Agents\ConnectorBuilderAgentContext;
 use App\Enums\ConnectorType;
+use App\Services\AI\DashboardAgentMemoryService;
 use App\Support\DynamicConnectorBaseUrl;
 use App\Enums\ConnectorBlueprintStatus;
 use App\Ingestion\Connectors\DynamicConnector;
@@ -16,6 +17,7 @@ class TestBlueprintConnectionTool extends ConnectorBuilderTool
     public function __construct(
         ConnectorBuilderAgentContext $context,
         protected DynamicConnector $connector,
+        protected DashboardAgentMemoryService $memories,
     ) {
         parent::__construct($context);
     }
@@ -57,6 +59,19 @@ class TestBlueprintConnectionTool extends ConnectorBuilderTool
             ));
             $this->context->blueprint->update(['status' => ConnectorBlueprintStatus::Ready]);
             $this->context->lastTestResult = ['success' => true];
+
+            $this->memories->remember($this->context->dashboard, [
+                'memory_key' => $this->context->blueprint->slug.':test_result',
+                'category' => 'test_result',
+                'agent_flow' => 'connector_builder',
+                'title' => $this->context->blueprint->label.' connection test',
+                'content' => 'Connection test succeeded. Response keys: '.implode(', ', array_keys($response)),
+                'source_tool' => self::class,
+                'metadata' => [
+                    'blueprint_slug' => $this->context->blueprint->slug,
+                    'blueprint_id' => $this->context->blueprint->id,
+                ],
+            ], $this->context->user);
 
             return $this->json([
                 'success' => true,

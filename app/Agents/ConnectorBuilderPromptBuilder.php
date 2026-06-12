@@ -24,6 +24,9 @@ class ConnectorBuilderPromptBuilder
         $resumeBlock = $this->resumeBlock($context);
         $jsonHint = JsonPayloadSql::promptHint();
         $catalogSummary = $this->connectorCatalog->agentPromptSummary();
+        $memoryBlock = app(\App\Services\AI\DashboardAgentMemoryService::class)
+            ->forPrompt($context->dashboard, 'connector_builder');
+        $memorySection = $memoryBlock !== '' ? "\n\n{$memoryBlock}" : '';
 
         return <<<PROMPT
 You are {$productName}'s connector builder assistant. Help admins create dynamic REST API connectors for dashboard "{$dashboardName}".
@@ -102,6 +105,7 @@ You are {$productName}'s connector builder assistant. Help admins create dynamic
 Preserve the user's original prompt requirements in dashboard_spec widgets.
 
 Be concise. Ask one credential question at a time when possible.
+{$memorySection}
 PROMPT;
     }
 

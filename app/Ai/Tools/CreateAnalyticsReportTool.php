@@ -6,6 +6,7 @@ use App\Agents\ReportingAgentContext;
 use App\Enums\AnalyticsReportSessionStatus;
 use App\Enums\ReportVisualizationType;
 use App\Models\AnalyticsReport;
+use App\Services\AI\DashboardAgentMemoryService;
 use App\Services\Analytics\ReportQueryContext;
 use App\Services\Analytics\ReportQueryExecutor;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -17,6 +18,7 @@ class CreateAnalyticsReportTool extends ReportingTool
     public function __construct(
         ReportingAgentContext $context,
         protected ReportQueryExecutor $executor,
+        protected DashboardAgentMemoryService $memories,
     ) {
         parent::__construct($context);
     }
@@ -59,6 +61,14 @@ class CreateAnalyticsReportTool extends ReportingTool
             $this->context->lastSavedReport = $report;
             $this->context->lastPreviewSql = $this->normalizeSql($sql);
             $this->context->lastPreviewResult = $preview;
+
+            $this->memories->rememberSuccessfulReport(
+                $this->context->dashboard,
+                $this->context->user,
+                $request->string('prompt')->toString(),
+                $sql,
+                $vizType->value,
+            );
 
             return $this->json([
                 'success' => true,

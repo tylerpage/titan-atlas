@@ -29,6 +29,11 @@ class ClientReportingPromptBuilder
             $skills[] = $this->sections->seoSkill();
         }
 
+        if ($this->sections->shouldIncludePaidMediaForContext($context)) {
+            $skills[] = $this->sections->paidMediaSkill();
+            $skills[] = $this->sections->dataAvailabilitySkill();
+        }
+
         $skillsBlock = implode("\n\n", $skills);
         $persona = $this->sections->clientPersonaTone();
         $visualRules = $this->sections->visualOutputRules();
@@ -82,7 +87,7 @@ End: {$previewEnd}
 {$compareDates}
 {$recentReports}
 
-{$schemaSummary}
+{$schemaSummary}{$this->sections->memoryBlock($context)}
 PROMPT;
     }
 }

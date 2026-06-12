@@ -2,6 +2,8 @@
 
 namespace App\Ai\Tools\ConnectorBuilder;
 
+use App\Agents\ConnectorBuilderAgentContext;
+use App\Services\AI\DashboardAgentMemoryService;
 use App\Support\DynamicConnectorAuth;
 use App\Support\DynamicConnectorReadOnlyGuard;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -11,6 +13,13 @@ use Stringable;
 
 class ResearchConnectorApiTool extends ConnectorBuilderTool
 {
+    public function __construct(
+        ConnectorBuilderAgentContext $context,
+        protected DashboardAgentMemoryService $memories,
+    ) {
+        parent::__construct($context);
+    }
+
     public function description(): Stringable|string
     {
         return 'Capture structured API research notes for read-only connectors: auth method (including oauth2_client_credentials), base URL, token endpoint, list/fetch endpoints, pagination, and recommended streams.';
@@ -32,9 +41,30 @@ class ResearchConnectorApiTool extends ConnectorBuilderTool
             }
         }
 
+        $integrationName = $request->string('integration_name')->toString();
+        $slug = str($integrationName)->slug()->toString() ?: 'integration';
+
+        $this->memories->remember($this->context->dashboard, [
+            'memory_key' => $slug.':api_research',
+            'category' => 'api_research',
+            'agent_flow' => 'connector_builder',
+            'title' => $integrationName.' API research',
+            'content' => json_encode([
+                'auth_type' => $request->string('auth_type')->toString(),
+                'base_url' => $request->string('base_url')->toString(),
+                'test_endpoint' => $request->string('test_endpoint')->toString(),
+                'rate_limits' => $request->string('rate_limits')->toString(),
+                'notes' => $request->string('notes')->toString(),
+                'recommended_streams' => $request->array('recommended_streams'),
+                'docs_hint' => $docsHint,
+            ], JSON_UNESCAPED_SLASHES),
+            'source_tool' => self::class,
+            'metadata' => ['blueprint_slug' => $slug],
+        ], $this->context->user);
+
         return $this->json([
             'success' => true,
-            'integration_name' => $request->string('integration_name')->toString(),
+            'integration_name' => $integrationName,
             'auth_type' => $request->string('auth_type')->toString(),
             'base_url' => $request->string('base_url')->toString(),
             'test_endpoint' => $request->string('test_endpoint')->toString(),

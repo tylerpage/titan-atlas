@@ -3,6 +3,7 @@
 namespace App\Ai\Tools;
 
 use App\Agents\ReportingAgentContext;
+use App\Services\AI\DashboardAgentMemoryService;
 use App\Support\AnalyticsSchemaCatalog;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Tools\Request;
@@ -13,6 +14,7 @@ class DescribeConnectorSchemaTool extends ReportingTool
     public function __construct(
         ReportingAgentContext $context,
         protected AnalyticsSchemaCatalog $catalog,
+        protected DashboardAgentMemoryService $memories,
     ) {
         parent::__construct($context);
     }
@@ -42,6 +44,16 @@ class DescribeConnectorSchemaTool extends ReportingTool
                 ->where('connector', $connectorType)
                 ->values()
                 ->all();
+
+            $this->memories->remember($this->context->dashboard, [
+                'memory_key' => $connectorType.':schema',
+                'category' => 'schema',
+                'agent_flow' => 'reporting',
+                'title' => "{$connectorType} payload schema",
+                'content' => json_encode($entities, JSON_UNESCAPED_SLASHES),
+                'source_tool' => self::class,
+                'metadata' => ['connector_type' => $connectorType],
+            ], $this->context->user);
         }
 
         return $this->json([

@@ -2,6 +2,7 @@
 
 namespace App\Agents;
 
+use App\Enums\ConnectorType;
 use App\Models\AnalyticsReport;
 use App\Support\AnalyticsSchemaCatalog;
 use Illuminate\Support\Str;
@@ -29,6 +30,10 @@ class TitanAiPromptSections
             'save_analytics_report' => 'SaveAnalyticsReportTool',
             'place_report_on_cover_page' => 'PlaceReportOnCoverPageTool',
             'pin_report_to_saved_dashboard' => 'PinReportToSavedDashboardTool',
+            'analyze_campaign_performance' => 'AnalyzeCampaignPerformanceTool',
+            'check_connector_data' => 'CheckConnectorDataTool',
+            'save_dashboard_memory' => 'SaveDashboardMemoryTool',
+            'list_dashboard_memories' => 'ListDashboardMemoriesTool',
         ];
     }
 
@@ -119,8 +124,40 @@ SKILL;
 - Position is average rank (lower is better). CTR is a ratio (0–1) in payloads.
 - Query-level analysis → resource_type = 'keyword'. Landing-page analysis → resource_type = 'search_page'. Device breakdown → resource_type = 'search_device'. Trend charts → search_daily.
 - GA4 data: resource_type traffic_daily (visitors, active_users, sessions), events_daily (event_name, event_count), landing_page (landing_page, sessions). Traffic trends → traffic_daily. Event analysis → events_daily.
-- Google Ads data: resource_type spend_daily (cost, impressions, clicks, ctr, conversions_value), campaign_daily (+ campaign_id, campaign_name). Spend trends → spend_daily. Campaign analysis → campaign_daily.
-- For connector field details call {$describeConnector} with connector search_console, google_analytics, or google_ads.
+- For connector field details call {$describeConnector} with connector search_console or google_analytics.
+SKILL;
+    }
+
+    public function paidMediaSkill(): string
+    {
+        $analyze = $this->tool('analyze_campaign_performance');
+        $check = $this->tool('check_connector_data');
+        $create = $this->tool('create_analytics_report');
+        $describeConnector = $this->tool('describe_connector_schema');
+
+        return <<<SKILL
+## Skill: paid media (Google Ads, StackAdapt, Reddit Ads)
+- Campaign / budget / ROAS questions → call {$analyze} FIRST with the active ad connection.
+- Before saying data is unavailable, call {$check} for resource_type campaign_daily (or spend_daily).
+- Account spend trends → resource_type spend_daily. Campaign analysis → resource_type campaign_daily (NOT spend_daily).
+- Fields: campaign_id, campaign_name, cost, impressions, clicks, ctr, conversions_value (and conversions for StackAdapt).
+- Filter ads SQL with c.connector_type IN ('google_ads', 'stackadapt', 'reddit_ads') when multiple ad connectors exist.
+- ROAS = conversions_value / NULLIF(cost, 0). Rank campaigns by ROAS and spend for budget reallocation advice.
+- High spend + low ROAS → cut candidates. Top ROAS with room to grow → receive candidates.
+- Projections: extrapolate from recent daily trends only — state clearly this is not a guaranteed forecast.
+- After analysis, save a table widget with {$create} when the user needs a visual.
+- For field details call {$describeConnector} with connector_type google_ads, stackadapt, or reddit_ads.
+SKILL;
+    }
+
+    public function dataAvailabilitySkill(): string
+    {
+        $check = $this->tool('check_connector_data');
+
+        return <<<SKILL
+## Data availability (mandatory)
+- Never claim connector data is missing or broken without calling {$check} or AnalyzeCampaignPerformanceTool first.
+- If row counts are zero, explain the connection may still be syncing — do not blame "campaign ID structure".
 SKILL;
     }
 
@@ -207,13 +244,55 @@ SELECT json_extract(r.payload, '$.date') AS date, SUM(CAST(json_extract(r.payloa
 EXAMPLES;
     }
 
+    public function paidMediaExamples(): string
+    {
+        return <<<'EXAMPLES'
+## Paid media SQL patterns
+Campaign performance table:
+SELECT json_extract(r.payload, '$.campaign_name') AS campaign_name, json_extract(r.payload, '$.campaign_id') AS campaign_id, SUM(CAST(json_extract(r.payload, '$.cost') AS REAL)) AS cost, SUM(CAST(json_extract(r.payload, '$.conversions_value') AS REAL)) AS conversions_value, CASE WHEN SUM(CAST(json_extract(r.payload, '$.cost') AS REAL)) = 0 THEN 0 ELSE SUM(CAST(json_extract(r.payload, '$.conversions_value') AS REAL)) / SUM(CAST(json_extract(r.payload, '$.cost') AS REAL)) END AS roas FROM raw_connector_payloads r JOIN connections c ON c.id = r.connection_id WHERE c.client_dashboard_id = :dashboard_id AND c.connector_type = 'google_ads' AND r.resource_type = 'campaign_daily' AND json_extract(r.payload, '$.date') BETWEEN :start_date AND :end_date GROUP BY 1, 2 ORDER BY cost DESC
+→ visualization_type: table, config: { "title": "Campaign performance", "columns": [{"key":"campaign_name","label":"Campaign"},{"key":"cost","label":"Spend"},{"key":"conversions_value","label":"Conv. value"},{"key":"roas","label":"ROAS"}] }
+EXAMPLES;
+    }
+
+    public function dashboardHasPaidMediaConnection(ReportingAgentContext $context): bool
+    {
+        return $context->dashboard->connections()
+            ->where('is_active', true)
+            ->whereIn('connector_type', [
+                ConnectorType::GoogleAds,
+                ConnectorType::StackAdapt,
+                ConnectorType::RedditAds,
+            ])
+            ->exists();
+    }
+
+    public function shouldIncludePaidMediaForContext(ReportingAgentContext $context): bool
+    {
+        return $this->dashboardHasPaidMediaConnection($context)
+            || app(PromptSkillRouter::class)->shouldIncludePaidMediaSkill($context->currentUserMessage);
+    }
+
+    public function memoryBlock(ReportingAgentContext $context, string $flow = 'reporting'): string
+    {
+        $block = app(\App\Services\AI\DashboardAgentMemoryService::class)
+            ->forPrompt($context->dashboard, $flow);
+
+        return $block !== '' ? "\n\n{$block}" : '';
+    }
+
     public function visualizationExamplesForContext(ReportingAgentContext $context): string
     {
         if ($this->sessionHasReports($context)) {
             return '';
         }
 
-        return $this->visualizationExamples();
+        $examples = $this->visualizationExamples();
+
+        if ($this->shouldIncludePaidMediaForContext($context)) {
+            $examples .= "\n\n".$this->paidMediaExamples();
+        }
+
+        return $examples;
     }
 
     public function recentSessionReports(ReportingAgentContext $context): string

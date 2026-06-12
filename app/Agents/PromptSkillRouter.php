@@ -77,15 +77,38 @@ class PromptSkillRouter
             'organic search',
             'ranking',
             'rankings',
-            'impressions',
             'search query',
             'search queries',
             'keyword',
             'keywords',
-            'ctr',
-            'click-through',
             'landing page',
             'serp',
+            'ga4',
+            'google analytics',
+            'traffic channel',
+        ]);
+    }
+
+    public function shouldIncludePaidMediaSkill(?string $message): bool
+    {
+        return $this->messageMatches($message, [
+            'google ads',
+            'ad spend',
+            'ad campaign',
+            'campaigns',
+            'campaign',
+            'budget',
+            'reallocate',
+            're-allocate',
+            'ppc',
+            'paid search',
+            'paid media',
+            'roas',
+            'cpa',
+            'stackadapt',
+            'reddit ads',
+            'conversions_value',
+            'cost per click',
         ]);
     }
 

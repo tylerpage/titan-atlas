@@ -7,6 +7,7 @@ use App\Agents\ConnectorBuilderPromptBuilder;
 use App\Ai\Concerns\CapsConnectorBuilderConversationHistory;
 use App\Ai\Tools\ConnectorBuilder\CreateDynamicConnectionTool;
 use App\Ai\Tools\ConnectorBuilder\GetBlueprintStatusTool;
+use App\Ai\Tools\ConnectorBuilder\ListDashboardMemoriesTool;
 use App\Ai\Tools\ConnectorBuilder\ListExistingConnectorsTool;
 use App\Ai\Tools\ConnectorBuilder\LookupConnectorCatalogTool;
 use App\Ai\Tools\ConnectorBuilder\ListBlueprintAnalyticsSchemaTool;
@@ -15,6 +16,7 @@ use App\Ai\Tools\ConnectorBuilder\RevertConnectorDashboardTool;
 use App\Ai\Tools\ConnectorBuilder\RecordDevTasksTool;
 use App\Ai\Tools\ConnectorBuilder\ResearchConnectorApiTool;
 use App\Ai\Tools\ConnectorBuilder\SaveConnectorBlueprintTool;
+use App\Ai\Tools\ConnectorBuilder\SaveDashboardMemoryTool;
 use App\Ai\Tools\ConnectorBuilder\TestBlueprintConnectionTool;
 use App\Ai\Tools\ConnectorBuilder\UpdateBlueprintCredentialsTool;
 use Illuminate\Contracts\Container\Container;
@@ -55,6 +57,8 @@ class ConnectorBuilderAgent implements Agent, Conversational, HasTools
         $context = $this->context;
 
         return [
+            $this->container->makeWith(ListDashboardMemoriesTool::class, ['context' => $context]),
+            $this->container->makeWith(SaveDashboardMemoryTool::class, ['context' => $context]),
             $this->container->makeWith(ListExistingConnectorsTool::class, ['context' => $context]),
             $this->container->makeWith(LookupConnectorCatalogTool::class, ['context' => $context]),
             $this->container->makeWith(ResearchConnectorApiTool::class, ['context' => $context]),
