@@ -12,6 +12,7 @@ use App\Models\AnalyticsReportSession;
 use App\Models\ClientDashboard;
 use App\Models\User;
 use App\Support\AgentAssistantTextResolver;
+use App\Support\AiTraceContext;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -144,11 +145,33 @@ class ReportingAgentService
             ? ClientReportingAgent::make(context: $context)
             : ReportingAgent::make(context: $context);
 
-        $response = $agent->prompt(
-            $message,
-            provider: $this->provider(),
-            model: config('titan.reporting.model', 'gpt-4o-mini'),
-        );
+        $historyMessages = $agent->messages();
+        $historyCount = is_countable($historyMessages)
+            ? count($historyMessages)
+            : iterator_count($historyMessages);
+
+        AiTraceContext::begin([
+            'flow' => 'reporting',
+            'session_id' => $session->id,
+            'dashboard_id' => $dashboard->id,
+            'model' => config('titan.reporting.model', 'gpt-4o-mini'),
+            'max_steps' => $agent->maxSteps(),
+            'instructions_chars' => strlen((string) $agent->instructions()),
+            'history_messages' => $historyCount,
+            'client_mode' => $clientMode,
+        ]);
+
+        try {
+            $response = $agent->prompt(
+                $message,
+                provider: $this->provider(),
+                model: config('titan.reporting.model', 'gpt-4o-mini'),
+            );
+        } finally {
+            if (AiTraceContext::active()) {
+                AiTraceContext::clear();
+            }
+        }
 
         $text = $this->assistantText->forReporting($response, $context);
 

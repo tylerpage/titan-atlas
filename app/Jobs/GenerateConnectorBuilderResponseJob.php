@@ -8,6 +8,7 @@ use App\Models\ConnectorBuilderSession;
 use App\Models\User;
 use App\Services\AI\AiBroadcastService;
 use App\Services\AI\ConnectorBuilderAgentService;
+use App\Support\AiTraceContext;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -38,6 +39,12 @@ class GenerateConnectorBuilderResponseJob implements ShouldQueue
         $session = ConnectorBuilderSession::query()->findOrFail($this->sessionId);
         $dashboard = ClientDashboard::query()->findOrFail($this->dashboardId);
         $user = User::query()->findOrFail($this->userId);
+
+        if ($session->updated_at !== null) {
+            AiTraceContext::setQueueWaitMs(
+                max(0, (int) round((microtime(true) - $session->updated_at->getTimestamp()) * 1000)),
+            );
+        }
 
         $agent->sendMessage(
             dashboard: $dashboard,

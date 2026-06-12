@@ -183,6 +183,8 @@ return [
         ],
     ],
 
+    'ai_perf_logging' => (bool) env('TITAN_AI_PERF_LOGGING', true),
+
     'reporting' => [
         'provider' => env('TITAN_AI_PROVIDER', 'openai'),
         'model' => env('TITAN_AI_MODEL', 'gpt-4o-mini'),

@@ -11,6 +11,7 @@ use App\Models\ConnectorBuilderMessage;
 use App\Models\ConnectorBuilderSession;
 use App\Models\User;
 use App\Support\AgentAssistantTextResolver;
+use App\Support\AiTraceContext;
 use App\Support\DynamicConnectorReadOnlyGuard;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -112,11 +113,32 @@ class ConnectorBuilderAgentService
 
         $agent = ConnectorBuilderAgent::make(context: $context);
 
-        $response = $agent->prompt(
-            $this->agentMessage($message),
-            provider: $this->provider(),
-            model: config('titan.connector_builder.model', 'gpt-4o-mini'),
-        );
+        $historyMessages = $agent->messages();
+        $historyCount = is_countable($historyMessages)
+            ? count($historyMessages)
+            : iterator_count($historyMessages);
+
+        AiTraceContext::begin([
+            'flow' => 'connector_builder',
+            'session_id' => $session->id,
+            'dashboard_id' => $dashboard->id,
+            'model' => config('titan.connector_builder.model', 'gpt-4o-mini'),
+            'max_steps' => $agent->maxSteps(),
+            'instructions_chars' => strlen((string) $agent->instructions()),
+            'history_messages' => $historyCount,
+        ]);
+
+        try {
+            $response = $agent->prompt(
+                $this->agentMessage($message),
+                provider: $this->provider(),
+                model: config('titan.connector_builder.model', 'gpt-4o-mini'),
+            );
+        } finally {
+            if (AiTraceContext::active()) {
+                AiTraceContext::clear();
+            }
+        }
 
         $text = $this->assistantText->forConnectorBuilder($response, $context);
 

@@ -8,6 +8,7 @@ use App\Models\ClientDashboard;
 use App\Models\User;
 use App\Services\AI\AiBroadcastService;
 use App\Services\AI\ReportingAgentService;
+use App\Support\AiTraceContext;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -41,6 +42,12 @@ class GenerateReportResponseJob implements ShouldQueue
         $session = AnalyticsReportSession::query()->findOrFail($this->sessionId);
         $dashboard = ClientDashboard::query()->findOrFail($this->dashboardId);
         $user = User::query()->findOrFail($this->userId);
+
+        if ($session->updated_at !== null) {
+            AiTraceContext::setQueueWaitMs(
+                max(0, (int) round((microtime(true) - $session->updated_at->getTimestamp()) * 1000)),
+            );
+        }
 
         $agent->sendMessage(
             dashboard: $dashboard,
