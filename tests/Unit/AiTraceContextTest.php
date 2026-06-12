@@ -9,6 +9,7 @@ class AiTraceContextTest extends TestCase
 {
     protected function tearDown(): void
     {
+        AiTraceContext::consumePreservedQueueWaitMs();
         AiTraceContext::clear();
 
         parent::tearDown();
@@ -49,5 +50,20 @@ class AiTraceContextTest extends TestCase
         AiTraceContext::recordToolEnd('tool-1', 'SaveAnalyticsReportTool');
 
         $this->assertSame([], AiTraceContext::snapshot()['tools'] ?? []);
+    }
+
+    public function test_preserve_and_consume_queue_wait_ms(): void
+    {
+        AiTraceContext::setQueueWaitMs(13420);
+        AiTraceContext::begin([
+            'flow' => 'reporting',
+            'session_id' => 17,
+        ]);
+
+        AiTraceContext::preserveQueueWaitMs();
+        AiTraceContext::clear();
+
+        $this->assertSame(13420, AiTraceContext::consumePreservedQueueWaitMs());
+        $this->assertSame(0, AiTraceContext::consumePreservedQueueWaitMs());
     }
 }

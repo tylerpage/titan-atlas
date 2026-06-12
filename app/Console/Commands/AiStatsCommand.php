@@ -45,6 +45,7 @@ class AiStatsCommand extends Command
                     ['Max duration (ms)', (string) $durations->max()],
                 ],
             );
+            $this->line('Session duration includes queue wait + agent run time (user-perceived latency).');
 
             $recent = AnalyticsReportSession::query()
                 ->where('updated_at', '>=', $since)
@@ -55,17 +56,31 @@ class AiStatsCommand extends Command
                 ->get(['id', 'client_dashboard_id', 'duration_ms', 'used_fast_path', 'status', 'updated_at']);
 
             if ($recent->isNotEmpty()) {
+                $latestTraces = AiAgentTrace::query()
+                    ->where('flow', 'reporting')
+                    ->whereIn('session_id', $recent->pluck('id'))
+                    ->orderByDesc('id')
+                    ->get()
+                    ->unique('session_id')
+                    ->keyBy('session_id');
+
                 $this->line('Recent sessions:');
                 $this->table(
-                    ['ID', 'Dashboard', 'Duration (ms)', 'Fast path', 'Status', 'Updated'],
-                    $recent->map(fn (AnalyticsReportSession $session) => [
-                        $session->id,
-                        $session->client_dashboard_id,
-                        $session->duration_ms,
-                        $session->used_fast_path ? 'yes' : 'no',
-                        $session->status->value,
-                        $session->updated_at?->toDateTimeString(),
-                    ])->all(),
+                    ['ID', 'Dashboard', 'Duration (ms)', 'Queue (ms)', 'Agent (ms)', 'Fast path', 'Status', 'Updated'],
+                    $recent->map(function (AnalyticsReportSession $session) use ($latestTraces) {
+                        $trace = $latestTraces->get($session->id);
+
+                        return [
+                            $session->id,
+                            $session->client_dashboard_id,
+                            $session->duration_ms,
+                            $trace?->queue_wait_ms ?? 'n/a',
+                            $trace?->total_ms ?? 'n/a',
+                            $session->used_fast_path ? 'yes' : 'no',
+                            $session->status->value,
+                            $session->updated_at?->toDateTimeString(),
+                        ];
+                    })->all(),
                 );
             }
         }

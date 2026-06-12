@@ -136,6 +136,7 @@ class ConnectorBuilderAgentService
             );
         } finally {
             if (AiTraceContext::active()) {
+                AiTraceContext::preserveQueueWaitMs();
                 AiTraceContext::clear();
             }
         }
@@ -155,7 +156,9 @@ class ConnectorBuilderAgentService
 
         $this->storeMessage($session, 'assistant', $text, $metadata);
 
-        $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
+        $agentDurationMs = (int) round((microtime(true) - $startedAt) * 1000);
+        $queueWaitMs = AiTraceContext::consumePreservedQueueWaitMs();
+        $durationMs = $agentDurationMs + $queueWaitMs;
 
         $session->update([
             'status' => ConnectorBuilderSessionStatus::Active,
@@ -166,6 +169,7 @@ class ConnectorBuilderAgentService
             'session_id' => $session->id,
             'dashboard_id' => $dashboard->id,
             'duration_ms' => $durationMs,
+            'queue_wait_ms' => $queueWaitMs,
             'blueprint_id' => $context->blueprint?->id,
             'connection_id' => $context->connection?->id,
         ]);

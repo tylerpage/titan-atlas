@@ -17,6 +17,8 @@ class AiTraceContext
     /** @var list<array{name: string, duration_ms: int}> */
     protected static array $tools = [];
 
+    protected static ?int $preservedQueueWaitMs = null;
+
     /**
      * @param  array<string, mixed>  $metadata
      */
@@ -91,6 +93,21 @@ class AiTraceContext
             'estimated_llm_ms' => max(0, $totalMs - $toolMs),
             'tools' => self::$tools,
         ];
+    }
+
+    public static function preserveQueueWaitMs(): void
+    {
+        if (self::$context !== null && isset(self::$context['queue_wait_ms'])) {
+            self::$preservedQueueWaitMs = max(0, (int) self::$context['queue_wait_ms']);
+        }
+    }
+
+    public static function consumePreservedQueueWaitMs(): int
+    {
+        $milliseconds = self::$preservedQueueWaitMs ?? 0;
+        self::$preservedQueueWaitMs = null;
+
+        return $milliseconds;
     }
 
     public static function clear(): void

@@ -55,6 +55,7 @@ class LogAiAgentPerformance
             );
         }
 
+        AiTraceContext::preserveQueueWaitMs();
         AiTraceContext::clear();
     }
 }

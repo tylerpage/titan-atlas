@@ -129,9 +129,64 @@ GA4 replaces the session/traffic metrics previously mixed into Search Console. G
 
 Configure queue names in `config/titan.php`:
 
+- `ai` — TitanAI reporting chat and connector builder (LLM jobs, 120–180s runtime)
 - `ingestion` — fetch data from external APIs
 - `transform` — normalize raw payloads into metric snapshots
 - `cache` — reserved for dashboard cache warming
+
+### Local development
+
+`composer dev` and `composer dev:share` run a single listener on all queues:
+
+```bash
+php artisan queue:listen --queue=ai,ingestion,transform,default --tries=1 --timeout=0 --memory=512
+```
+
+That is fine locally. **Do not mirror this in production** — long ingestion jobs can block AI chat.
+
+### Laravel Cloud production workers
+
+Run **separate worker processes** per queue family:
+
+**AI worker** (reporting + connector builder):
+
+```bash
+php artisan queue:work --queue=ai --timeout=210 --memory=512 --tries=2
+```
+
+| Setting | Value | Why |
+|---------|-------|-----|
+| `--queue` | `ai` only | Prevents ingestion/transform from starving chat |
+| `--timeout` | `210` | Must exceed job timeouts (reporting 120s, builder 180s) |
+| `--tries` | `2` | Matches `GenerateReportResponseJob` |
+| Processes | `2–4` | Parallel chat sessions; scale when queue depth stays > 0 |
+
+**Ingestion / transform worker** (separate process):
+
+```bash
+php artisan queue:work --queue=ingestion,transform --timeout=60 --memory=512 --tries=3
+```
+
+### Required environment variables
+
+```env
+TITAN_QUEUE_AI=ai
+DB_QUEUE_RETRY_AFTER=210
+TITAN_AI_RESPONSE_TIMEOUT=120
+TITAN_CONNECTOR_BUILDER_RESPONSE_TIMEOUT=180
+```
+
+`DB_QUEUE_RETRY_AFTER` must be **greater than** the longest AI job timeout. The default of 90 seconds is too low and can release jobs back to the queue while they are still running.
+
+### Observability
+
+```bash
+php artisan titan:ai-queue-status   # pending AI jobs, oldest job age, retry_after check
+php artisan titan:ai-stats          # session durations (includes queue wait) + traces
+php artisan titan:ai-trace {id} --flow=reporting
+```
+
+**Smoke test after worker changes:** send one chat message on an idle system, then run `titan:ai-trace {sessionId}`. Queue wait should be under ~500ms when no other jobs are pending.
 
 ## Tests
 

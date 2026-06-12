@@ -5,6 +5,7 @@ namespace App\Ai\Tools\ConnectorBuilder;
 use App\Agents\ConnectorBuilderAgentContext;
 use App\Enums\ConnectorType;
 use App\Services\AI\DashboardAgentMemoryService;
+use App\Support\ConnectorApiLogScope;
 use App\Support\DynamicConnectorBaseUrl;
 use App\Enums\ConnectorBlueprintStatus;
 use App\Ingestion\Connectors\DynamicConnector;
