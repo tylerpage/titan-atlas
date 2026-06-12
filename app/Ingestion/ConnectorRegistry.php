@@ -8,6 +8,7 @@ use App\Ingestion\Connectors\BigCommerceConnector;
 use App\Ingestion\Connectors\DynamicConnector;
 use App\Ingestion\Connectors\GoogleAdsConnector;
 use App\Ingestion\Connectors\GoogleAnalyticsConnector;
+use App\Ingestion\Connectors\RedditAdsConnector;
 use App\Ingestion\Connectors\SearchConsoleConnector;
 use App\Ingestion\Connectors\SemrushConnector;
 use App\Ingestion\Connectors\ShopifyConnector;
@@ -29,6 +30,7 @@ class ConnectorRegistry
             ConnectorType::GoogleAnalytics->value => GoogleAnalyticsConnector::class,
             ConnectorType::Semrush->value => SemrushConnector::class,
             ConnectorType::StackAdapt->value => StackAdaptConnector::class,
+            ConnectorType::RedditAds->value => RedditAdsConnector::class,
             ConnectorType::Dynamic->value => DynamicConnector::class,
         ];
     }

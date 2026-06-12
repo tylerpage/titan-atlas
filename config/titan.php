@@ -155,6 +155,16 @@ return [
         'test_window_days' => (int) env('TITAN_STACKADAPT_TEST_WINDOW_DAYS', 30),
     ],
 
+    'reddit_ads' => [
+        'base_url' => env('TITAN_REDDIT_ADS_BASE_URL', 'https://ads-api.reddit.com/api/v3'),
+        'backfill_months' => (int) env('TITAN_REDDIT_ADS_BACKFILL_MONTHS', 16),
+        'incremental_days' => (int) env('TITAN_REDDIT_ADS_INCREMENTAL_DAYS', 5),
+        'data_lag_days' => (int) env('TITAN_REDDIT_ADS_DATA_LAG_DAYS', 1),
+        'chunk_days' => (int) env('TITAN_REDDIT_ADS_CHUNK_DAYS', 7),
+        'http_timeout_seconds' => (int) env('TITAN_REDDIT_ADS_HTTP_TIMEOUT', 30),
+        'top_campaigns_limit' => (int) env('TITAN_REDDIT_ADS_TOP_CAMPAIGNS_LIMIT', 25),
+    ],
+
     'google_analytics' => [
         'backfill_months' => (int) env('TITAN_GA4_BACKFILL_MONTHS', 16),
         'incremental_days' => (int) env('TITAN_GA4_INCREMENTAL_DAYS', 5),

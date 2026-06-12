@@ -1140,10 +1140,10 @@
             "platform": "Reddit Ads",
             "slug": "reddit-ads",
             "category": "advertising",
-            "documentation_url": "https://www.reddit.com/dev/api",
+            "documentation_url": "https://ads-api.reddit.com/docs/v3",
             "dynamic_connector": {
                 "supported": false,
-                "notes": "No curated recipe yet. Use ResearchConnectorApiTool and verify auth/pagination manually."
+                "notes": "Use the built-in Reddit Ads connector type (reddit_ads) for daily spend and campaign reporting."
             },
             "authentication": {
                 "type": "oauth2_or_api_key"

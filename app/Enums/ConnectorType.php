@@ -11,6 +11,7 @@ enum ConnectorType: string
     case GoogleAnalytics = 'google_analytics';
     case Semrush = 'semrush';
     case StackAdapt = 'stackadapt';
+    case RedditAds = 'reddit_ads';
     case Dynamic = 'dynamic';
 
     public function label(): string
@@ -23,6 +24,7 @@ enum ConnectorType: string
             self::GoogleAnalytics => 'Google Analytics 4',
             self::Semrush => 'SEMrush',
             self::StackAdapt => 'StackAdapt',
+            self::RedditAds => 'Reddit Ads',
             self::Dynamic => 'Dynamic connector',
         };
     }
@@ -130,6 +132,20 @@ enum ConnectorType: string
                     'help' => 'Optional legacy REST key used only when GraphQL auth fails during migration. New syncs use GraphQL only.',
                 ],
             ],
+            self::RedditAds => [
+                [
+                    'key' => 'access_token',
+                    'label' => 'OAuth access token',
+                    'type' => 'password',
+                    'help' => 'Reddit Ads API v3 bearer token with ads read scope. Generate via Reddit developer app OAuth.',
+                ],
+                [
+                    'key' => 'account_id',
+                    'label' => 'Ad account ID',
+                    'placeholder' => 't2_abc123',
+                    'help' => 'Reddit ad account ID from Ads Manager or the ad_accounts API. One account per connection.',
+                ],
+            ],
         };
     }
 
@@ -148,7 +164,7 @@ enum ConnectorType: string
 
     public function supportsLiveConnectionTest(): bool
     {
-        return in_array($this, [self::Shopify, self::BigCommerce, self::SearchConsole, self::GoogleAnalytics, self::GoogleAds, self::StackAdapt, self::Dynamic], true);
+        return in_array($this, [self::Shopify, self::BigCommerce, self::SearchConsole, self::GoogleAnalytics, self::GoogleAds, self::StackAdapt, self::RedditAds, self::Dynamic], true);
     }
 
     public function isDynamic(): bool
@@ -193,6 +209,7 @@ enum ConnectorType: string
             self::GoogleAnalytics => self::productName().' syncs GA4 traffic, events, and landing-page metrics. The unified GA4 dashboard also requires a Search Console connection on the same dashboard. Platform setup: enable the Google Analytics Data API and Google Analytics Admin API in Google Cloud, create an OAuth web client, add redirect URI '.route('admin.google.oauth.callback', absolute: true).', and set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET in '.self::productName().'. Then click Connect with Google and choose a GA4 property.',
             self::GoogleAds => self::productName().' syncs Google Ads spend, impressions, clicks, CTR, and conversion value with daily and campaign breakdowns. Platform setup: enable the Google Ads API in Google Cloud, create an OAuth web client, add redirect URI '.route('admin.google.oauth.callback', absolute: true).', set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET, and obtain a developer token from the Google Ads API Center (GOOGLE_ADS_DEVELOPER_TOKEN). Then click Connect with Google and choose an Ads account.',
             self::StackAdapt => self::productName().' syncs StackAdapt programmatic delivery data: daily advertiser spend, campaign performance, channel mix (CTV, native, display, video, audio, and more), plus geo, domain, and device insights. Paste your StackAdapt GraphQL API key, test the connection to list advertisers, then select one advertiser per connection.',
+            self::RedditAds => self::productName().' syncs Reddit Ads performance via the Ads API v3 reporting endpoint: daily spend, impressions, clicks, CTR, and conversions at account and campaign level. Provide an OAuth access token with ads read scope and the Reddit ad account ID (for example t2_abc123).',
             self::Dynamic => self::productName().' syncs data from an AI-configured REST API connector. Credentials and endpoints are defined in the connector blueprint.',
             default => null,
         };

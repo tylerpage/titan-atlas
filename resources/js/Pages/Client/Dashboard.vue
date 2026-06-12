@@ -255,7 +255,7 @@ const canEditCoverPage = computed(() => isAdmin.value && isCoverTab.value && pro
 const showCommerceView = computed(() => isDataTab.value && props.connectorData?.kind === 'commerce');
 const showSearchConsoleView = computed(() => isDataTab.value && props.connectorData?.kind === 'search_console');
 const showGoogleAnalyticsView = computed(() => isDataTab.value && props.connectorData?.kind === 'google_analytics');
-const showGoogleAdsView = computed(() => isDataTab.value && props.connectorData?.kind === 'google_ads');
+const showGoogleAdsView = computed(() => isDataTab.value && ['google_ads', 'reddit_ads'].includes(props.connectorData?.kind));
 const showStackAdaptView = computed(() => isDataTab.value && props.connectorData?.kind === 'stackadapt');
 const showDynamicView = computed(() => isDataTab.value && props.connectorData?.kind === 'dynamic');
 const showConnectorView = computed(() => showCommerceView.value || showSearchConsoleView.value || showGoogleAnalyticsView.value || showGoogleAdsView.value || showStackAdaptView.value || showDynamicView.value);

@@ -13,6 +13,7 @@ use App\Services\Analytics\ConnectorDashboardCache;
 use App\Services\Analytics\DynamicConnectorDashboardService;
 use App\Services\Analytics\GoogleAdsDashboardService;
 use App\Services\Analytics\GoogleAnalyticsDashboardService;
+use App\Services\Analytics\RedditAdsDashboardService;
 use App\Services\Analytics\SearchConsoleDashboardService;
 use App\Services\Analytics\StackAdaptDashboardService;
 use App\Services\Analytics\CoverPageDataResolver;
@@ -34,6 +35,7 @@ class DashboardController extends Controller
         GoogleAnalyticsDashboardService $googleAnalytics,
         GoogleAdsDashboardService $googleAds,
         StackAdaptDashboardService $stackAdapt,
+        RedditAdsDashboardService $redditAds,
         DynamicConnectorDashboardService $dynamicConnector,
         CoverPageDataResolver $coverPages,
         ClientDashboardTabDataService $tabData,
@@ -112,6 +114,7 @@ class DashboardController extends Controller
                 $googleAnalytics,
                 $googleAds,
                 $stackAdapt,
+                $redditAds,
                 $dynamicConnector,
                 $dateRange,
                 $customRange,
@@ -220,6 +223,7 @@ class DashboardController extends Controller
         GoogleAnalyticsDashboardService $googleAnalytics,
         GoogleAdsDashboardService $googleAds,
         StackAdaptDashboardService $stackAdapt,
+        RedditAdsDashboardService $redditAds,
         DynamicConnectorDashboardService $dynamicConnector,
         string $dateRange,
         ?array $customRange,
@@ -249,6 +253,13 @@ class DashboardController extends Controller
                 $dashboard->connections,
             ),
             $connection->connector_type === ConnectorType::GoogleAds => fn () => $googleAds->dataFor(
+                $dashboard,
+                $connection,
+                $dateRange,
+                $customRange,
+                $comparison,
+            ),
+            $connection->connector_type === ConnectorType::RedditAds => fn () => $redditAds->dataFor(
                 $dashboard,
                 $connection,
                 $dateRange,
