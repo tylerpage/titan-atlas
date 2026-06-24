@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 import RevenueLineChart from '../RevenueLineChart.vue';
+import { formatCurrency, formatDecimal, formatNumber, formatPercent } from '../../lib/formatters';
 
 const props = defineProps({
     connectorData: {
@@ -21,30 +22,12 @@ const props = defineProps({
     },
 });
 
-function formatNumber(value, currency = false) {
-    if (currency) {
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD',
-            maximumFractionDigits: 0,
-        }).format(value ?? 0);
-    }
-
-    return new Intl.NumberFormat('en-US', {
-        maximumFractionDigits: 0,
-    }).format(value ?? 0);
-}
-
-function formatPercent(value) {
-    return `${Number(value ?? 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}%`;
-}
-
 function formatRoas(value) {
     if (value === null || value === undefined) {
         return '—';
     }
 
-    return Number(value).toLocaleString('en-US', { maximumFractionDigits: 2 });
+    return formatDecimal(value);
 }
 
 function formatChange(value) {
@@ -104,7 +87,7 @@ const maxChannelCost = computed(() => {
             <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <p class="text-sm text-slate-500">Spend</p>
                 <div class="mt-1 flex flex-wrap items-end gap-3">
-                    <p class="text-3xl font-semibold">{{ formatNumber(summary.cost, true) }}</p>
+                    <p class="text-3xl font-semibold">{{ formatCurrency(summary.cost) }}</p>
                     <p
                         v-if="summary.cost_change_percent !== null"
                         class="pb-1 text-lg font-medium"
@@ -205,7 +188,7 @@ const maxChannelCost = computed(() => {
                     <div v-for="channel in channels" :key="channel.channel_type" class="space-y-1">
                         <div class="flex items-center justify-between text-sm">
                             <span class="font-medium">{{ channel.channel_type }}</span>
-                            <span class="text-slate-600">{{ formatNumber(channel.cost, true) }}</span>
+                            <span class="text-slate-600">{{ formatCurrency(channel.cost) }}</span>
                         </div>
                         <div class="h-2 overflow-hidden rounded-full bg-slate-100">
                             <div
@@ -227,7 +210,7 @@ const maxChannelCost = computed(() => {
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div class="rounded-lg border border-slate-100 bg-slate-50 p-4">
                         <p class="text-sm text-slate-500">Conversion revenue</p>
-                        <p class="mt-1 text-2xl font-semibold">{{ formatNumber(summary.conversions_value, true) }}</p>
+                        <p class="mt-1 text-2xl font-semibold">{{ formatCurrency(summary.conversions_value) }}</p>
                     </div>
                     <div class="rounded-lg border border-slate-100 bg-slate-50 p-4">
                         <p class="text-sm text-slate-500">Secondary conversions</p>
@@ -276,7 +259,7 @@ const maxChannelCost = computed(() => {
                             <td class="px-4 py-3 font-medium">{{ campaign.campaign_name }}</td>
                             <td class="px-4 py-3 text-slate-600">{{ campaign.campaign_group_name || '—' }}</td>
                             <td class="px-4 py-3 text-slate-600">{{ campaign.channel_type || '—' }}</td>
-                            <td class="px-4 py-3">{{ formatNumber(campaign.cost, true) }}</td>
+                            <td class="px-4 py-3">{{ formatCurrency(campaign.cost) }}</td>
                             <td class="px-4 py-3">{{ formatNumber(campaign.impressions) }}</td>
                             <td class="px-4 py-3">{{ formatNumber(campaign.clicks) }}</td>
                             <td class="px-4 py-3">{{ formatNumber(campaign.conversions) }}</td>
@@ -307,7 +290,7 @@ const maxChannelCost = computed(() => {
                         <tbody>
                             <tr v-for="row in topGeos" :key="row.dimension_key" class="border-t border-slate-100">
                                 <td class="px-4 py-3">{{ row.dimension_label }}</td>
-                                <td class="px-4 py-3">{{ formatNumber(row.cost, true) }}</td>
+                                <td class="px-4 py-3">{{ formatCurrency(row.cost) }}</td>
                             </tr>
                             <tr v-if="topGeos.length === 0">
                                 <td colspan="2" class="px-4 py-6 text-center text-slate-500">No geo insight data yet.</td>
@@ -332,7 +315,7 @@ const maxChannelCost = computed(() => {
                         <tbody>
                             <tr v-for="row in topDomains" :key="row.dimension_key" class="border-t border-slate-100">
                                 <td class="px-4 py-3">{{ row.dimension_label }}</td>
-                                <td class="px-4 py-3">{{ formatNumber(row.cost, true) }}</td>
+                                <td class="px-4 py-3">{{ formatCurrency(row.cost) }}</td>
                             </tr>
                             <tr v-if="topDomains.length === 0">
                                 <td colspan="2" class="px-4 py-6 text-center text-slate-500">No domain insight data yet.</td>
@@ -357,7 +340,7 @@ const maxChannelCost = computed(() => {
                         <tbody>
                             <tr v-for="row in devices" :key="row.dimension_key" class="border-t border-slate-100">
                                 <td class="px-4 py-3">{{ row.dimension_label }}</td>
-                                <td class="px-4 py-3">{{ formatNumber(row.cost, true) }}</td>
+                                <td class="px-4 py-3">{{ formatCurrency(row.cost) }}</td>
                             </tr>
                             <tr v-if="devices.length === 0">
                                 <td colspan="2" class="px-4 py-6 text-center text-slate-500">No device insight data yet.</td>

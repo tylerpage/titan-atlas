@@ -14,6 +14,7 @@ import GoogleAdsDashboardPanel from '../../Components/Dashboard/GoogleAdsDashboa
 import StackAdaptDashboardPanel from '../../Components/Dashboard/StackAdaptDashboardPanel.vue';
 import DynamicConnectorDashboardPanel from '../../Components/Dashboard/DynamicConnectorDashboardPanel.vue';
 import RevenueLineChart from '../../Components/RevenueLineChart.vue';
+import { formatCurrency, formatNumber } from '../../lib/formatters';
 import { useAppBranding } from '../../Composables/useAppBranding';
 
 const { aiName } = useAppBranding();
@@ -470,23 +471,6 @@ function selectConnection(connectionId) {
     visitDashboard(dashboardQuery({ tab: 'data', connection: connectionId }), { tab: 'data' });
 }
 
-function formatNumber(value, currency = false) {
-    const formatted = new Intl.NumberFormat('en-US', {
-        maximumFractionDigits: currency ? 0 : 0,
-        minimumFractionDigits: currency ? 0 : 0,
-    }).format(value ?? 0);
-
-    return currency ? `$${formatted}` : formatted;
-}
-
-function formatMoney(value) {
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-        maximumFractionDigits: 2,
-    }).format(value ?? 0);
-}
-
 function formatChange(value) {
     if (value === null || value === undefined) {
         return null;
@@ -796,7 +780,7 @@ function sourceMediumLabel(order) {
                 <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                     <p class="text-sm text-slate-500">Revenue</p>
                     <div class="mt-1 flex flex-wrap items-end gap-3">
-                        <p class="text-3xl font-semibold">{{ formatNumber(connectorData.summary.revenue, true) }}</p>
+                        <p class="text-3xl font-semibold">{{ formatCurrency(connectorData.summary.revenue) }}</p>
                         <p
                             v-if="connectorData.summary.revenue_change_percent !== null"
                             class="pb-1 text-lg font-medium"
@@ -841,7 +825,7 @@ function sourceMediumLabel(order) {
                 <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                     <p class="text-sm text-slate-500">Avg. order value</p>
                     <div class="mt-1 flex flex-wrap items-end gap-3">
-                        <p class="text-3xl font-semibold">{{ formatNumber(connectorData.summary.avg_order_value, true) }}</p>
+                        <p class="text-3xl font-semibold">{{ formatCurrency(connectorData.summary.avg_order_value) }}</p>
                         <p
                             v-if="connectorData.summary.avg_order_value_change_percent !== null"
                             class="pb-1 text-lg font-medium"
@@ -918,7 +902,7 @@ function sourceMediumLabel(order) {
                                 </td>
                                 <td class="px-4 py-3 text-slate-600">{{ product.sku || '—' }}</td>
                                 <td class="px-4 py-3">{{ formatNumber(product.units_sold) }}</td>
-                                <td class="px-4 py-3">{{ formatMoney(product.revenue) }}</td>
+                                <td class="px-4 py-3">{{ formatCurrency(product.revenue) }}</td>
                             </tr>
                         </tbody>
                     </table>
@@ -947,7 +931,7 @@ function sourceMediumLabel(order) {
                             <tr v-for="order in connectorData.orders ?? []" :key="order.external_id" class="border-t border-slate-100">
                                 <td class="px-4 py-3 font-medium">{{ order.order_number }}</td>
                                 <td class="px-4 py-3 text-slate-600">{{ order.date }}</td>
-                                <td class="px-4 py-3">{{ formatMoney(order.total) }}</td>
+                                <td class="px-4 py-3">{{ formatCurrency(order.total) }}</td>
                                 <td class="px-4 py-3 text-slate-600">{{ sourceMediumLabel(order) }}</td>
                                 <td class="px-4 py-3 text-slate-600">{{ order.channel || '—' }}</td>
                             </tr>
@@ -1033,7 +1017,7 @@ function sourceMediumLabel(order) {
                         <div>
                             <p class="text-sm text-slate-500">Revenue</p>
                             <p class="text-2xl font-semibold">
-                                {{ formatNumber(widgetDataFor(placement.id).revenue, true) }}
+                                {{ formatCurrency(widgetDataFor(placement.id).revenue) }}
                             </p>
                             <p
                                 v-if="widgetDataFor(placement.id).revenue_change_percent !== undefined"
@@ -1046,7 +1030,7 @@ function sourceMediumLabel(order) {
                         <div>
                             <p class="text-sm text-slate-500">Ad spend</p>
                             <p class="text-2xl font-semibold">
-                                {{ formatNumber(widgetDataFor(placement.id).ad_spend, true) }}
+                                {{ formatCurrency(widgetDataFor(placement.id).ad_spend) }}
                             </p>
                             <p
                                 v-if="widgetDataFor(placement.id).ad_spend_change_percent !== undefined"
@@ -1091,7 +1075,7 @@ function sourceMediumLabel(order) {
                         <p class="text-3xl font-semibold">
                             {{
                                 ['revenue', 'ad_spend'].includes(placement.widget_type)
-                                    ? formatNumber(widgetDataFor(placement.id).total, true)
+                                    ? formatCurrency(widgetDataFor(placement.id).total)
                                     : formatNumber(widgetDataFor(placement.id).total)
                             }}
                         </p>

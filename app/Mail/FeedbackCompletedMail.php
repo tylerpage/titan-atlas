@@ -20,7 +20,7 @@ class FeedbackCompletedMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Your feedback has been reviewed — '.config('app.name'),
+            subject: 'Your feedback is complete — '.config('app.name'),
         );
     }
 
@@ -33,6 +33,7 @@ class FeedbackCompletedMail extends Mailable
             with: [
                 'userName' => $this->submission->user->name,
                 'reasonLabel' => $this->submission->reason->label(),
+                'feedbackMessage' => $this->submission->message,
                 'submittedAt' => $this->submission->created_at,
             ],
         );

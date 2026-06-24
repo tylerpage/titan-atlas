@@ -3,6 +3,7 @@
 namespace App\Services\Analytics;
 
 use App\Enums\ReportVisualizationType;
+use App\Support\ValueFormatter;
 
 class ReportDataMapper
 {
@@ -103,20 +104,6 @@ class ReportDataMapper
 
     protected function formatValue(mixed $value, string $format): string
     {
-        if ($value === null || $value === '') {
-            return '—';
-        }
-
-        if (! is_numeric($value)) {
-            return (string) $value;
-        }
-
-        $number = (float) $value;
-
-        return match ($format) {
-            'currency' => '$'.number_format($number, $number >= 1000 ? 0 : 2),
-            'percent' => number_format($number, 1).'%',
-            default => number_format($number, $number == (int) $number ? 0 : 2),
-        };
+        return ValueFormatter::format($value, $format);
     }
 }

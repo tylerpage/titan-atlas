@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 import RevenueLineChart from '../RevenueLineChart.vue';
+import { formatCurrency, formatNumber, formatPercent } from '../../lib/formatters';
 
 const props = defineProps({
     connectorData: {
@@ -20,24 +21,6 @@ const props = defineProps({
         default: false,
     },
 });
-
-function formatNumber(value, currency = false) {
-    if (currency) {
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD',
-            maximumFractionDigits: 0,
-        }).format(value ?? 0);
-    }
-
-    return new Intl.NumberFormat('en-US', {
-        maximumFractionDigits: 0,
-    }).format(value ?? 0);
-}
-
-function formatPercent(value) {
-    return `${Number(value ?? 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}%`;
-}
 
 function formatChange(value) {
     if (value === null || value === undefined) {
@@ -80,7 +63,7 @@ const showPriorYearSpend = computed(() => (props.connectorData.prior_year_spend_
             <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <p class="text-sm text-slate-500">Cost</p>
                 <div class="mt-1 flex flex-wrap items-end gap-3">
-                    <p class="text-3xl font-semibold">{{ formatNumber(summary.cost, true) }}</p>
+                    <p class="text-3xl font-semibold">{{ formatCurrency(summary.cost) }}</p>
                     <p
                         v-if="summary.cost_change_percent !== null"
                         class="pb-1 text-lg font-medium"
@@ -132,7 +115,7 @@ const showPriorYearSpend = computed(() => (props.connectorData.prior_year_spend_
             <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <p class="text-sm text-slate-500">All conv. value</p>
                 <div class="mt-1 flex flex-wrap items-end gap-3">
-                    <p class="text-3xl font-semibold">{{ formatNumber(summary.conversions_value, true) }}</p>
+                    <p class="text-3xl font-semibold">{{ formatCurrency(summary.conversions_value) }}</p>
                     <p
                         v-if="summary.conversions_value_change_percent !== null"
                         class="pb-1 text-lg font-medium"
@@ -186,11 +169,11 @@ const showPriorYearSpend = computed(() => (props.connectorData.prior_year_spend_
                             class="border-t border-slate-100"
                         >
                             <td class="px-4 py-3 font-medium">{{ campaign.campaign_name }}</td>
-                            <td class="px-4 py-3">{{ formatNumber(campaign.cost, true) }}</td>
+                            <td class="px-4 py-3">{{ formatCurrency(campaign.cost) }}</td>
                             <td class="px-4 py-3">{{ formatNumber(campaign.impressions) }}</td>
                             <td class="px-4 py-3">{{ formatNumber(campaign.clicks) }}</td>
                             <td class="px-4 py-3">{{ formatPercent(campaign.ctr) }}</td>
-                            <td class="px-4 py-3">{{ formatNumber(campaign.conversions_value, true) }}</td>
+                            <td class="px-4 py-3">{{ formatCurrency(campaign.conversions_value) }}</td>
                         </tr>
                         <tr v-if="campaigns.length === 0">
                             <td colspan="6" class="px-4 py-8 text-center text-slate-500">

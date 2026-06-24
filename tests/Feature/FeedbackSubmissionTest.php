@@ -103,7 +103,8 @@ class FeedbackSubmissionTest extends TestCase
                 'admin_notes' => 'Follow up with client on ROAS definition.',
                 'mark_reviewed' => true,
             ])
-            ->assertRedirect(route('admin.feedback.show', $submission));
+            ->assertRedirect(route('admin.feedback.show', $submission))
+            ->assertSessionHas('status', 'Feedback marked reviewed. No email was sent.');
 
         $submission->refresh();
 
@@ -148,7 +149,38 @@ class FeedbackSubmissionTest extends TestCase
         $this->assertNotNull($submission->completed_at);
         $this->assertNotNull($submission->reviewed_at);
 
-        Mail::assertSent(FeedbackCompletedMail::class, fn (FeedbackCompletedMail $mail) => $mail->hasTo('client@example.com'));
+        Mail::assertSent(FeedbackCompletedMail::class, function (FeedbackCompletedMail $mail) use ($submission) {
+            return $mail->hasTo('client@example.com')
+                && str_contains($mail->render(), 'The export button does nothing.');
+        });
+    }
+
+    public function test_marking_reviewed_does_not_send_email(): void
+    {
+        Mail::fake();
+
+        $admin = User::factory()->create(['role' => UserRole::Admin]);
+        $user = User::factory()->create(['role' => UserRole::Client]);
+
+        $submission = FeedbackSubmission::query()->create([
+            'user_id' => $user->id,
+            'reason' => FeedbackReason::Confused->value,
+            'message' => 'What does this chart mean?',
+            'status' => FeedbackStatus::Pending,
+        ]);
+
+        $this->actingAs($admin)
+            ->post(route('admin.feedback.update', $submission), [
+                'mark_reviewed' => true,
+            ])
+            ->assertRedirect(route('admin.feedback.show', $submission))
+            ->assertSessionHas('status', 'Feedback marked reviewed. No email was sent.');
+
+        $submission->refresh();
+
+        $this->assertSame(FeedbackStatus::Reviewed, $submission->status);
+
+        Mail::assertNothingSent();
     }
 
     public function test_marking_completed_twice_does_not_resend_email(): void

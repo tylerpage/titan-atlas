@@ -64,9 +64,11 @@ class FeedbackSubmissionController extends Controller
             $feedback->update(['admin_notes' => $request->validated('admin_notes')]);
         }
 
-        $statusMessage = $request->boolean('mark_completed')
-            ? 'Feedback marked complete and the user was notified by email.'
-            : 'Feedback updated.';
+        $statusMessage = match (true) {
+            $request->boolean('mark_completed') => 'Feedback marked complete and the user was notified by email.',
+            $request->boolean('mark_reviewed') => 'Feedback marked reviewed. No email was sent.',
+            default => 'Feedback updated.',
+        };
 
         return redirect()
             ->route('admin.feedback.show', $feedback)

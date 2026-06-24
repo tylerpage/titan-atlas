@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue';
+import { formatCurrency, isCurrencyColumn } from '../lib/formatters';
 
 const props = defineProps({
     title: {
@@ -44,19 +45,15 @@ const filteredRows = computed(() => {
     }));
 });
 
-function cellValue(row, key) {
-    const value = row[key];
+function cellValue(row, column) {
+    const value = row[column.key];
 
     if (value === null || value === undefined || value === '') {
         return '—';
     }
 
-    if (key === 'total' && typeof value === 'number') {
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD',
-            maximumFractionDigits: 2,
-        }).format(value);
+    if (typeof value === 'number' && isCurrencyColumn(column)) {
+        return formatCurrency(value);
     }
 
     return value;
@@ -106,7 +103,7 @@ function cellValue(row, key) {
                             :key="column.key"
                             class="px-4 py-3 text-slate-600"
                         >
-                            {{ cellValue(row, column.key) }}
+                            {{ cellValue(row, column) }}
                         </td>
                     </tr>
                     <tr v-if="filteredRows.length === 0">

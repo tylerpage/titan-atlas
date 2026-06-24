@@ -85,7 +85,7 @@ function submit(action = 'save') {
                             :disabled="form.processing"
                             @click="submit('reviewed')"
                         >
-                            Mark reviewed
+                            Mark reviewed (no email)
                         </button>
                         <button
                             v-if="submission.status !== 'completed'"
@@ -98,7 +98,9 @@ function submit(action = 'save') {
                         </button>
                     </div>
                     <p v-if="submission.status !== 'completed'" class="mt-3 text-xs text-slate-500">
-                        Marking completed sends the submitter an email confirming their feedback was reviewed.
+                        <span class="font-medium text-slate-600">Mark reviewed</span> updates status internally only.
+                        <span class="font-medium text-slate-600">Mark completed</span> emails the submitter with their
+                        feedback message and confirms the work is done.
                     </p>
                 </form>
             </section>

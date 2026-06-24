@@ -1,9 +1,15 @@
 <x-mail::message>
-# Thanks for your feedback
+# Your feedback is complete
 
 Hi {{ $userName }},
 
-We've reviewed your feedback about **{{ $reasonLabel }}** submitted on {{ $submittedAt->timezone(config('app.timezone'))->format('M j, Y') }} and marked it complete.
+We've finished work on your feedback and wanted to let you know.
+
+<x-mail::panel>
+**{{ $reasonLabel }}** · submitted {{ $submittedAt->timezone(config('app.timezone'))->format('M j, Y') }}
+
+{{ $feedbackMessage }}
+</x-mail::panel>
 
 If we made changes based on your report, they should already be live or on the way. If you still see an issue, feel free to send another note from the feedback button in the app.
 

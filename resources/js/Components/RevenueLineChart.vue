@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Chart, ensureChartJsRegistered } from '../lib/chartSetup';
+import { formatChartValue } from '../lib/formatters';
 
 ensureChartJsRegistered();
 
@@ -37,19 +38,7 @@ const props = defineProps({
 });
 
 function formatValue(value) {
-    const number = Number(value ?? 0);
-
-    switch (props.valueFormat) {
-        case 'currency':
-            return `$${number.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
-        case 'percent':
-            return `${number.toLocaleString('en-US', { maximumFractionDigits: 1 })}%`;
-        case 'none':
-            return String(number);
-        case 'number':
-        default:
-            return number.toLocaleString('en-US', { maximumFractionDigits: number >= 1000 ? 0 : 2 });
-    }
+    return formatChartValue(value, props.valueFormat);
 }
 
 const canvasRef = ref(null);

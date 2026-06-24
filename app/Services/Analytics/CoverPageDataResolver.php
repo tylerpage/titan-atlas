@@ -11,6 +11,7 @@ use App\Models\Connection;
 use App\Models\CoverPage;
 use App\Models\CoverPageBlock;
 use App\Support\RichTextSanitizer;
+use App\Support\ValueFormatter;
 use Carbon\Carbon;
 
 class CoverPageDataResolver
@@ -158,8 +159,8 @@ class CoverPageDataResolver
 
                     $text = match ($metricKey) {
                         'orders' => number_format($total),
-                        'avg_order_value' => '$'.number_format($total, 2),
-                        default => '$'.number_format($total, 0),
+                        'avg_order_value' => ValueFormatter::currency($total),
+                        default => ValueFormatter::currency($total),
                     };
 
                     if ($improvementPercent === null) {
