@@ -28,6 +28,8 @@ return [
         'last_7_days' => 'Last 7 days',
         'last_30_days' => 'Last 30 days',
         'last_90_days' => 'Last 90 days',
+        'last_month' => 'Last month',
+        'last_year' => 'Last year',
         'ytd' => 'Year to date',
     ],
 

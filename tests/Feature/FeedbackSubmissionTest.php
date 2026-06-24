@@ -5,12 +5,14 @@ namespace Tests\Feature;
 use App\Enums\FeedbackReason;
 use App\Enums\FeedbackStatus;
 use App\Enums\UserRole;
+use App\Mail\FeedbackCompletedMail;
 use App\Models\ClientDashboard;
 use App\Models\Company;
 use App\Models\FeedbackSubmission;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -112,6 +114,66 @@ class FeedbackSubmissionTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.feedback.attachments.download', $attachment))
             ->assertOk();
+    }
+
+    public function test_admin_can_mark_feedback_completed_and_notify_user(): void
+    {
+        Mail::fake();
+
+        $admin = User::factory()->create(['role' => UserRole::Admin]);
+        $user = User::factory()->create([
+            'role' => UserRole::Client,
+            'email' => 'client@example.com',
+        ]);
+
+        $submission = FeedbackSubmission::query()->create([
+            'user_id' => $user->id,
+            'reason' => FeedbackReason::Other->value,
+            'message' => 'The export button does nothing.',
+            'status' => FeedbackStatus::Pending,
+        ]);
+
+        $this->actingAs($admin)
+            ->post(route('admin.feedback.update', $submission), [
+                'admin_notes' => 'Fixed in release 1.2.',
+                'mark_completed' => true,
+            ])
+            ->assertRedirect(route('admin.feedback.show', $submission))
+            ->assertSessionHas('status', 'Feedback marked complete and the user was notified by email.');
+
+        $submission->refresh();
+
+        $this->assertSame(FeedbackStatus::Completed, $submission->status);
+        $this->assertSame($admin->id, $submission->completed_by_user_id);
+        $this->assertNotNull($submission->completed_at);
+        $this->assertNotNull($submission->reviewed_at);
+
+        Mail::assertSent(FeedbackCompletedMail::class, fn (FeedbackCompletedMail $mail) => $mail->hasTo('client@example.com'));
+    }
+
+    public function test_marking_completed_twice_does_not_resend_email(): void
+    {
+        Mail::fake();
+
+        $admin = User::factory()->create(['role' => UserRole::Admin]);
+        $user = User::factory()->create(['role' => UserRole::Client]);
+
+        $submission = FeedbackSubmission::query()->create([
+            'user_id' => $user->id,
+            'reason' => FeedbackReason::Other->value,
+            'message' => 'General suggestion.',
+            'status' => FeedbackStatus::Completed,
+            'completed_at' => now(),
+            'completed_by_user_id' => $admin->id,
+        ]);
+
+        $this->actingAs($admin)
+            ->post(route('admin.feedback.update', $submission), [
+                'mark_completed' => true,
+            ])
+            ->assertRedirect(route('admin.feedback.show', $submission));
+
+        Mail::assertNothingSent();
     }
 
     public function test_client_cannot_access_admin_feedback_pages(): void

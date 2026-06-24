@@ -12,10 +12,12 @@ const props = defineProps({
 const form = useForm({
     admin_notes: props.submission.admin_notes ?? '',
     mark_reviewed: false,
+    mark_completed: false,
 });
 
-function submit(markReviewed = false) {
-    form.mark_reviewed = markReviewed;
+function submit(action = 'save') {
+    form.mark_reviewed = action === 'reviewed';
+    form.mark_completed = action === 'completed';
     form.post(route('admin.feedback.update', props.submission.id));
 }
 </script>
@@ -59,7 +61,7 @@ function submit(markReviewed = false) {
 
                 <form
                     class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
-                    @submit.prevent="submit(false)"
+                    @submit.prevent="submit('save')"
                 >
                     <h2 class="text-lg font-semibold">Admin notes</h2>
                     <textarea
@@ -79,13 +81,25 @@ function submit(markReviewed = false) {
                         <button
                             v-if="submission.status === 'pending'"
                             type="button"
-                            class="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
+                            class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                             :disabled="form.processing"
-                            @click="submit(true)"
+                            @click="submit('reviewed')"
                         >
                             Mark reviewed
                         </button>
+                        <button
+                            v-if="submission.status !== 'completed'"
+                            type="button"
+                            class="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
+                            :disabled="form.processing"
+                            @click="submit('completed')"
+                        >
+                            Mark completed & notify user
+                        </button>
                     </div>
+                    <p v-if="submission.status !== 'completed'" class="mt-3 text-xs text-slate-500">
+                        Marking completed sends the submitter an email confirming their feedback was reviewed.
+                    </p>
                 </form>
             </section>
 
@@ -116,6 +130,13 @@ function submit(markReviewed = false) {
                     <p class="font-medium text-slate-900">Reviewed</p>
                     <p class="mt-1 text-slate-600">{{ new Date(submission.reviewed_at).toLocaleString() }}</p>
                     <p v-if="submission.reviewed_by" class="text-slate-500">by {{ submission.reviewed_by.name }}</p>
+                </div>
+
+                <div v-if="submission.completed_at">
+                    <p class="font-medium text-slate-900">Completed</p>
+                    <p class="mt-1 text-slate-600">{{ new Date(submission.completed_at).toLocaleString() }}</p>
+                    <p v-if="submission.completed_by" class="text-slate-500">by {{ submission.completed_by.name }}</p>
+                    <p class="mt-1 text-emerald-700">User notified by email</p>
                 </div>
             </aside>
         </div>

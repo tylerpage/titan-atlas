@@ -19,6 +19,7 @@ class UpdateFeedbackSubmissionRequest extends FormRequest
         return [
             'admin_notes' => ['nullable', 'string', 'max:5000'],
             'mark_reviewed' => ['sometimes', 'boolean'],
+            'mark_completed' => ['sometimes', 'boolean'],
         ];
     }
 }

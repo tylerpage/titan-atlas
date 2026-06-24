@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\UpdateFeedbackSubmissionRequest;
 use App\Models\FeedbackAttachment;
 use App\Models\FeedbackSubmission;
+use App\Services\Feedback\CompleteFeedbackSubmissionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -21,7 +22,7 @@ class FeedbackSubmissionController extends Controller
             'submissions' => FeedbackSubmission::query()
                 ->with(['user:id,name,email,role', 'clientDashboard:id,name,slug'])
                 ->withCount('attachments')
-                ->orderByRaw("CASE WHEN status = 'pending' THEN 0 ELSE 1 END")
+                ->orderByRaw("CASE status WHEN 'pending' THEN 0 WHEN 'reviewed' THEN 1 ELSE 2 END")
                 ->orderByDesc('created_at')
                 ->get()
                 ->map(fn (FeedbackSubmission $submission) => $this->serializeListItem($submission)),
@@ -37,6 +38,7 @@ class FeedbackSubmissionController extends Controller
             'user:id,name,email,role',
             'clientDashboard.company:id,name',
             'reviewedBy:id,name',
+            'completedBy:id,name',
             'attachments',
         ]);
 
@@ -48,16 +50,27 @@ class FeedbackSubmissionController extends Controller
     public function update(
         UpdateFeedbackSubmissionRequest $request,
         FeedbackSubmission $feedback,
+        CompleteFeedbackSubmissionService $completeFeedback,
     ): RedirectResponse {
-        if ($request->boolean('mark_reviewed') && $feedback->status === FeedbackStatus::Pending) {
+        if ($request->boolean('mark_completed') && $feedback->status !== FeedbackStatus::Completed) {
+            $completeFeedback->complete(
+                $feedback,
+                $request->user(),
+                $request->validated('admin_notes'),
+            );
+        } elseif ($request->boolean('mark_reviewed') && $feedback->status === FeedbackStatus::Pending) {
             $feedback->markReviewed($request->user(), $request->validated('admin_notes'));
         } elseif ($request->has('admin_notes')) {
             $feedback->update(['admin_notes' => $request->validated('admin_notes')]);
         }
 
+        $statusMessage = $request->boolean('mark_completed')
+            ? 'Feedback marked complete and the user was notified by email.'
+            : 'Feedback updated.';
+
         return redirect()
             ->route('admin.feedback.show', $feedback)
-            ->with('status', 'Feedback updated.');
+            ->with('status', $statusMessage);
     }
 
     public function downloadAttachment(FeedbackAttachment $attachment): StreamedResponse
@@ -115,6 +128,7 @@ class FeedbackSubmissionController extends Controller
             'admin_notes' => $submission->admin_notes,
             'created_at' => $submission->created_at?->toIso8601String(),
             'reviewed_at' => $submission->reviewed_at?->toIso8601String(),
+            'completed_at' => $submission->completed_at?->toIso8601String(),
             'user' => [
                 'id' => $submission->user->id,
                 'name' => $submission->user->name,
@@ -130,6 +144,10 @@ class FeedbackSubmissionController extends Controller
             'reviewed_by' => $submission->reviewedBy ? [
                 'id' => $submission->reviewedBy->id,
                 'name' => $submission->reviewedBy->name,
+            ] : null,
+            'completed_by' => $submission->completedBy ? [
+                'id' => $submission->completedBy->id,
+                'name' => $submission->completedBy->name,
             ] : null,
             'attachments' => $submission->attachments
                 ->map(fn (FeedbackAttachment $attachment) => [

@@ -19,6 +19,8 @@ class FeedbackSubmission extends Model
         'status',
         'reviewed_at',
         'reviewed_by_user_id',
+        'completed_at',
+        'completed_by_user_id',
         'admin_notes',
     ];
 
@@ -31,6 +33,7 @@ class FeedbackSubmission extends Model
             'reason' => FeedbackReason::class,
             'status' => FeedbackStatus::class,
             'reviewed_at' => 'datetime',
+            'completed_at' => 'datetime',
         ];
     }
 
@@ -47,6 +50,11 @@ class FeedbackSubmission extends Model
     public function reviewedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewed_by_user_id');
+    }
+
+    public function completedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'completed_by_user_id');
     }
 
     public function attachments(): HasMany

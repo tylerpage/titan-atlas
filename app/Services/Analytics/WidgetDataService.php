@@ -67,6 +67,14 @@ class WidgetDataService
         return match ($preset) {
             'last_7_days' => [now()->subDays(6)->startOfDay(), now()->endOfDay()],
             'last_90_days' => [now()->subDays(89)->startOfDay(), now()->endOfDay()],
+            'last_month' => [
+                now()->startOfMonth()->subMonth()->startOfDay(),
+                now()->startOfMonth()->subDay()->endOfDay(),
+            ],
+            'last_year' => [
+                now()->subYear()->startOfYear()->startOfDay(),
+                now()->subYear()->endOfYear()->endOfDay(),
+            ],
             'ytd' => [now()->startOfYear(), now()->endOfDay()],
             default => [now()->subDays(29)->startOfDay(), now()->endOfDay()],
         };
