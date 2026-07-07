@@ -78,6 +78,7 @@ class DashboardController extends Controller
                 'slug' => $dashboard->slug,
                 'timezone' => $dashboard->timezone,
                 'default_date_range' => $dashboard->default_date_range,
+                'show_summary_tab' => $dashboard->show_summary_tab,
                 'attribution_window_days' => $dashboard->attribution_window_days,
                 'primary_color' => $dashboard->primary_color,
                 'secondary_color' => $dashboard->secondary_color,

@@ -23,6 +23,7 @@ class ClientDashboard extends Model
         'timezone',
         'currency',
         'default_date_range',
+        'show_summary_tab',
         'attribution_window_days',
         'custom_domain',
     ];
@@ -31,6 +32,7 @@ class ClientDashboard extends Model
     {
         return [
             'show_powered_by' => 'boolean',
+            'show_summary_tab' => 'boolean',
         ];
     }
 
@@ -72,7 +74,21 @@ class ClientDashboard extends Model
 
     public function activeCoverPage(): ?CoverPage
     {
-        return $this->coverPages()->where('is_active', true)->first();
+        return $this->coverPages()->where('is_draft', false)->where('is_active', true)->first();
+    }
+
+    public function hasPublishedCoverPages(): bool
+    {
+        if ($this->relationLoaded('coverPages')) {
+            return $this->coverPages->contains(fn (CoverPage $page) => ! $page->is_draft);
+        }
+
+        return $this->coverPages()->where('is_draft', false)->exists();
+    }
+
+    public function showsSummaryTab(): bool
+    {
+        return $this->show_summary_tab && $this->hasPublishedCoverPages();
     }
 
     public function analyticsReports(): HasMany

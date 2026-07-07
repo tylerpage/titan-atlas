@@ -50,6 +50,7 @@ class UpdateClientDashboardRequest extends FormRequest
                 'max:255',
                 Rule::unique('client_dashboards', 'custom_domain')->ignore($dashboard->id),
             ],
+            'show_summary_tab' => ['sometimes', 'boolean'],
             'logo' => ['nullable', 'image', 'max:2048'],
             'remove_logo' => ['sometimes', 'boolean'],
         ];

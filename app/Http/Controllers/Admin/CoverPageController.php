@@ -153,6 +153,7 @@ class CoverPageController extends Controller
             'period_start' => $coverPage->period_start?->toDateString(),
             'period_end' => $coverPage->period_end?->toDateString(),
             'is_active' => $coverPage->is_active,
+            'is_draft' => $coverPage->is_draft,
             'sort_order' => $coverPage->sort_order,
             'blocks_count' => $coverPage->blocks_count ?? $coverPage->blocks->count(),
         ];

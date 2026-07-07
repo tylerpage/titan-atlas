@@ -42,6 +42,7 @@ const pageForm = useForm({
     period_start: props.coverPage.period_start ?? '',
     period_end: props.coverPage.period_end ?? '',
     is_active: props.coverPage.is_active,
+    is_draft: props.coverPage.is_draft ?? false,
 });
 
 const page = usePage();
@@ -211,6 +212,12 @@ function placeSavedReport() {
                 <div class="flex flex-wrap items-center gap-2">
                     <h1 class="text-3xl font-semibold">{{ coverPage.title }}</h1>
                     <span
+                        v-if="coverPage.is_draft"
+                        class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900"
+                    >
+                        Draft
+                    </span>
+                    <span
                         v-if="coverPage.is_active"
                         class="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800"
                     >
@@ -228,6 +235,7 @@ function placeSavedReport() {
                     Set active
                 </button>
                 <Link
+                    v-if="!coverPage.is_draft"
                     :href="route('client.dashboard.show', { dashboard: dashboard.slug, tab: 'cover', cover_page: coverPage.id })"
                     class="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50"
                 >
@@ -255,6 +263,13 @@ function placeSavedReport() {
             <label class="flex items-center gap-2 text-sm">
                 <input v-model="pageForm.is_active" type="checkbox" class="rounded border-slate-300" />
                 Active cover page
+            </label>
+            <label class="flex items-start gap-2 text-sm">
+                <input v-model="pageForm.is_draft" type="checkbox" class="mt-1 rounded border-slate-300" />
+                <span>
+                    <span class="font-medium text-slate-900">Draft</span>
+                    <span class="mt-1 block text-slate-600">Draft summaries are hidden from the client dashboard until published.</span>
+                </span>
             </label>
             <button type="submit" class="rounded-lg bg-primary px-4 py-2 text-sm text-white hover:bg-primary-hover" :disabled="pageForm.processing">
                 Save settings

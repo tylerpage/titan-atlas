@@ -13,6 +13,7 @@ use App\Services\Analytics\ConnectorDashboardCache;
 use App\Services\Analytics\DynamicConnectorDashboardService;
 use App\Services\Analytics\GoogleAdsDashboardService;
 use App\Services\Analytics\GoogleAnalyticsDashboardService;
+use App\Services\Analytics\MetaAdsDashboardService;
 use App\Services\Analytics\RedditAdsDashboardService;
 use App\Services\Analytics\SearchConsoleDashboardService;
 use App\Services\Analytics\StackAdaptDashboardService;
@@ -35,6 +36,7 @@ class DashboardController extends Controller
         GoogleAnalyticsDashboardService $googleAnalytics,
         GoogleAdsDashboardService $googleAds,
         StackAdaptDashboardService $stackAdapt,
+        MetaAdsDashboardService $metaAds,
         RedditAdsDashboardService $redditAds,
         DynamicConnectorDashboardService $dynamicConnector,
         CoverPageDataResolver $coverPages,
@@ -46,12 +48,18 @@ class DashboardController extends Controller
         $dashboard->load([
             'company',
             'connections' => fn ($q) => $q->where('is_active', true)->orderBy('name')->with('connectorBlueprint'),
-            'coverPages',
+            'coverPages' => fn ($q) => $q->orderByDesc('sort_order'),
         ]);
 
-        $activeCoverPage = $dashboard->coverPages->firstWhere('is_active', true);
-        $hasCoverPages = $dashboard->coverPages->isNotEmpty();
-        $tab = (string) $request->query('tab', $hasCoverPages && $activeCoverPage ? 'cover' : 'data');
+        $publishedCoverPages = $dashboard->coverPages->where('is_draft', false)->values();
+        $showSummaryTab = $dashboard->showsSummaryTab();
+        $activeCoverPage = $publishedCoverPages->firstWhere('is_active', true);
+        $defaultTab = $showSummaryTab && $activeCoverPage ? 'cover' : 'data';
+        $tab = (string) $request->query('tab', $defaultTab);
+
+        if ($tab === 'cover' && ! $showSummaryTab) {
+            $tab = 'data';
+        }
 
         if ($tab === 'data') {
             $dashboard->load('widgetPlacements');
@@ -68,14 +76,14 @@ class DashboardController extends Controller
 
         if ($tab === 'cover') {
             $selectedCoverPage = $selectedCoverPageId
-                ? $dashboard->coverPages->firstWhere('id', $selectedCoverPageId)
-                : ($activeCoverPage ?? $dashboard->coverPages->first());
+                ? $publishedCoverPages->firstWhere('id', $selectedCoverPageId)
+                : ($activeCoverPage ?? $publishedCoverPages->first());
 
             $coverPageData = $selectedCoverPage
                 ? $coverPages->resolveForClient($selectedCoverPage, $dashboard)
                 : null;
 
-            $coverPageOptions = $dashboard->coverPages->map(fn (CoverPage $page) => [
+            $coverPageOptions = $publishedCoverPages->map(fn (CoverPage $page) => [
                 'id' => $page->id,
                 'title' => $page->title,
                 'period_start' => $page->period_start?->toDateString(),
@@ -114,6 +122,7 @@ class DashboardController extends Controller
                 $googleAnalytics,
                 $googleAds,
                 $stackAdapt,
+                $metaAds,
                 $redditAds,
                 $dynamicConnector,
                 $dateRange,
@@ -195,7 +204,8 @@ class DashboardController extends Controller
             'comparisonRangeEnd' => $comparisonRange ? $comparisonRange[1]->toDateString() : null,
             'poweredByText' => config('titan.branding.powered_by_text'),
             'tab' => $tab,
-            'hasCoverPages' => $hasCoverPages,
+            'showSummaryTab' => $showSummaryTab,
+            'hasCoverPages' => $showSummaryTab,
             'coverPageData' => $coverPageData,
             'coverPageOptions' => $coverPageOptions,
             'selectedCoverPageId' => $selectedCoverPage?->id,
@@ -223,6 +233,7 @@ class DashboardController extends Controller
         GoogleAnalyticsDashboardService $googleAnalytics,
         GoogleAdsDashboardService $googleAds,
         StackAdaptDashboardService $stackAdapt,
+        MetaAdsDashboardService $metaAds,
         RedditAdsDashboardService $redditAds,
         DynamicConnectorDashboardService $dynamicConnector,
         string $dateRange,
@@ -267,6 +278,13 @@ class DashboardController extends Controller
                 $comparison,
             ),
             $connection->connector_type === ConnectorType::StackAdapt => fn () => $stackAdapt->dataFor(
+                $dashboard,
+                $connection,
+                $dateRange,
+                $customRange,
+                $comparison,
+            ),
+            $connection->connector_type === ConnectorType::MetaAds => fn () => $metaAds->dataFor(
                 $dashboard,
                 $connection,
                 $dateRange,

@@ -5,6 +5,8 @@ import ConnectorDataLagNotice from './ConnectorDataLagNotice.vue';
 import CoverBarChart from '../CoverBarChart.vue';
 import RevenueLineChart from '../RevenueLineChart.vue';
 
+import { formatNumber, formatPercent } from '../../lib/formatters';
+
 const props = defineProps({
     connectorData: {
         type: Object,
@@ -27,12 +29,6 @@ const props = defineProps({
         default: false,
     },
 });
-
-function formatNumber(value) {
-    return new Intl.NumberFormat('en-US', {
-        maximumFractionDigits: 0,
-    }).format(value ?? 0);
-}
 
 function formatChange(value) {
     if (value === null || value === undefined) {

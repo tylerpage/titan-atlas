@@ -18,6 +18,9 @@ class UpdateClientDashboardService
             'slug' => $data['slug'],
             'timezone' => $data['timezone'] ?? $dashboard->timezone,
             'default_date_range' => $data['default_date_range'] ?? $dashboard->default_date_range,
+            'show_summary_tab' => array_key_exists('show_summary_tab', $data)
+                ? (bool) $data['show_summary_tab']
+                : $dashboard->show_summary_tab,
             'attribution_window_days' => $data['attribution_window_days'] ?? $dashboard->attribution_window_days,
             'primary_color' => $data['primary_color'] ?? $dashboard->primary_color,
             'secondary_color' => $data['secondary_color'] ?? $dashboard->secondary_color,

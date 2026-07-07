@@ -120,4 +120,38 @@ class CoverPageClientViewTest extends TestCase
                 'cover_page' => $active->id,
             ]));
     }
+
+    public function test_draft_cover_page_is_hidden_from_client_dashboard(): void
+    {
+        [$dashboard, $client, $active, $archived] = $this->createDashboardWithCoverPage();
+
+        $active->update(['is_draft' => true]);
+        $archived->update(['is_draft' => true]);
+
+        $this->actingAs($client)
+            ->get(route('client.dashboard.show', $dashboard))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Client/Dashboard')
+                ->where('tab', 'data')
+                ->where('showSummaryTab', false)
+                ->where('hasCoverPages', false)
+            );
+    }
+
+    public function test_dashboard_can_hide_summary_tab_even_when_cover_pages_exist(): void
+    {
+        [$dashboard, $client] = $this->createDashboardWithCoverPage();
+
+        $dashboard->update(['show_summary_tab' => false]);
+
+        $this->actingAs($client)
+            ->get(route('client.dashboard.show', $dashboard))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Client/Dashboard')
+                ->where('tab', 'data')
+                ->where('showSummaryTab', false)
+            );
+    }
 }

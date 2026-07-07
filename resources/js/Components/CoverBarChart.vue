@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Chart, ensureChartJsRegistered } from '../lib/chartSetup';
+import { formatChartValue } from '../lib/formatters';
 
 ensureChartJsRegistered();
 
@@ -55,7 +56,10 @@ function buildChartConfig() {
                 tooltip: {
                     callbacks: {
                         label(context) {
-                            return Number(context.parsed[props.horizontal ? 'x' : 'y'] ?? 0).toLocaleString('en-US');
+                            return formatChartValue(
+                                context.parsed[props.horizontal ? 'x' : 'y'] ?? 0,
+                                'number',
+                            );
                         },
                     },
                 },

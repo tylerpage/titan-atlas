@@ -350,6 +350,40 @@ SUMMARY;
                 ],
             ],
             [
+                'connector_type' => 'meta_ads',
+                'label' => 'Meta Ads',
+                'resources' => [
+                    [
+                        'name' => 'spend_daily',
+                        'titan_resource_type' => 'spend_daily',
+                        'source_api' => 'Meta Marketing API Insights (account level, time_increment=1)',
+                        'payload_fields' => ['date', 'cost', 'impressions', 'clicks', 'ctr', 'cpc', 'cpm', 'reach', 'frequency', 'conversions', 'conversions_value'],
+                        'fact_table_recommendation' => 'fact_meta_spend_daily',
+                    ],
+                    [
+                        'name' => 'campaign_daily',
+                        'titan_resource_type' => 'campaign_daily',
+                        'source_api' => 'Meta Marketing API Insights (campaign level, time_increment=1)',
+                        'payload_fields' => ['date', 'campaign_id', 'campaign_name', 'objective', 'cost', 'impressions', 'clicks', 'reach', 'conversions', 'conversions_value'],
+                        'fact_table_recommendation' => 'fact_meta_campaigns',
+                    ],
+                    [
+                        'name' => 'placement_daily',
+                        'titan_resource_type' => 'placement_daily',
+                        'source_api' => 'Meta Marketing API Insights breakdowns publisher_platform, platform_position',
+                        'payload_fields' => ['date', 'dimension_key', 'dimension_label', 'cost', 'impressions', 'clicks', 'conversions', 'conversions_value'],
+                        'fact_table_recommendation' => 'fact_meta_placements',
+                    ],
+                    [
+                        'name' => 'device_daily',
+                        'titan_resource_type' => 'device_daily',
+                        'source_api' => 'Meta Marketing API Insights breakdown device_platform',
+                        'payload_fields' => ['date', 'dimension_key', 'dimension_label', 'cost', 'impressions', 'clicks', 'conversions', 'conversions_value'],
+                        'fact_table_recommendation' => 'fact_meta_devices',
+                    ],
+                ],
+            ],
+            [
                 'connector_type' => 'google_analytics',
                 'label' => 'Google Analytics 4',
                 'resources' => [

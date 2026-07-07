@@ -35,6 +35,20 @@ export function formatNumber(value) {
     return integerFormatter.format(Number(value ?? 0));
 }
 
+export function formatMetric(value) {
+    const number = Number(value ?? 0);
+
+    if (! Number.isFinite(number)) {
+        return '—';
+    }
+
+    if (Number.isInteger(number) || number === Math.trunc(number)) {
+        return formatNumber(number);
+    }
+
+    return formatDecimal(number);
+}
+
 export function formatDecimal(value) {
     return decimalFormatter.format(Number(value ?? 0));
 }
@@ -54,8 +68,10 @@ export function formatChartValue(value, format = 'number') {
             return formatCurrency(number);
         case 'percent':
             return formatPercent(number, 1);
+        case 'decimal':
+            return formatDecimal(number);
         case 'none':
-            return String(number);
+            return formatDecimal(number);
         case 'number':
         default:
             return formatNumber(number);

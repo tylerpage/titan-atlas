@@ -105,6 +105,8 @@ return [
             'spend_daily',
             'campaign_daily',
             'channel_daily',
+            'placement_daily',
+            'device_daily',
         ],
     ],
 
@@ -165,6 +167,20 @@ return [
         'chunk_days' => (int) env('TITAN_REDDIT_ADS_CHUNK_DAYS', 7),
         'http_timeout_seconds' => (int) env('TITAN_REDDIT_ADS_HTTP_TIMEOUT', 30),
         'top_campaigns_limit' => (int) env('TITAN_REDDIT_ADS_TOP_CAMPAIGNS_LIMIT', 25),
+    ],
+
+    'meta_ads' => [
+        'graph_base_url' => env('TITAN_META_GRAPH_BASE_URL', 'https://graph.facebook.com'),
+        'api_version' => env('TITAN_META_API_VERSION', 'v21.0'),
+        'backfill_months' => (int) env('TITAN_META_ADS_BACKFILL_MONTHS', 16),
+        'incremental_days' => (int) env('TITAN_META_ADS_INCREMENTAL_DAYS', 5),
+        'data_lag_days' => (int) env('TITAN_META_ADS_DATA_LAG_DAYS', 1),
+        'chunk_days' => (int) env('TITAN_META_ADS_CHUNK_DAYS', 7),
+        'page_size' => (int) env('TITAN_META_ADS_PAGE_SIZE', 500),
+        'ad_accounts_limit' => (int) env('TITAN_META_ADS_AD_ACCOUNTS_LIMIT', 100),
+        'http_timeout_seconds' => (int) env('TITAN_META_ADS_HTTP_TIMEOUT', 60),
+        'top_campaigns_limit' => (int) env('TITAN_META_ADS_TOP_CAMPAIGNS_LIMIT', 100),
+        'top_breakdown_limit' => (int) env('TITAN_META_ADS_TOP_BREAKDOWN_LIMIT', 15),
     ],
 
     'google_analytics' => [

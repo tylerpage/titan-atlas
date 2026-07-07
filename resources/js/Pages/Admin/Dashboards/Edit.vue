@@ -31,6 +31,7 @@ const form = useForm({
     primary_color: props.dashboard.primary_color,
     secondary_color: props.dashboard.secondary_color,
     custom_domain: props.dashboard.custom_domain ?? '',
+    show_summary_tab: props.dashboard.show_summary_tab ?? true,
     logo: null,
     remove_logo: false,
 });
@@ -108,6 +109,22 @@ function submit() {
                 <select id="attribution_window_days" v-model="form.attribution_window_days" class="w-full rounded-lg border border-slate-300 px-3 py-2">
                     <option v-for="(label, value) in attributionWindows" :key="value" :value="Number(value)">{{ label }}</option>
                 </select>
+            </div>
+
+            <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                <label class="flex items-start gap-3 text-sm">
+                    <input
+                        v-model="form.show_summary_tab"
+                        type="checkbox"
+                        class="mt-1 rounded border-slate-300"
+                    />
+                    <span>
+                        <span class="font-medium text-slate-900">Show Summary tab</span>
+                        <span class="mt-1 block text-slate-600">
+                            When enabled, published summary pages appear as the Summary tab on the client dashboard.
+                        </span>
+                    </span>
+                </label>
             </div>
 
             <div class="border-t border-slate-100 pt-6">

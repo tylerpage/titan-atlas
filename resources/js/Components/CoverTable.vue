@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue';
-import { formatCurrency, isCurrencyColumn } from '../lib/formatters';
+import { formatCurrency, formatMetric, formatPercent, isCurrencyColumn } from '../lib/formatters';
 
 const props = defineProps({
     title: {
@@ -52,8 +52,16 @@ function cellValue(row, column) {
         return '—';
     }
 
-    if (typeof value === 'number' && isCurrencyColumn(column)) {
-        return formatCurrency(value);
+    if (typeof value === 'number') {
+        if (isCurrencyColumn(column)) {
+            return formatCurrency(value);
+        }
+
+        if (column.format === 'percent') {
+            return formatPercent(value);
+        }
+
+        return formatMetric(value);
     }
 
     return value;

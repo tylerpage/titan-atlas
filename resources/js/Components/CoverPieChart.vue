@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Chart, ensureChartJsRegistered } from '../lib/chartSetup';
+import { formatNumber } from '../lib/formatters';
 
 ensureChartJsRegistered();
 
@@ -61,7 +62,7 @@ function buildChartConfig() {
                             const value = context.parsed ?? 0;
                             const share = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
 
-                            return `${context.label}: ${value.toLocaleString('en-US')} (${share}%)`;
+                            return `${context.label}: ${formatNumber(value)} (${share}%)`;
                         },
                     },
                 },

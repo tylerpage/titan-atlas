@@ -12,6 +12,7 @@ import SearchConsoleDashboardPanel from '../../Components/Dashboard/SearchConsol
 import GoogleAnalyticsDashboardPanel from '../../Components/Dashboard/GoogleAnalyticsDashboardPanel.vue';
 import GoogleAdsDashboardPanel from '../../Components/Dashboard/GoogleAdsDashboardPanel.vue';
 import StackAdaptDashboardPanel from '../../Components/Dashboard/StackAdaptDashboardPanel.vue';
+import MetaAdsDashboardPanel from '../../Components/Dashboard/MetaAdsDashboardPanel.vue';
 import DynamicConnectorDashboardPanel from '../../Components/Dashboard/DynamicConnectorDashboardPanel.vue';
 import RevenueLineChart from '../../Components/RevenueLineChart.vue';
 import { formatCurrency, formatNumber } from '../../lib/formatters';
@@ -81,6 +82,10 @@ const props = defineProps({
         default: 'data',
     },
     hasCoverPages: {
+        type: Boolean,
+        default: false,
+    },
+    showSummaryTab: {
         type: Boolean,
         default: false,
     },
@@ -247,7 +252,7 @@ const activeConnection = computed(() =>
 );
 const page = usePage();
 const isAdmin = computed(() => page.props.auth.user?.is_admin ?? false);
-const showCoverTab = computed(() => props.hasCoverPages);
+const showCoverTab = computed(() => props.showSummaryTab);
 const isCoverTab = computed(() => activeTab.value === 'cover' && showCoverTab.value);
 const isAiTab = computed(() => activeTab.value === 'ai');
 const isSavedTab = computed(() => activeTab.value === 'saved');
@@ -258,8 +263,9 @@ const showSearchConsoleView = computed(() => isDataTab.value && props.connectorD
 const showGoogleAnalyticsView = computed(() => isDataTab.value && props.connectorData?.kind === 'google_analytics');
 const showGoogleAdsView = computed(() => isDataTab.value && ['google_ads', 'reddit_ads'].includes(props.connectorData?.kind));
 const showStackAdaptView = computed(() => isDataTab.value && props.connectorData?.kind === 'stackadapt');
+const showMetaAdsView = computed(() => isDataTab.value && props.connectorData?.kind === 'meta_ads');
 const showDynamicView = computed(() => isDataTab.value && props.connectorData?.kind === 'dynamic');
-const showConnectorView = computed(() => showCommerceView.value || showSearchConsoleView.value || showGoogleAnalyticsView.value || showGoogleAdsView.value || showStackAdaptView.value || showDynamicView.value);
+const showConnectorView = computed(() => showCommerceView.value || showSearchConsoleView.value || showGoogleAnalyticsView.value || showGoogleAdsView.value || showStackAdaptView.value || showMetaAdsView.value || showDynamicView.value);
 const showLegacyWidgets = computed(() => isDataTab.value && (!hasConnections.value || (!showConnectorView.value && hasConnections.value)));
 const showTabFilters = computed(() => isDataTab.value);
 const shareStatus = ref(null);
@@ -973,6 +979,14 @@ function sourceMediumLabel(order) {
 
         <StackAdaptDashboardPanel
             v-else-if="showStackAdaptView"
+            :connector-data="connectorData"
+            :connection-name="activeConnection?.name ?? ''"
+            :primary-color="dashboard.primary_color"
+            :comparing="comparing"
+        />
+
+        <MetaAdsDashboardPanel
+            v-else-if="showMetaAdsView"
             :connector-data="connectorData"
             :connection-name="activeConnection?.name ?? ''"
             :primary-color="dashboard.primary_color"

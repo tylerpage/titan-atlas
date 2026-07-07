@@ -5,6 +5,7 @@ import AppLayout from '../../../../Layouts/AppLayout.vue';
 import CredentialFieldLabel from '../../../../Components/CredentialFieldLabel.vue';
 import GoogleOAuthConnect from '../../../../Components/GoogleOAuthConnect.vue';
 import StackAdaptConnect from '../../../../Components/StackAdaptConnect.vue';
+import MetaConnect from '../../../../Components/MetaConnect.vue';
 
 const page = usePage();
 
@@ -83,7 +84,9 @@ const visibleCredentialFields = computed(() =>
 
 const usesGoogleOAuth = computed(() => Boolean(selectedConnector.value?.uses_google_oauth));
 const usesStackAdapt = computed(() => form.connector_type === 'stackadapt');
+const usesMetaAds = computed(() => form.connector_type === 'meta_ads');
 const stackAdaptAdvertisers = ref([]);
+const metaAdAccounts = ref([]);
 
 function applyGoogleOauthPrefill() {
     const oauth = googleOauth.value;
@@ -240,6 +243,14 @@ async function testConnection() {
                 form.credentials.advertiser_id = data.debug.advertisers[0].advertiserId;
             }
         }
+
+        if (usesMetaAds.value && Array.isArray(data.debug?.ad_accounts)) {
+            metaAdAccounts.value = data.debug.ad_accounts;
+
+            if (!form.credentials.ad_account_id && data.debug.ad_accounts.length === 1) {
+                form.credentials.ad_account_id = data.debug.ad_accounts[0].adAccountId;
+            }
+        }
     } catch {
         testStatus.value = {
             type: 'error',
@@ -271,6 +282,12 @@ function submit() {
 
     if (usesStackAdapt.value && !form.credentials.advertiser_id) {
         form.setError('credentials.advertiser_id', 'Select a StackAdapt advertiser after testing your GraphQL API key.');
+
+        return;
+    }
+
+    if (usesMetaAds.value && !form.credentials.ad_account_id) {
+        form.setError('credentials.ad_account_id', 'Select a Meta ad account after testing your access token.');
 
         return;
     }
@@ -370,15 +387,21 @@ function submit() {
                     :advertisers="stackAdaptAdvertisers"
                 />
 
+                <MetaConnect
+                    v-if="usesMetaAds"
+                    v-model:ad-account-id="form.credentials.ad_account_id"
+                    :ad-accounts="metaAdAccounts"
+                />
+
                 <div v-for="field in visibleCredentialFields" :key="field.key">
                     <CredentialFieldLabel
-                        v-if="(!usesGoogleOAuth || !['site_url', 'property_id', 'customer_id', 'login_customer_id'].includes(field.key)) && (!usesStackAdapt || field.key !== 'advertiser_id')"
+                        v-if="(!usesGoogleOAuth || !['site_url', 'property_id', 'customer_id', 'login_customer_id'].includes(field.key)) && (!usesStackAdapt || field.key !== 'advertiser_id') && (!usesMetaAds || field.key !== 'ad_account_id')"
                         :for-id="field.key"
                         :label="field.label"
                         :help="field.help"
                     />
                     <input
-                        v-if="(!usesGoogleOAuth || !['site_url', 'property_id', 'customer_id', 'login_customer_id'].includes(field.key)) && (!usesStackAdapt || field.key !== 'advertiser_id')"
+                        v-if="(!usesGoogleOAuth || !['site_url', 'property_id', 'customer_id', 'login_customer_id'].includes(field.key)) && (!usesStackAdapt || field.key !== 'advertiser_id') && (!usesMetaAds || field.key !== 'ad_account_id')"
                         :id="field.key"
                         v-model="form.credentials[field.key]"
                         :type="field.type ?? 'text'"

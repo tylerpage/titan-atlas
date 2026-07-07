@@ -14,6 +14,7 @@ class CoverPage extends Model
         'period_start',
         'period_end',
         'is_active',
+        'is_draft',
         'sort_order',
     ];
 
@@ -23,6 +24,7 @@ class CoverPage extends Model
             'period_start' => 'date',
             'period_end' => 'date',
             'is_active' => 'boolean',
+            'is_draft' => 'boolean',
         ];
     }
 

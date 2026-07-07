@@ -92,7 +92,7 @@ class TitanPlatformTest extends TestCase
             $this->assertSame($type, $connector->type());
         }
 
-        $this->assertCount(9, $registry->connectors());
+        $this->assertCount(10, $registry->connectors());
     }
 
     public function test_metric_snapshots_support_dimensional_rows(): void

@@ -61,6 +61,12 @@ function deleteCoverPage(coverPage) {
                         <div class="flex flex-wrap items-center gap-2">
                             <h2 class="text-lg font-semibold">{{ coverPage.title }}</h2>
                             <span
+                                v-if="coverPage.is_draft"
+                                class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900"
+                            >
+                                Draft
+                            </span>
+                            <span
                                 v-if="coverPage.is_active"
                                 class="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800"
                             >

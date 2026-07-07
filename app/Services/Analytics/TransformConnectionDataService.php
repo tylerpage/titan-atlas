@@ -545,6 +545,8 @@ class TransformConnectionDataService
             'insight_geo_daily' => $this->insightMetricsFromPayload($payload, $connectionId, $resourceType),
             'insight_domain_daily' => $this->insightMetricsFromPayload($payload, $connectionId, $resourceType),
             'insight_device_daily' => $this->insightMetricsFromPayload($payload, $connectionId, $resourceType),
+            'placement_daily' => $this->insightMetricsFromPayload($payload, $connectionId, 'insight_placement_daily'),
+            'device_daily' => $this->insightMetricsFromPayload($payload, $connectionId, 'insight_device_daily'),
             'session_attribution' => [[
                 'date' => Carbon::parse($payload['date'] ?? now()->toDateString()),
                 'key' => 'sessions',

@@ -12,6 +12,7 @@ enum ConnectorType: string
     case Semrush = 'semrush';
     case StackAdapt = 'stackadapt';
     case RedditAds = 'reddit_ads';
+    case MetaAds = 'meta_ads';
     case Dynamic = 'dynamic';
 
     public function label(): string
@@ -25,6 +26,7 @@ enum ConnectorType: string
             self::Semrush => 'SEMrush',
             self::StackAdapt => 'StackAdapt',
             self::RedditAds => 'Reddit Ads',
+            self::MetaAds => 'Meta Ads',
             self::Dynamic => 'Dynamic connector',
         };
     }
@@ -146,6 +148,20 @@ enum ConnectorType: string
                     'help' => 'Reddit ad account ID from Ads Manager or the ad_accounts API. One account per connection.',
                 ],
             ],
+            self::MetaAds => [
+                [
+                    'key' => 'access_token',
+                    'label' => 'Marketing API access token',
+                    'type' => 'password',
+                    'help' => 'Meta Marketing API token with ads_read scope. Generate from Meta Business Settings or a System User.',
+                ],
+                [
+                    'key' => 'ad_account_id',
+                    'label' => 'Ad account',
+                    'placeholder' => 'Select after testing connection',
+                    'help' => 'One Meta ad account per connection. Run Test connection to list accessible ad accounts.',
+                ],
+            ],
         };
     }
 
@@ -164,7 +180,7 @@ enum ConnectorType: string
 
     public function supportsLiveConnectionTest(): bool
     {
-        return in_array($this, [self::Shopify, self::BigCommerce, self::SearchConsole, self::GoogleAnalytics, self::GoogleAds, self::StackAdapt, self::RedditAds, self::Dynamic], true);
+        return in_array($this, [self::Shopify, self::BigCommerce, self::SearchConsole, self::GoogleAnalytics, self::GoogleAds, self::StackAdapt, self::RedditAds, self::MetaAds, self::Dynamic], true);
     }
 
     public function isDynamic(): bool
@@ -210,6 +226,7 @@ enum ConnectorType: string
             self::GoogleAds => self::productName().' syncs Google Ads spend, impressions, clicks, CTR, and conversion value with daily and campaign breakdowns. Platform setup: enable the Google Ads API in Google Cloud, create an OAuth web client, add redirect URI '.route('admin.google.oauth.callback', absolute: true).', set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET, and obtain a developer token from the Google Ads API Center (GOOGLE_ADS_DEVELOPER_TOKEN). Then click Connect with Google and choose an Ads account.',
             self::StackAdapt => self::productName().' syncs StackAdapt programmatic delivery data: daily advertiser spend, campaign performance, channel mix (CTV, native, display, video, audio, and more), plus geo, domain, and device insights. Paste your StackAdapt GraphQL API key, test the connection to list advertisers, then select one advertiser per connection.',
             self::RedditAds => self::productName().' syncs Reddit Ads performance via the Ads API v3 reporting endpoint: daily spend, impressions, clicks, CTR, and conversions at account and campaign level. Provide an OAuth access token with ads read scope and the Reddit ad account ID (for example t2_abc123).',
+            self::MetaAds => self::productName().' syncs Meta (Facebook/Instagram) Ads via the Marketing API Insights endpoint: daily spend, purchase revenue, ROAS, reach, campaign performance, and spend breakdowns by objective, placement, and device. Provide a Marketing API access token with ads_read scope, test the connection to list ad accounts, then select one account per connection.',
             self::Dynamic => self::productName().' syncs data from an AI-configured REST API connector. Credentials and endpoints are defined in the connector blueprint.',
             default => null,
         };

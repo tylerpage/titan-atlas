@@ -25,7 +25,7 @@ const props = defineProps({
     valueFormat: {
         type: String,
         default: 'currency',
-        validator: (value) => ['currency', 'number', 'percent', 'none'].includes(value),
+        validator: (value) => ['currency', 'number', 'decimal', 'percent', 'none'].includes(value),
     },
     seriesLabel: {
         type: String,

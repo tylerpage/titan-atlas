@@ -28,6 +28,7 @@ class CoverPageService
                 'period_start' => $data['period_start'] ?? null,
                 'period_end' => $data['period_end'] ?? null,
                 'is_active' => $isActive,
+                'is_draft' => (bool) ($data['is_draft'] ?? false),
                 'sort_order' => $sortOrder,
             ]);
         });
@@ -50,6 +51,7 @@ class CoverPageService
                 'period_start' => $data['period_start'] ?? null,
                 'period_end' => $data['period_end'] ?? null,
                 'is_active' => $isActive,
+                'is_draft' => (bool) ($data['is_draft'] ?? $coverPage->is_draft),
             ]);
 
             return $coverPage->fresh();
@@ -77,6 +79,7 @@ class CoverPageService
                 'period_start' => $coverPage->period_start,
                 'period_end' => $coverPage->period_end,
                 'is_active' => false,
+                'is_draft' => true,
                 'sort_order' => $sortOrder,
             ]);
 
