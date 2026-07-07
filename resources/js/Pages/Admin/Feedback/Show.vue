@@ -11,6 +11,7 @@ const props = defineProps({
 
 const form = useForm({
     admin_notes: props.submission.admin_notes ?? '',
+    completion_message: props.submission.completion_message ?? '',
     mark_reviewed: false,
     mark_completed: false,
 });
@@ -64,12 +65,26 @@ function submit(action = 'save') {
                     @submit.prevent="submit('save')"
                 >
                     <h2 class="text-lg font-semibold">Admin notes</h2>
+                    <p class="mt-1 text-sm text-slate-500">Internal only. Never sent to the user.</p>
                     <textarea
                         v-model="form.admin_notes"
                         rows="4"
                         class="mt-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                         placeholder="Internal notes about this feedback"
                     />
+
+                    <div v-if="submission.status !== 'completed'" class="mt-6">
+                        <h3 class="text-sm font-semibold text-slate-900">Message to user</h3>
+                        <p class="mt-1 text-sm text-slate-500">
+                            Optional. Included in the completion email when you mark this feedback done.
+                        </p>
+                        <textarea
+                            v-model="form.completion_message"
+                            rows="3"
+                            class="mt-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                            placeholder="e.g. We fixed the export button and it should be live now."
+                        />
+                    </div>
                     <div class="mt-4 flex flex-wrap gap-3">
                         <button
                             type="submit"
@@ -100,7 +115,7 @@ function submit(action = 'save') {
                     <p v-if="submission.status !== 'completed'" class="mt-3 text-xs text-slate-500">
                         <span class="font-medium text-slate-600">Mark reviewed</span> updates status internally only.
                         <span class="font-medium text-slate-600">Mark completed</span> emails the submitter with their
-                        feedback message and confirms the work is done.
+                        feedback message, an optional note from you, and confirms the work is done.
                     </p>
                 </form>
             </section>
@@ -139,6 +154,10 @@ function submit(action = 'save') {
                     <p class="mt-1 text-slate-600">{{ new Date(submission.completed_at).toLocaleString() }}</p>
                     <p v-if="submission.completed_by" class="text-slate-500">by {{ submission.completed_by.name }}</p>
                     <p class="mt-1 text-emerald-700">User notified by email</p>
+                    <p v-if="submission.completion_message" class="mt-3 whitespace-pre-wrap text-slate-600">
+                        <span class="font-medium text-slate-900">Message sent:</span>
+                        {{ submission.completion_message }}
+                    </p>
                 </div>
             </aside>
         </div>

@@ -57,6 +57,7 @@ class FeedbackSubmissionController extends Controller
                 $feedback,
                 $request->user(),
                 $request->validated('admin_notes'),
+                $request->validated('completion_message'),
             );
         } elseif ($request->boolean('mark_reviewed') && $feedback->status === FeedbackStatus::Pending) {
             $feedback->markReviewed($request->user(), $request->validated('admin_notes'));
@@ -128,6 +129,7 @@ class FeedbackSubmissionController extends Controller
             'status_label' => $submission->status->label(),
             'page_url' => $submission->page_url,
             'admin_notes' => $submission->admin_notes,
+            'completion_message' => $submission->completion_message,
             'created_at' => $submission->created_at?->toIso8601String(),
             'reviewed_at' => $submission->reviewed_at?->toIso8601String(),
             'completed_at' => $submission->completed_at?->toIso8601String(),

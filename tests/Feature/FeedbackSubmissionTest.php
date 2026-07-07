@@ -137,6 +137,7 @@ class FeedbackSubmissionTest extends TestCase
         $this->actingAs($admin)
             ->post(route('admin.feedback.update', $submission), [
                 'admin_notes' => 'Fixed in release 1.2.',
+                'completion_message' => 'The export button fix is live in today\'s release.',
                 'mark_completed' => true,
             ])
             ->assertRedirect(route('admin.feedback.show', $submission))
@@ -148,10 +149,12 @@ class FeedbackSubmissionTest extends TestCase
         $this->assertSame($admin->id, $submission->completed_by_user_id);
         $this->assertNotNull($submission->completed_at);
         $this->assertNotNull($submission->reviewed_at);
+        $this->assertSame('The export button fix is live in today\'s release.', $submission->completion_message);
 
         Mail::assertSent(FeedbackCompletedMail::class, function (FeedbackCompletedMail $mail) use ($submission) {
             return $mail->hasTo('client@example.com')
-                && str_contains($mail->render(), 'The export button does nothing.');
+                && str_contains($mail->render(), 'The export button does nothing.')
+                && str_contains($mail->render(), 'The export button fix is live in today\'s release.');
         });
     }
 

@@ -14,6 +14,7 @@ class CompleteFeedbackSubmissionService
         FeedbackSubmission $submission,
         User $admin,
         ?string $adminNotes = null,
+        ?string $completionMessage = null,
     ): FeedbackSubmission {
         if ($submission->status === FeedbackStatus::Completed) {
             return $submission;
@@ -26,6 +27,9 @@ class CompleteFeedbackSubmissionService
             'completed_at' => now(),
             'completed_by_user_id' => $admin->id,
             'admin_notes' => $adminNotes ?? $submission->admin_notes,
+            'completion_message' => $completionMessage !== null && trim($completionMessage) !== ''
+                ? trim($completionMessage)
+                : null,
         ];
 
         if ($submission->reviewed_at === null) {

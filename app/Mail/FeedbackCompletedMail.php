@@ -34,6 +34,7 @@ class FeedbackCompletedMail extends Mailable
                 'userName' => $this->submission->user->name,
                 'reasonLabel' => $this->submission->reason->label(),
                 'feedbackMessage' => $this->submission->message,
+                'completionMessage' => $this->submission->completion_message,
                 'submittedAt' => $this->submission->created_at,
             ],
         );

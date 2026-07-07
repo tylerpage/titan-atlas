@@ -22,6 +22,7 @@ class FeedbackSubmission extends Model
         'completed_at',
         'completed_by_user_id',
         'admin_notes',
+        'completion_message',
     ];
 
     /**
