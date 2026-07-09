@@ -1,13 +1,21 @@
-@import url('https://fonts.bunny.net/css?family=instrument-sans:400,500,600');
-
 @import 'tailwindcss';
+
+@font-face {
+    font-family: 'Graphik Web';
+    font-stretch: normal;
+    font-style: italic;
+    font-weight: 800;
+    src:
+        url('/static/Graphik-BlackItalic-Web-fca0e280ae7628a81514b9d5b72b94a2.woff2') format('woff2'),
+        url('/static/Graphik-BlackItalic-Web-53c34206f870b9b66f522df703c3d0cb.woff') format('woff');
+}
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 @source '../js/**/*.vue';
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+    --font-sans: 'Graphik Web', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
     --color-primary: var(--color-slate-900);
     --color-primary-hover: var(--color-slate-800);
