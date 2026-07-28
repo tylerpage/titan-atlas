@@ -6,6 +6,7 @@ import CredentialFieldLabel from '../../../../Components/CredentialFieldLabel.vu
 import GoogleOAuthConnect from '../../../../Components/GoogleOAuthConnect.vue';
 import StackAdaptConnect from '../../../../Components/StackAdaptConnect.vue';
 import MetaConnect from '../../../../Components/MetaConnect.vue';
+import PaidMediaAccountPicker from '../../../../Components/PaidMediaAccountPicker.vue';
 
 const props = defineProps({
     connection: {
@@ -50,8 +51,14 @@ const visibleCredentialFields = computed(() =>
 const usesGoogleOAuth = computed(() => Boolean(selectedConnector.value?.uses_google_oauth));
 const usesStackAdapt = computed(() => props.connection.connector_type === 'stackadapt');
 const usesMetaAds = computed(() => props.connection.connector_type === 'meta_ads');
+const usesAmazonAds = computed(() => props.connection.connector_type === 'amazon_ads');
+const usesWalmartConnect = computed(() => props.connection.connector_type === 'walmart_connect');
+const usesEbayAds = computed(() => props.connection.connector_type === 'ebay_ads');
 const stackAdaptAdvertisers = ref([]);
 const metaAdAccounts = ref([]);
+const amazonProfiles = ref([]);
+const walmartAdvertisers = ref([]);
+const ebayAdAccounts = ref([]);
 
 const googleOauth = computed(() => {
     const flashed = page.props.flash?.google_oauth;
@@ -189,6 +196,30 @@ async function testConnection() {
                 form.credentials.ad_account_id = data.debug.ad_accounts[0].adAccountId;
             }
         }
+
+        if (usesAmazonAds.value && Array.isArray(data.debug?.profiles)) {
+            amazonProfiles.value = data.debug.profiles;
+
+            if (!form.credentials.profile_id && data.debug.profiles.length === 1) {
+                form.credentials.profile_id = data.debug.profiles[0].accountId;
+            }
+        }
+
+        if (usesWalmartConnect.value && Array.isArray(data.debug?.advertisers)) {
+            walmartAdvertisers.value = data.debug.advertisers;
+
+            if (!form.credentials.advertiser_id && data.debug.advertisers.length === 1) {
+                form.credentials.advertiser_id = data.debug.advertisers[0].accountId;
+            }
+        }
+
+        if (usesEbayAds.value && Array.isArray(data.debug?.accounts)) {
+            ebayAdAccounts.value = data.debug.accounts;
+
+            if (!form.credentials.account_id && data.debug.accounts.length === 1) {
+                form.credentials.account_id = data.debug.accounts[0].accountId;
+            }
+        }
     } catch {
         testStatus.value = {
             type: 'error',
@@ -295,15 +326,42 @@ function clearConnectionData() {
                     :ad-accounts="metaAdAccounts"
                 />
 
+                <PaidMediaAccountPicker
+                    v-if="usesAmazonAds"
+                    v-model:account-id="form.credentials.profile_id"
+                    :accounts="amazonProfiles"
+                    input-id="amazon_profile_id"
+                    label="Advertising profile"
+                    help-text="One Amazon Ads profile per connection. Run Test connection after entering your access token to load this list."
+                />
+
+                <PaidMediaAccountPicker
+                    v-if="usesWalmartConnect"
+                    v-model:account-id="form.credentials.advertiser_id"
+                    :accounts="walmartAdvertisers"
+                    input-id="walmart_advertiser_id"
+                    label="Advertiser"
+                    help-text="One Walmart Connect advertiser per connection. Run Test connection after entering your access token to load this list."
+                />
+
+                <PaidMediaAccountPicker
+                    v-if="usesEbayAds"
+                    v-model:account-id="form.credentials.account_id"
+                    :accounts="ebayAdAccounts"
+                    input-id="ebay_account_id"
+                    label="Ad account"
+                    help-text="One eBay ad account per connection. Run Test connection after entering your access token to load this list."
+                />
+
                 <div v-for="field in visibleCredentialFields" :key="field.key">
                     <CredentialFieldLabel
-                        v-if="(!usesGoogleOAuth || !['site_url', 'property_id', 'customer_id', 'login_customer_id'].includes(field.key)) && (!usesStackAdapt || field.key !== 'advertiser_id') && (!usesMetaAds || field.key !== 'ad_account_id')"
+                        v-if="(!usesGoogleOAuth || !['site_url', 'property_id', 'customer_id', 'login_customer_id'].includes(field.key)) && (!usesStackAdapt || field.key !== 'advertiser_id') && (!usesMetaAds || field.key !== 'ad_account_id') && (!usesAmazonAds || field.key !== 'profile_id') && (!usesWalmartConnect || field.key !== 'advertiser_id') && (!usesEbayAds || field.key !== 'account_id')"
                         :for-id="field.key"
                         :label="field.label"
                         :help="field.help"
                     />
                     <input
-                        v-if="(!usesGoogleOAuth || !['site_url', 'property_id', 'customer_id', 'login_customer_id'].includes(field.key)) && (!usesStackAdapt || field.key !== 'advertiser_id') && (!usesMetaAds || field.key !== 'ad_account_id')"
+                        v-if="(!usesGoogleOAuth || !['site_url', 'property_id', 'customer_id', 'login_customer_id'].includes(field.key)) && (!usesStackAdapt || field.key !== 'advertiser_id') && (!usesMetaAds || field.key !== 'ad_account_id') && (!usesAmazonAds || field.key !== 'profile_id') && (!usesWalmartConnect || field.key !== 'advertiser_id') && (!usesEbayAds || field.key !== 'account_id')"
                         :id="field.key"
                         v-model="form.credentials[field.key]"
                         :type="field.type ?? 'text'"

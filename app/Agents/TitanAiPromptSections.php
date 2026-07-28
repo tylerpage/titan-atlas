@@ -136,17 +136,17 @@ SKILL;
         $describeConnector = $this->tool('describe_connector_schema');
 
         return <<<SKILL
-## Skill: paid media (Google Ads, StackAdapt, Reddit Ads)
+## Skill: paid media (Google Ads, Meta Ads, StackAdapt, Reddit Ads, Amazon Ads, Walmart Connect, eBay Advertising)
 - Campaign / budget / ROAS questions → call {$analyze} FIRST with the active ad connection.
 - Before saying data is unavailable, call {$check} for resource_type campaign_daily (or spend_daily).
 - Account spend trends → resource_type spend_daily. Campaign analysis → resource_type campaign_daily (NOT spend_daily).
 - Fields: campaign_id, campaign_name, cost, impressions, clicks, ctr, conversions_value (and conversions for StackAdapt).
-- Filter ads SQL with c.connector_type IN ('google_ads', 'stackadapt', 'reddit_ads') when multiple ad connectors exist.
+- Filter ads SQL with c.connector_type IN ('google_ads', 'meta_ads', 'stackadapt', 'reddit_ads', 'amazon_ads', 'walmart_connect', 'ebay_ads') when multiple ad connectors exist.
 - ROAS = conversions_value / NULLIF(cost, 0). Rank campaigns by ROAS and spend for budget reallocation advice.
 - High spend + low ROAS → cut candidates. Top ROAS with room to grow → receive candidates.
 - Projections: extrapolate from recent daily trends only — state clearly this is not a guaranteed forecast.
 - After analysis, save a table widget with {$create} when the user needs a visual.
-- For field details call {$describeConnector} with connector_type google_ads, stackadapt, or reddit_ads.
+- For field details call {$describeConnector} with connector_type google_ads, meta_ads, stackadapt, reddit_ads, amazon_ads, walmart_connect, or ebay_ads.
 SKILL;
     }
 
@@ -260,8 +260,12 @@ EXAMPLES;
             ->where('is_active', true)
             ->whereIn('connector_type', [
                 ConnectorType::GoogleAds,
+                ConnectorType::MetaAds,
                 ConnectorType::StackAdapt,
                 ConnectorType::RedditAds,
+                ConnectorType::AmazonAds,
+                ConnectorType::WalmartConnect,
+                ConnectorType::EbayAds,
             ])
             ->exists();
     }

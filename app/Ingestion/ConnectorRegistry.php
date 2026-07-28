@@ -4,8 +4,10 @@ namespace App\Ingestion;
 
 use App\Contracts\Ingestion\ConnectorInterface;
 use App\Enums\ConnectorType;
+use App\Ingestion\Connectors\AmazonAdsConnector;
 use App\Ingestion\Connectors\BigCommerceConnector;
 use App\Ingestion\Connectors\DynamicConnector;
+use App\Ingestion\Connectors\EbayAdsConnector;
 use App\Ingestion\Connectors\GoogleAdsConnector;
 use App\Ingestion\Connectors\GoogleAnalyticsConnector;
 use App\Ingestion\Connectors\MetaAdsConnector;
@@ -14,6 +16,7 @@ use App\Ingestion\Connectors\SearchConsoleConnector;
 use App\Ingestion\Connectors\SemrushConnector;
 use App\Ingestion\Connectors\ShopifyConnector;
 use App\Ingestion\Connectors\StackAdaptConnector;
+use App\Ingestion\Connectors\WalmartConnectConnector;
 use InvalidArgumentException;
 
 class ConnectorRegistry
@@ -33,6 +36,9 @@ class ConnectorRegistry
             ConnectorType::StackAdapt->value => StackAdaptConnector::class,
             ConnectorType::RedditAds->value => RedditAdsConnector::class,
             ConnectorType::MetaAds->value => MetaAdsConnector::class,
+            ConnectorType::AmazonAds->value => AmazonAdsConnector::class,
+            ConnectorType::WalmartConnect->value => WalmartConnectConnector::class,
+            ConnectorType::EbayAds->value => EbayAdsConnector::class,
             ConnectorType::Dynamic->value => DynamicConnector::class,
         ];
     }

@@ -384,6 +384,66 @@ SUMMARY;
                 ],
             ],
             [
+                'connector_type' => 'amazon_ads',
+                'label' => 'Amazon Ads',
+                'resources' => [
+                    [
+                        'name' => 'spend_daily',
+                        'titan_resource_type' => 'spend_daily',
+                        'source_api' => 'Amazon Advertising API reporting (account daily)',
+                        'payload_fields' => ['date', 'cost', 'impressions', 'clicks', 'ctr', 'conversions', 'conversions_value'],
+                        'fact_table_recommendation' => 'fact_amazon_ads_spend_daily',
+                    ],
+                    [
+                        'name' => 'campaign_daily',
+                        'titan_resource_type' => 'campaign_daily',
+                        'source_api' => 'Amazon Advertising API reporting (campaign daily)',
+                        'payload_fields' => ['date', 'campaign_id', 'campaign_name', 'objective', 'cost', 'impressions', 'clicks', 'conversions', 'conversions_value'],
+                        'fact_table_recommendation' => 'fact_amazon_ads_campaigns',
+                    ],
+                ],
+            ],
+            [
+                'connector_type' => 'walmart_connect',
+                'label' => 'Walmart Connect',
+                'resources' => [
+                    [
+                        'name' => 'spend_daily',
+                        'titan_resource_type' => 'spend_daily',
+                        'source_api' => 'Walmart Connect Ads API reporting (advertiser daily)',
+                        'payload_fields' => ['date', 'cost', 'impressions', 'clicks', 'ctr', 'conversions', 'conversions_value'],
+                        'fact_table_recommendation' => 'fact_walmart_connect_spend_daily',
+                    ],
+                    [
+                        'name' => 'campaign_daily',
+                        'titan_resource_type' => 'campaign_daily',
+                        'source_api' => 'Walmart Connect Ads API reporting (campaign daily)',
+                        'payload_fields' => ['date', 'campaign_id', 'campaign_name', 'cost', 'impressions', 'clicks', 'conversions', 'conversions_value'],
+                        'fact_table_recommendation' => 'fact_walmart_connect_campaigns',
+                    ],
+                ],
+            ],
+            [
+                'connector_type' => 'ebay_ads',
+                'label' => 'eBay Advertising',
+                'resources' => [
+                    [
+                        'name' => 'spend_daily',
+                        'titan_resource_type' => 'spend_daily',
+                        'source_api' => 'eBay Sell Marketing API reporting (account daily)',
+                        'payload_fields' => ['date', 'cost', 'impressions', 'clicks', 'ctr', 'conversions', 'conversions_value'],
+                        'fact_table_recommendation' => 'fact_ebay_ads_spend_daily',
+                    ],
+                    [
+                        'name' => 'campaign_daily',
+                        'titan_resource_type' => 'campaign_daily',
+                        'source_api' => 'eBay Sell Marketing API reporting (campaign daily)',
+                        'payload_fields' => ['date', 'campaign_id', 'campaign_name', 'cost', 'impressions', 'clicks', 'conversions', 'conversions_value'],
+                        'fact_table_recommendation' => 'fact_ebay_ads_campaigns',
+                    ],
+                ],
+            ],
+            [
                 'connector_type' => 'google_analytics',
                 'label' => 'Google Analytics 4',
                 'resources' => [

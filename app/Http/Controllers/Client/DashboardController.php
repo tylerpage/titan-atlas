@@ -8,15 +8,18 @@ use App\Http\Controllers\Controller;
 use App\Models\ClientDashboard;
 use App\Models\Connection;
 use App\Models\CoverPage;
+use App\Services\Analytics\AmazonAdsDashboardService;
 use App\Services\Analytics\CommerceDashboardService;
 use App\Services\Analytics\ConnectorDashboardCache;
 use App\Services\Analytics\DynamicConnectorDashboardService;
+use App\Services\Analytics\EbayAdsDashboardService;
 use App\Services\Analytics\GoogleAdsDashboardService;
 use App\Services\Analytics\GoogleAnalyticsDashboardService;
 use App\Services\Analytics\MetaAdsDashboardService;
 use App\Services\Analytics\RedditAdsDashboardService;
 use App\Services\Analytics\SearchConsoleDashboardService;
 use App\Services\Analytics\StackAdaptDashboardService;
+use App\Services\Analytics\WalmartConnectDashboardService;
 use App\Services\Analytics\CoverPageDataResolver;
 use App\Services\Analytics\WidgetDataService;
 use App\Services\Client\ClientDashboardTabDataService;
@@ -37,6 +40,9 @@ class DashboardController extends Controller
         GoogleAdsDashboardService $googleAds,
         StackAdaptDashboardService $stackAdapt,
         MetaAdsDashboardService $metaAds,
+        AmazonAdsDashboardService $amazonAds,
+        WalmartConnectDashboardService $walmartConnect,
+        EbayAdsDashboardService $ebayAds,
         RedditAdsDashboardService $redditAds,
         DynamicConnectorDashboardService $dynamicConnector,
         CoverPageDataResolver $coverPages,
@@ -123,6 +129,9 @@ class DashboardController extends Controller
                 $googleAds,
                 $stackAdapt,
                 $metaAds,
+                $amazonAds,
+                $walmartConnect,
+                $ebayAds,
                 $redditAds,
                 $dynamicConnector,
                 $dateRange,
@@ -234,6 +243,9 @@ class DashboardController extends Controller
         GoogleAdsDashboardService $googleAds,
         StackAdaptDashboardService $stackAdapt,
         MetaAdsDashboardService $metaAds,
+        AmazonAdsDashboardService $amazonAds,
+        WalmartConnectDashboardService $walmartConnect,
+        EbayAdsDashboardService $ebayAds,
         RedditAdsDashboardService $redditAds,
         DynamicConnectorDashboardService $dynamicConnector,
         string $dateRange,
@@ -285,6 +297,27 @@ class DashboardController extends Controller
                 $comparison,
             ),
             $connection->connector_type === ConnectorType::MetaAds => fn () => $metaAds->dataFor(
+                $dashboard,
+                $connection,
+                $dateRange,
+                $customRange,
+                $comparison,
+            ),
+            $connection->connector_type === ConnectorType::AmazonAds => fn () => $amazonAds->dataFor(
+                $dashboard,
+                $connection,
+                $dateRange,
+                $customRange,
+                $comparison,
+            ),
+            $connection->connector_type === ConnectorType::WalmartConnect => fn () => $walmartConnect->dataFor(
+                $dashboard,
+                $connection,
+                $dateRange,
+                $customRange,
+                $comparison,
+            ),
+            $connection->connector_type === ConnectorType::EbayAds => fn () => $ebayAds->dataFor(
                 $dashboard,
                 $connection,
                 $dateRange,

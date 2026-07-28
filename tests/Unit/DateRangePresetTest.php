@@ -13,6 +13,28 @@ class DateRangePresetTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_this_month_is_current_calendar_month_through_today(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-06-24 15:00:00'));
+
+        $dashboard = $this->dashboard();
+        [$start, $end] = app(WidgetDataService::class)->resolveDateRange($dashboard, 'this_month');
+
+        $this->assertSame('2026-06-01', $start->toDateString());
+        $this->assertSame('2026-06-24', $end->toDateString());
+    }
+
+    public function test_this_month_from_january_starts_on_first(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-01-10 09:00:00'));
+
+        $dashboard = $this->dashboard();
+        [$start, $end] = app(WidgetDataService::class)->resolveDateRange($dashboard, 'this_month');
+
+        $this->assertSame('2026-01-01', $start->toDateString());
+        $this->assertSame('2026-01-10', $end->toDateString());
+    }
+
     public function test_last_month_is_previous_full_calendar_month(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-06-24 15:00:00'));

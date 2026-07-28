@@ -84,6 +84,34 @@ class StoreConnectionRequest extends FormRequest
                     'Select a StackAdapt advertiser after testing your GraphQL API key.',
                 );
             }
+
+            if ($connectorType === ConnectorType::MetaAds && empty($credentials['ad_account_id'])) {
+                $validator->errors()->add(
+                    'credentials.ad_account_id',
+                    'Select a Meta ad account after testing your access token.',
+                );
+            }
+
+            if ($connectorType === ConnectorType::AmazonAds && empty($credentials['profile_id'])) {
+                $validator->errors()->add(
+                    'credentials.profile_id',
+                    'Select an Amazon Ads profile after testing your access token.',
+                );
+            }
+
+            if ($connectorType === ConnectorType::WalmartConnect && empty($credentials['advertiser_id'])) {
+                $validator->errors()->add(
+                    'credentials.advertiser_id',
+                    'Select a Walmart Connect advertiser after testing your access token.',
+                );
+            }
+
+            if ($connectorType === ConnectorType::EbayAds && empty($credentials['account_id'])) {
+                $validator->errors()->add(
+                    'credentials.account_id',
+                    'Select an eBay ad account after testing your access token.',
+                );
+            }
         });
     }
 }

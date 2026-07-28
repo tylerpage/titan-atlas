@@ -6,9 +6,13 @@ use App\Agents\ReportingAgentContext;
 use App\Enums\ConnectorType;
 use App\Models\Connection;
 use App\Services\AI\DashboardAgentMemoryService;
+use App\Services\Analytics\AmazonAdsDashboardService;
+use App\Services\Analytics\EbayAdsDashboardService;
 use App\Services\Analytics\GoogleAdsDashboardService;
+use App\Services\Analytics\MetaAdsDashboardService;
 use App\Services\Analytics\RedditAdsDashboardService;
 use App\Services\Analytics\StackAdaptDashboardService;
+use App\Services\Analytics\WalmartConnectDashboardService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Tools\Request;
 use Stringable;
@@ -19,7 +23,11 @@ class AnalyzeCampaignPerformanceTool extends ReportingTool
         ReportingAgentContext $context,
         protected GoogleAdsDashboardService $googleAds,
         protected StackAdaptDashboardService $stackAdapt,
+        protected MetaAdsDashboardService $metaAds,
         protected RedditAdsDashboardService $redditAds,
+        protected AmazonAdsDashboardService $amazonAds,
+        protected WalmartConnectDashboardService $walmartConnect,
+        protected EbayAdsDashboardService $ebayAds,
         protected DashboardAgentMemoryService $memories,
     ) {
         parent::__construct($context);
@@ -27,7 +35,7 @@ class AnalyzeCampaignPerformanceTool extends ReportingTool
 
     public function description(): Stringable|string
     {
-        return 'Return campaign-level ad performance for Google Ads, StackAdapt, or Reddit Ads using synced payload data. Use this before budget reallocation or ROAS questions.';
+        return 'Return campaign-level ad performance for paid media connectors using synced payload data. Use this before budget reallocation or ROAS questions.';
     }
 
     public function handle(Request $request): Stringable|string
@@ -69,13 +77,49 @@ class AnalyzeCampaignPerformanceTool extends ReportingTool
                     'end' => $this->context->previewEndDate->toDateString(),
                 ],
             ),
+            ConnectorType::MetaAds => $this->metaAds->dataFor(
+                $this->context->dashboard,
+                $connection,
+                'custom',
+                [
+                    'start' => $this->context->previewStartDate->toDateString(),
+                    'end' => $this->context->previewEndDate->toDateString(),
+                ],
+            ),
+            ConnectorType::AmazonAds => $this->amazonAds->dataFor(
+                $this->context->dashboard,
+                $connection,
+                'custom',
+                [
+                    'start' => $this->context->previewStartDate->toDateString(),
+                    'end' => $this->context->previewEndDate->toDateString(),
+                ],
+            ),
+            ConnectorType::WalmartConnect => $this->walmartConnect->dataFor(
+                $this->context->dashboard,
+                $connection,
+                'custom',
+                [
+                    'start' => $this->context->previewStartDate->toDateString(),
+                    'end' => $this->context->previewEndDate->toDateString(),
+                ],
+            ),
+            ConnectorType::EbayAds => $this->ebayAds->dataFor(
+                $this->context->dashboard,
+                $connection,
+                'custom',
+                [
+                    'start' => $this->context->previewStartDate->toDateString(),
+                    'end' => $this->context->previewEndDate->toDateString(),
+                ],
+            ),
             default => null,
         };
 
         if ($data === null) {
             return $this->json([
                 'success' => false,
-                'error' => 'AnalyzeCampaignPerformanceTool supports google_ads, stackadapt, and reddit_ads only.',
+                'error' => 'AnalyzeCampaignPerformanceTool does not support this connector type.',
             ]);
         }
 
@@ -150,7 +194,11 @@ class AnalyzeCampaignPerformanceTool extends ReportingTool
             ->whereIn('connector_type', [
                 ConnectorType::GoogleAds,
                 ConnectorType::StackAdapt,
+                ConnectorType::MetaAds,
                 ConnectorType::RedditAds,
+                ConnectorType::AmazonAds,
+                ConnectorType::WalmartConnect,
+                ConnectorType::EbayAds,
             ]);
 
         if ($connectionId) {

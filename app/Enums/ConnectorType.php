@@ -13,6 +13,9 @@ enum ConnectorType: string
     case StackAdapt = 'stackadapt';
     case RedditAds = 'reddit_ads';
     case MetaAds = 'meta_ads';
+    case AmazonAds = 'amazon_ads';
+    case WalmartConnect = 'walmart_connect';
+    case EbayAds = 'ebay_ads';
     case Dynamic = 'dynamic';
 
     public function label(): string
@@ -27,6 +30,9 @@ enum ConnectorType: string
             self::StackAdapt => 'StackAdapt',
             self::RedditAds => 'Reddit Ads',
             self::MetaAds => 'Meta Ads',
+            self::AmazonAds => 'Amazon Ads',
+            self::WalmartConnect => 'Walmart Connect',
+            self::EbayAds => 'eBay Advertising',
             self::Dynamic => 'Dynamic connector',
         };
     }
@@ -162,6 +168,48 @@ enum ConnectorType: string
                     'help' => 'One Meta ad account per connection. Run Test connection to list accessible ad accounts.',
                 ],
             ],
+            self::AmazonAds => [
+                [
+                    'key' => 'access_token',
+                    'label' => 'Login with Amazon access token',
+                    'type' => 'password',
+                    'help' => 'OAuth access token with Amazon Advertising API scope. Platform OAuth flow coming soon — paste a token from Login with Amazon for now.',
+                ],
+                [
+                    'key' => 'profile_id',
+                    'label' => 'Advertising profile',
+                    'placeholder' => 'Select after testing connection',
+                    'help' => 'One Amazon Ads profile per connection. Run Test connection to list accessible profiles.',
+                ],
+            ],
+            self::WalmartConnect => [
+                [
+                    'key' => 'access_token',
+                    'label' => 'OAuth access token',
+                    'type' => 'password',
+                    'help' => 'Walmart Connect OAuth token with Ads API read scope. Requires approved Walmart partner access.',
+                ],
+                [
+                    'key' => 'advertiser_id',
+                    'label' => 'Advertiser',
+                    'placeholder' => 'Select after testing connection',
+                    'help' => 'One Walmart Connect advertiser per connection. Run Test connection to list accessible advertisers.',
+                ],
+            ],
+            self::EbayAds => [
+                [
+                    'key' => 'access_token',
+                    'label' => 'OAuth access token',
+                    'type' => 'password',
+                    'help' => 'eBay OAuth token with sell.marketing.readonly scope from your eBay developer application.',
+                ],
+                [
+                    'key' => 'account_id',
+                    'label' => 'Ad account',
+                    'placeholder' => 'Select after testing connection',
+                    'help' => 'One eBay ad account per connection. Run Test connection to list accessible ad accounts.',
+                ],
+            ],
         };
     }
 
@@ -180,7 +228,7 @@ enum ConnectorType: string
 
     public function supportsLiveConnectionTest(): bool
     {
-        return in_array($this, [self::Shopify, self::BigCommerce, self::SearchConsole, self::GoogleAnalytics, self::GoogleAds, self::StackAdapt, self::RedditAds, self::MetaAds, self::Dynamic], true);
+        return in_array($this, [self::Shopify, self::BigCommerce, self::SearchConsole, self::GoogleAnalytics, self::GoogleAds, self::StackAdapt, self::RedditAds, self::MetaAds, self::AmazonAds, self::WalmartConnect, self::EbayAds, self::Dynamic], true);
     }
 
     public function isDynamic(): bool
@@ -212,6 +260,10 @@ enum ConnectorType: string
         return match ($this) {
             self::GoogleAds => ['login_customer_id'],
             self::StackAdapt => ['rest_api_key'],
+            self::MetaAds => ['ad_account_id'],
+            self::AmazonAds => ['profile_id'],
+            self::WalmartConnect => ['advertiser_id'],
+            self::EbayAds => ['account_id'],
             default => [],
         };
     }
@@ -227,6 +279,9 @@ enum ConnectorType: string
             self::StackAdapt => self::productName().' syncs StackAdapt programmatic delivery data: daily advertiser spend, campaign performance, channel mix (CTV, native, display, video, audio, and more), plus geo, domain, and device insights. Paste your StackAdapt GraphQL API key, test the connection to list advertisers, then select one advertiser per connection.',
             self::RedditAds => self::productName().' syncs Reddit Ads performance via the Ads API v3 reporting endpoint: daily spend, impressions, clicks, CTR, and conversions at account and campaign level. Provide an OAuth access token with ads read scope and the Reddit ad account ID (for example t2_abc123).',
             self::MetaAds => self::productName().' syncs Meta (Facebook/Instagram) Ads via the Marketing API Insights endpoint: daily spend, purchase revenue, ROAS, reach, campaign performance, and spend breakdowns by objective, placement, and device. Provide a Marketing API access token with ads_read scope, test the connection to list ad accounts, then select one account per connection.',
+            self::AmazonAds => self::productName().' syncs Amazon Advertising performance via the Advertising API: daily spend, impressions, clicks, attributed sales, ROAS, and campaign-level breakdowns for Sponsored Products, Brands, and Display. Set AMAZON_ADS_CLIENT_ID in platform config, provide a Login with Amazon access token, test the connection to list profiles, then select one profile per connection.',
+            self::WalmartConnect => self::productName().' syncs Walmart Connect retail media performance: daily spend, impressions, clicks, attributed sales, and campaign breakdowns. Requires Walmart partner-approved API access. Provide an OAuth token, test the connection to list advertisers, then select one advertiser per connection.',
+            self::EbayAds => self::productName().' syncs eBay Promoted Listings and advertising performance via the Sell Marketing API: daily spend, impressions, clicks, attributed sales, and campaign breakdowns. Provide an OAuth token with sell.marketing.readonly scope, test the connection to list ad accounts, then select one account per connection.',
             self::Dynamic => self::productName().' syncs data from an AI-configured REST API connector. Credentials and endpoints are defined in the connector blueprint.',
             default => null,
         };

@@ -28,6 +28,7 @@ return [
         'last_7_days' => 'Last 7 days',
         'last_30_days' => 'Last 30 days',
         'last_90_days' => 'Last 90 days',
+        'this_month' => 'This month',
         'last_month' => 'Last month',
         'last_year' => 'Last year',
         'ytd' => 'Year to date',
@@ -181,6 +182,41 @@ return [
         'http_timeout_seconds' => (int) env('TITAN_META_ADS_HTTP_TIMEOUT', 60),
         'top_campaigns_limit' => (int) env('TITAN_META_ADS_TOP_CAMPAIGNS_LIMIT', 100),
         'top_breakdown_limit' => (int) env('TITAN_META_ADS_TOP_BREAKDOWN_LIMIT', 15),
+    ],
+
+    'amazon_ads' => [
+        'base_url' => env('TITAN_AMAZON_ADS_BASE_URL', 'https://advertising-api.amazon.com'),
+        'api_version' => env('TITAN_AMAZON_ADS_API_VERSION', 'v2'),
+        'client_id' => env('AMAZON_ADS_CLIENT_ID'),
+        'client_secret' => env('AMAZON_ADS_CLIENT_SECRET'),
+        'profile_scope' => env('TITAN_AMAZON_ADS_PROFILE_SCOPE', 'advertising::campaign_management'),
+        'backfill_months' => (int) env('TITAN_AMAZON_ADS_BACKFILL_MONTHS', 16),
+        'incremental_days' => (int) env('TITAN_AMAZON_ADS_INCREMENTAL_DAYS', 5),
+        'data_lag_days' => (int) env('TITAN_AMAZON_ADS_DATA_LAG_DAYS', 2),
+        'chunk_days' => (int) env('TITAN_AMAZON_ADS_CHUNK_DAYS', 7),
+        'http_timeout_seconds' => (int) env('TITAN_AMAZON_ADS_HTTP_TIMEOUT', 60),
+        'top_campaigns_limit' => (int) env('TITAN_AMAZON_ADS_TOP_CAMPAIGNS_LIMIT', 100),
+    ],
+
+    'walmart_connect' => [
+        'base_url' => env('TITAN_WALMART_CONNECT_BASE_URL', 'https://developer.api.walmart.com/api-proxy/service/WPA/AdsApi/v1'),
+        'backfill_months' => (int) env('TITAN_WALMART_CONNECT_BACKFILL_MONTHS', 16),
+        'incremental_days' => (int) env('TITAN_WALMART_CONNECT_INCREMENTAL_DAYS', 5),
+        'data_lag_days' => (int) env('TITAN_WALMART_CONNECT_DATA_LAG_DAYS', 2),
+        'chunk_days' => (int) env('TITAN_WALMART_CONNECT_CHUNK_DAYS', 7),
+        'http_timeout_seconds' => (int) env('TITAN_WALMART_CONNECT_HTTP_TIMEOUT', 60),
+        'top_campaigns_limit' => (int) env('TITAN_WALMART_CONNECT_TOP_CAMPAIGNS_LIMIT', 100),
+    ],
+
+    'ebay_ads' => [
+        'base_url' => env('TITAN_EBAY_ADS_BASE_URL', 'https://api.ebay.com/sell/marketing/v1'),
+        'marketplace_id' => env('TITAN_EBAY_ADS_MARKETPLACE_ID', 'EBAY_US'),
+        'backfill_months' => (int) env('TITAN_EBAY_ADS_BACKFILL_MONTHS', 16),
+        'incremental_days' => (int) env('TITAN_EBAY_ADS_INCREMENTAL_DAYS', 5),
+        'data_lag_days' => (int) env('TITAN_EBAY_ADS_DATA_LAG_DAYS', 1),
+        'chunk_days' => (int) env('TITAN_EBAY_ADS_CHUNK_DAYS', 7),
+        'http_timeout_seconds' => (int) env('TITAN_EBAY_ADS_HTTP_TIMEOUT', 60),
+        'top_campaigns_limit' => (int) env('TITAN_EBAY_ADS_TOP_CAMPAIGNS_LIMIT', 100),
     ],
 
     'google_analytics' => [

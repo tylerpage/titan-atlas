@@ -67,6 +67,7 @@ class WidgetDataService
         return match ($preset) {
             'last_7_days' => [now()->subDays(6)->startOfDay(), now()->endOfDay()],
             'last_90_days' => [now()->subDays(89)->startOfDay(), now()->endOfDay()],
+            'this_month' => [now()->startOfMonth()->startOfDay(), now()->endOfDay()],
             'last_month' => [
                 now()->startOfMonth()->subMonth()->startOfDay(),
                 now()->startOfMonth()->subDay()->endOfDay(),
