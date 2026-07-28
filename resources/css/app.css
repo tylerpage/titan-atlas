@@ -3,6 +3,46 @@
 @font-face {
     font-family: 'Graphik Web';
     font-stretch: normal;
+    font-style: normal;
+    font-weight: 400;
+    src:
+        url('/static/Graphik-Regular-Web-4d7517f7fd39aba6022b5c8763c4f3d0.woff2') format('woff2'),
+        url('/static/Graphik-Regular-Web-31d1c182e407107f51377bac1d5147c0.woff') format('woff');
+}
+
+@font-face {
+    font-family: 'Graphik Web';
+    font-stretch: normal;
+    font-style: italic;
+    font-weight: 400;
+    src:
+        url('/static/Graphik-RegularItalic-Web-834caeda4dbac0668c3cf424e5023dc4.woff2') format('woff2'),
+        url('/static/Graphik-RegularItalic-Web-7140235e0898e0949cad11520638acbb.woff') format('woff');
+}
+
+@font-face {
+    font-family: 'Graphik Web';
+    font-stretch: normal;
+    font-style: normal;
+    font-weight: 600;
+    src:
+        url('/static/Graphik-Semibold-Web-8025c8999dfb55372ec23de79379fb65.woff2') format('woff2'),
+        url('/static/Graphik-Semibold-Web-2a57d72c1e190f8591c4c8891ac8eb8f.woff') format('woff');
+}
+
+@font-face {
+    font-family: 'Graphik Web';
+    font-stretch: normal;
+    font-style: normal;
+    font-weight: 800;
+    src:
+        url('/static/Graphik-Black-Web-d5e055a0df257b462bee0cefc44485fc.woff2') format('woff2'),
+        url('/static/Graphik-Black-Web-0d3fd43b507c8b21b564842535a60879.woff') format('woff');
+}
+
+@font-face {
+    font-family: 'Graphik Web';
+    font-stretch: normal;
     font-style: italic;
     font-weight: 800;
     src:
