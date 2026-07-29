@@ -852,6 +852,7 @@ function sourceMediumLabel(order) {
                     :comparison-series="connectorData.comparison_revenue_series"
                     :comparing="comparing"
                     :color="dashboard.primary_color"
+                    series-label="This period"
                 />
             </section>
 

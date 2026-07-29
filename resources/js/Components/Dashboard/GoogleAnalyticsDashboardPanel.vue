@@ -190,7 +190,7 @@ const lagNoticeItems = computed(() => {
                 :comparing="comparing"
                 :color="primaryColor"
                 value-format="number"
-                series-label="Sessions"
+                series-label="This period"
             />
         </section>
 

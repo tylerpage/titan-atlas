@@ -37,7 +37,7 @@ const props = defineProps({
     },
     comparisonOverlay: {
         type: Boolean,
-        default: false,
+        default: true,
     },
 });
 
@@ -47,6 +47,10 @@ function formatValue(value) {
 
 const canvasRef = ref(null);
 let chart = null;
+
+const useComparisonOverlay = computed(() => (
+    props.comparing && props.comparisonSeries.length > 0 && props.comparisonOverlay
+));
 
 const labels = computed(() => {
     const dates = new Set();
@@ -67,7 +71,7 @@ function valuesForSeries(series) {
 }
 
 const datasets = computed(() => {
-    if (props.comparisonOverlay && props.comparing && props.comparisonSeries.length > 0) {
+    if (useComparisonOverlay.value) {
         return [
             {
                 label: props.comparisonSeriesLabel,
@@ -163,7 +167,7 @@ function buildChartConfig() {
                             return `${context.dataset.label}: ${formatValue(context.parsed.y)}`;
                         },
                         afterBody(tooltipItems) {
-                            if (!props.comparisonOverlay || tooltipItems.length < 2) {
+                            if (!useComparisonOverlay.value || tooltipItems.length < 2) {
                                 return [];
                             }
 

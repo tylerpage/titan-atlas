@@ -292,8 +292,10 @@ return [
     ],
 
     'feedback' => [
+        'disk' => env('TITAN_FEEDBACK_DISK', env('FILESYSTEM_DISK', 'local')),
         'max_attachments' => (int) env('TITAN_FEEDBACK_MAX_ATTACHMENTS', 5),
         'max_attachment_kb' => (int) env('TITAN_FEEDBACK_MAX_ATTACHMENT_KB', 10240),
+        'inline_preview_max_bytes' => (int) env('TITAN_FEEDBACK_INLINE_PREVIEW_MAX_BYTES', 5_242_880),
     ],
 
     'analytics_engineer' => [

@@ -8,8 +8,12 @@ const props = defineProps({
     },
 });
 
-const imageAttachments = computed(() => props.attachments.filter((attachment) => attachment.is_image && attachment.preview_url));
+const imageAttachments = computed(() => props.attachments.filter((attachment) => attachment.is_image && attachmentPreviewSrc(attachment)));
 const nonImageAttachments = computed(() => props.attachments.filter((attachment) => !attachment.is_image));
+
+function attachmentPreviewSrc(attachment) {
+    return attachment.preview_src || attachment.preview_url || null;
+}
 
 const lightboxOpen = ref(false);
 const activeAttachment = ref(null);
@@ -91,7 +95,7 @@ onBeforeUnmount(() => {
                 @click="openLightbox(attachment)"
             >
                 <img
-                    :src="attachment.preview_url"
+                    :src="attachmentPreviewSrc(attachment)"
                     :alt="attachment.original_filename"
                     class="max-h-72 w-full object-contain transition group-hover:scale-[1.01]"
                 />
@@ -168,7 +172,7 @@ onBeforeUnmount(() => {
 
         <div class="flex flex-1 items-center justify-center overflow-auto p-4">
             <img
-                :src="activeAttachment.preview_url"
+                :src="attachmentPreviewSrc(activeAttachment)"
                 :alt="activeAttachment.original_filename"
                 class="max-w-none origin-center transition-transform duration-150"
                 :style="{ transform: `scale(${zoom})` }"

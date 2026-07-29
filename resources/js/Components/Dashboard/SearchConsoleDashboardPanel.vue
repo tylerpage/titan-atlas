@@ -137,7 +137,7 @@ const lagNoticeItems = computed(() => {
                     :comparing="comparing"
                     :color="primaryColor"
                     value-format="number"
-                    series-label="Impressions"
+                    series-label="This period"
                 />
             </section>
             <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -148,7 +148,7 @@ const lagNoticeItems = computed(() => {
                     :comparing="comparing"
                     :color="primaryColor"
                     value-format="number"
-                    series-label="URL clicks"
+                    series-label="This period"
                 />
             </section>
         </div>

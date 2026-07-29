@@ -8,6 +8,7 @@ use App\Http\Requests\Admin\UpdateFeedbackSubmissionRequest;
 use App\Models\FeedbackAttachment;
 use App\Models\FeedbackSubmission;
 use App\Services\Feedback\CompleteFeedbackSubmissionService;
+use App\Services\Feedback\FeedbackAttachmentPresenter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -17,6 +18,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FeedbackSubmissionController extends Controller
 {
+    public function __construct(protected FeedbackAttachmentPresenter $attachments) {}
     public function index(): Response
     {
         return Inertia::render('Admin/Feedback/Index', [
@@ -79,23 +81,30 @@ class FeedbackSubmissionController extends Controller
 
     public function downloadAttachment(FeedbackAttachment $attachment): StreamedResponse
     {
-        abort_unless(Storage::disk('local')->exists($attachment->storage_path), 404);
+        $disk = $this->attachments->disk();
+        abort_unless(Storage::disk($disk)->exists($attachment->storage_path), 404);
 
-        return Storage::disk('local')->download(
+        return Storage::disk($disk)->download(
             $attachment->storage_path,
             $attachment->original_filename,
         );
     }
 
-    public function showAttachment(FeedbackAttachment $attachment): BinaryFileResponse
+    public function showAttachment(FeedbackAttachment $attachment): BinaryFileResponse|RedirectResponse
     {
-        abort_unless(Storage::disk('local')->exists($attachment->storage_path), 404);
-        abort_unless(str_starts_with((string) $attachment->mime_type, 'image/'), 404);
+        abort_unless($this->attachments->isImage($attachment), 404);
+
+        $disk = $this->attachments->disk();
+        abort_unless(Storage::disk($disk)->exists($attachment->storage_path), 404);
+
+        if (config("filesystems.disks.{$disk}.driver") === 's3') {
+            return redirect()->away($this->attachments->previewUrl($attachment));
+        }
 
         return response()->file(
-            Storage::disk('local')->path($attachment->storage_path),
+            Storage::disk($disk)->path($attachment->storage_path),
             [
-                'Content-Type' => $attachment->mime_type,
+                'Content-Type' => $this->attachments->imageMimeType($attachment),
                 'Content-Disposition' => 'inline; filename="'.addslashes($attachment->original_filename).'"',
             ],
         );
@@ -169,27 +178,9 @@ class FeedbackSubmissionController extends Controller
                 'name' => $submission->completedBy->name,
             ] : null,
             'attachments' => $submission->attachments
-                ->map(fn (FeedbackAttachment $attachment) => $this->serializeAttachment($attachment))
+                ->map(fn (FeedbackAttachment $attachment) => $this->attachments->serialize($attachment))
                 ->values()
                 ->all(),
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    protected function serializeAttachment(FeedbackAttachment $attachment): array
-    {
-        $isImage = str_starts_with((string) $attachment->mime_type, 'image/');
-
-        return [
-            'id' => $attachment->id,
-            'original_filename' => $attachment->original_filename,
-            'mime_type' => $attachment->mime_type,
-            'size_bytes' => $attachment->size_bytes,
-            'is_image' => $isImage,
-            'preview_url' => $isImage ? route('admin.feedback.attachments.show', $attachment) : null,
-            'download_url' => route('admin.feedback.attachments.download', $attachment),
         ];
     }
 }

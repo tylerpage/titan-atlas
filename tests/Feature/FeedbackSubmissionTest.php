@@ -132,6 +132,41 @@ class FeedbackSubmissionTest extends TestCase
             ->assertHeader('Content-Disposition', 'inline; filename="screenshot.png"');
     }
 
+    public function test_admin_feedback_show_embeds_inline_image_preview_src(): void
+    {
+        Storage::fake('local');
+        config(['titan.feedback.disk' => 'local']);
+
+        $admin = User::factory()->create(['role' => UserRole::Admin]);
+        $user = User::factory()->create(['role' => UserRole::Client]);
+
+        $submission = FeedbackSubmission::query()->create([
+            'user_id' => $user->id,
+            'reason' => FeedbackReason::DataWrong->value,
+            'message' => 'Chart looks wrong.',
+            'status' => FeedbackStatus::Pending,
+        ]);
+
+        $path = 'feedback/'.$submission->id.'/screenshot.png';
+        Storage::disk('local')->put($path, 'fake-image-bytes');
+
+        $submission->attachments()->create([
+            'original_filename' => 'screenshot.png',
+            'storage_path' => $path,
+            'mime_type' => 'image/png',
+            'size_bytes' => 16,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.feedback.show', $submission))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Admin/Feedback/Show')
+                ->where('submission.attachments.0.preview_src', fn ($src) => str_starts_with((string) $src, 'data:image/png;base64,'))
+                ->where('submission.attachments.0.is_image', true)
+            );
+    }
+
     public function test_admin_can_mark_feedback_completed_and_notify_user(): void
     {
         Mail::fake();

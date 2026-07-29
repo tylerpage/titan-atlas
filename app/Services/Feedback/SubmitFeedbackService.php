@@ -44,21 +44,25 @@ class SubmitFeedbackService
 
     protected function storeAttachment(FeedbackSubmission $submission, UploadedFile $file): FeedbackAttachment
     {
-        $path = $file->store('feedback/'.$submission->id, 'local');
+        $disk = (string) config('titan.feedback.disk', config('filesystems.default', 'local'));
+        $path = $file->store('feedback/'.$submission->id, $disk);
+        $mimeType = $file->getMimeType() ?: $file->getClientMimeType();
 
         return FeedbackAttachment::query()->create([
             'feedback_submission_id' => $submission->id,
             'original_filename' => $file->getClientOriginalName(),
             'storage_path' => $path,
-            'mime_type' => $file->getClientMimeType(),
+            'mime_type' => $mimeType,
             'size_bytes' => $file->getSize() ?: 0,
         ]);
     }
 
     public function deleteAttachmentFile(FeedbackAttachment $attachment): void
     {
-        if (Storage::disk('local')->exists($attachment->storage_path)) {
-            Storage::disk('local')->delete($attachment->storage_path);
+        $disk = (string) config('titan.feedback.disk', config('filesystems.default', 'local'));
+
+        if (Storage::disk($disk)->exists($attachment->storage_path)) {
+            Storage::disk($disk)->delete($attachment->storage_path);
         }
     }
 }
