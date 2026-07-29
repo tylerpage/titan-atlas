@@ -10,7 +10,9 @@ use App\Models\FeedbackSubmission;
 use App\Services\Feedback\CompleteFeedbackSubmissionService;
 use App\Services\Feedback\FeedbackAttachmentPresenter;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -89,9 +91,13 @@ class FeedbackSubmissionController extends Controller
         );
     }
 
-    public function showAttachment(FeedbackAttachment $attachment): StreamedResponse
+    public function showAttachment(Request $request, FeedbackAttachment $attachment): StreamedResponse
     {
         abort_unless($this->attachments->isImage($attachment), 404);
+        abort_unless(
+            $request->hasValidSignature() || ($request->user()?->isAdmin() ?? false),
+            403,
+        );
 
         $disk = $this->attachments->resolveReadableDisk($attachment);
         abort_unless($disk !== null, 404);

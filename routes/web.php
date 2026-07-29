@@ -52,6 +52,10 @@ Route::get('/admin/google/oauth/callback', [AdminGoogleOAuthController::class, '
 
 Route::get('/s/{code}', [DashboardShareController::class, 'show'])->name('dashboard.share.show');
 
+Route::get('/admin/feedback-attachments/{attachment}', [AdminFeedbackSubmissionController::class, 'showAttachment'])
+    ->middleware('signed')
+    ->name('admin.feedback.attachments.show');
+
 Route::middleware('auth')->group(function () {
     Route::get('/', HomeController::class)->name('home');
 
@@ -64,8 +68,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/feedback/{feedback}', [AdminFeedbackSubmissionController::class, 'update'])->name('feedback.update');
         Route::get('/feedback-attachments/{attachment}/download', [AdminFeedbackSubmissionController::class, 'downloadAttachment'])
             ->name('feedback.attachments.download');
-        Route::get('/feedback-attachments/{attachment}', [AdminFeedbackSubmissionController::class, 'showAttachment'])
-            ->name('feedback.attachments.show');
         Route::get('/connector-api-logs', [AdminConnectorApiLogController::class, 'index'])->name('connector-api-logs.index');
         Route::get('/connector-api-logs/{connectorApiLog}', [AdminConnectorApiLogController::class, 'show'])->name('connector-api-logs.show');
         Route::get('/gathered-analytics', [AdminGatheredAnalyticsController::class, 'index'])->name('gathered-analytics.index');

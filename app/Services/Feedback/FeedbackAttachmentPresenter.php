@@ -4,6 +4,7 @@ namespace App\Services\Feedback;
 
 use App\Models\FeedbackAttachment;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 
 class FeedbackAttachmentPresenter
 {
@@ -51,7 +52,11 @@ class FeedbackAttachmentPresenter
             'is_image' => $isImage,
             'preview_src' => $previewSrc,
             'preview_url' => $isImage && $readableDisk !== null && $previewSrc === null
-                ? route('admin.feedback.attachments.show', $attachment, absolute: true)
+                ? URL::temporarySignedRoute(
+                    'admin.feedback.attachments.show',
+                    now()->addMinutes(30),
+                    ['attachment' => $attachment->id],
+                )
                 : null,
             'download_url' => route('admin.feedback.attachments.download', $attachment, absolute: true),
             'missing' => $readableDisk === null,

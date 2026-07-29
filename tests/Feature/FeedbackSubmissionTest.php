@@ -14,6 +14,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
 
 class FeedbackSubmissionTest extends TestCase
@@ -127,7 +128,11 @@ class FeedbackSubmissionTest extends TestCase
         ]);
 
         $this->actingAs($admin)
-            ->get(route('admin.feedback.attachments.show', $imageAttachment))
+            ->get(URL::temporarySignedRoute(
+                'admin.feedback.attachments.show',
+                now()->addHour(),
+                ['attachment' => $imageAttachment->id],
+            ))
             ->assertOk()
             ->assertHeader('content-type', 'image/png');
     }

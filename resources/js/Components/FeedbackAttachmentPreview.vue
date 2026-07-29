@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 
 const props = defineProps({
     attachments: {
@@ -11,86 +11,17 @@ const props = defineProps({
 const imageAttachments = computed(() => props.attachments.filter((attachment) => attachment.is_image));
 const nonImageAttachments = computed(() => props.attachments.filter((attachment) => !attachment.is_image));
 
-const resolvedSrcById = ref({});
-const failedIds = ref(new Set());
-const blobUrls = [];
-
-function resolveKey(attachment) {
-    return String(attachment.id);
-}
-
-function setResolvedSrc(attachment, src) {
-    resolvedSrcById.value = {
-        ...resolvedSrcById.value,
-        [resolveKey(attachment)]: src,
-    };
-}
-
-function markFailed(attachment) {
-    failedIds.value = new Set([...failedIds.value, resolveKey(attachment)]);
-}
-
 function attachmentPreviewSrc(attachment) {
-    return resolvedSrcById.value[resolveKey(attachment)] ?? attachment.preview_src ?? null;
-}
-
-async function loadAttachmentPreview(attachment) {
-    const key = resolveKey(attachment);
-
     if (attachment.preview_src) {
-        setResolvedSrc(attachment, attachment.preview_src);
-
-        return;
+        return attachment.preview_src;
     }
 
-    if (!attachment.preview_url || attachment.missing) {
-        if (attachment.missing) {
-            markFailed(attachment);
-        }
-
-        return;
+    if (attachment.preview_url) {
+        return attachment.preview_url;
     }
 
-    try {
-        const response = await fetch(attachment.preview_url, {
-            credentials: 'same-origin',
-            headers: {
-                Accept: 'image/*',
-            },
-        });
-
-        if (!response.ok) {
-            markFailed(attachment);
-
-            return;
-        }
-
-        const blob = await response.blob();
-        const objectUrl = URL.createObjectURL(blob);
-        blobUrls.push(objectUrl);
-        setResolvedSrc(attachment, objectUrl);
-    } catch {
-        markFailed(attachment);
-    }
+    return null;
 }
-
-async function loadAllPreviews() {
-    await Promise.all(imageAttachments.value.map((attachment) => loadAttachmentPreview(attachment)));
-}
-
-onMounted(loadAllPreviews);
-
-watch(
-    () => props.attachments,
-    () => {
-        loadAllPreviews();
-    },
-    { deep: true },
-);
-
-onBeforeUnmount(() => {
-    blobUrls.forEach((url) => URL.revokeObjectURL(url));
-});
 
 const lightboxOpen = ref(false);
 const activeAttachment = ref(null);
@@ -183,11 +114,11 @@ onBeforeUnmount(() => {
                         :alt="attachment.original_filename"
                         class="max-h-72 w-full object-contain transition group-hover:scale-[1.01]"
                     />
-                    <p v-else-if="failedIds.has(resolveKey(attachment)) || attachment.missing" class="px-4 text-center text-sm text-slate-500">
+                    <p v-else-if="attachment.missing" class="px-4 text-center text-sm text-slate-500">
                         Image file unavailable on server storage.
                     </p>
                     <p v-else class="px-4 text-center text-sm text-slate-500">
-                        Loading preview…
+                        Preview unavailable.
                     </p>
                 </div>
                 <div class="border-t border-slate-200 px-3 py-2 text-sm">
