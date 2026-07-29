@@ -2,31 +2,27 @@
 
 namespace App\Ingestion\Connectors\AmazonAds;
 
+use App\Ingestion\Connectors\Concerns\MapsMarketplaceReportRows;
 use App\Ingestion\Connectors\Contracts\PaidMediaAdsApiClient;
+use App\Support\AsyncReportPoller;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
 class AmazonAdsApiClient implements PaidMediaAdsApiClient
 {
+    use MapsMarketplaceReportRows;
+
+    public function __construct(protected AsyncReportPoller $poller) {}
+
     protected function baseUrl(): string
     {
         return rtrim((string) config('titan.amazon_ads.base_url', 'https://advertising-api.amazon.com'), '/');
     }
 
-    protected function apiVersion(): string
-    {
-        return trim((string) config('titan.amazon_ads.api_version', 'v2'), '/');
-    }
-
     protected function clientId(): string
     {
         return trim((string) config('titan.amazon_ads.client_id', ''));
-    }
-
-    protected function profileScope(): string
-    {
-        return trim((string) config('titan.amazon_ads.profile_scope', 'advertising::campaign_management'));
     }
 
     public function normalizeProfileId(string $id): string
@@ -39,10 +35,13 @@ class AmazonAdsApiClient implements PaidMediaAdsApiClient
      */
     public function listAccounts(string $accessToken): array
     {
-        $response = $this->request($accessToken, 'GET', '/profiles');
+        $response = $this->request($accessToken, 'GET', '/v2/profiles');
+        $source = is_array($response) && array_is_list($response)
+            ? $response
+            : Arr::get($response, 'profiles', Arr::get($response, 'data', []));
         $profiles = [];
 
-        foreach (Arr::get($response, 'profiles', Arr::get($response, 'data', [])) as $row) {
+        foreach ($source as $row) {
             if (! is_array($row)) {
                 continue;
             }
@@ -71,9 +70,8 @@ class AmazonAdsApiClient implements PaidMediaAdsApiClient
     public function testConnection(string $accessToken, string $accountId): array
     {
         $accountId = $this->normalizeProfileId($accountId);
-        $profiles = $this->listAccounts($accessToken);
 
-        foreach ($profiles as $profile) {
+        foreach ($this->listAccounts($accessToken) as $profile) {
             if ($profile['accountId'] === $accountId) {
                 return $profile;
             }
@@ -94,33 +92,314 @@ class AmazonAdsApiClient implements PaidMediaAdsApiClient
     ): array {
         $accountId = $this->normalizeProfileId($accountId);
 
-        $response = $this->request(
-            $accessToken,
-            'POST',
-            '/reporting/reports/query',
-            profileId: $accountId,
-            body: [
-                'startDate' => $startDate,
-                'endDate' => $endDate,
-                'stream' => $stream,
-                'groupBy' => $stream === 'campaign_daily' ? ['date', 'campaign'] : ['date'],
-                'metrics' => [
-                    'impressions',
-                    'clicks',
-                    'cost',
-                    'purchases',
-                    'sales',
-                ],
-            ],
-        );
+        if ($stream === 'spend_daily') {
+            return $this->aggregateDailySpend(
+                $this->fetchAdProductReports($accessToken, $accountId, $startDate, $endDate, 'spend_daily'),
+            );
+        }
 
-        $rows = Arr::get($response, 'rows', Arr::get($response, 'data', []));
+        if ($stream === 'ad_type_daily') {
+            return $this->fetchAdTypeDaily($accessToken, $accountId, $startDate, $endDate);
+        }
 
-        if (! is_array($rows)) {
+        $configuration = $this->reportConfiguration($stream);
+
+        if ($configuration === null) {
             return [];
         }
 
-        return array_values(array_filter($rows, fn ($row) => is_array($row)));
+        return $this->mapAmazonRows(
+            $this->runAsyncReport($accessToken, $accountId, $startDate, $endDate, $configuration),
+            $stream,
+        );
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     * @return list<array<string, mixed>>
+     */
+    protected function mapAmazonRows(array $rows, string $stream): array
+    {
+        $mapped = [];
+
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $date = $this->mapDate($row);
+
+            if ($date === '') {
+                continue;
+            }
+
+            $metrics = $this->mapStandardMetrics($row);
+            $mappedRow = array_merge(['date' => $date], $metrics);
+
+            if ($stream === 'campaign_daily') {
+                $campaignId = (string) ($row['campaignId'] ?? $row['campaign_id'] ?? '');
+
+                if ($campaignId === '') {
+                    continue;
+                }
+
+                $mappedRow['campaign_id'] = $campaignId;
+                $mappedRow['campaign_name'] = (string) ($row['campaignName'] ?? $row['campaign_name'] ?? $campaignId);
+                $mappedRow['objective'] = (string) ($row['adProduct'] ?? $row['campaignType'] ?? '');
+            } elseif ($stream === 'keyword_daily') {
+                $keyword = (string) ($row['searchTerm'] ?? $row['keyword'] ?? $row['targeting'] ?? '');
+
+                if ($keyword === '') {
+                    continue;
+                }
+
+                $mappedRow['dimension_key'] = md5(strtolower($keyword));
+                $mappedRow['dimension_label'] = $keyword;
+            } elseif ($stream === 'ad_product_daily') {
+                $asin = (string) ($row['advertisedAsin'] ?? $row['asin'] ?? '');
+
+                if ($asin === '') {
+                    continue;
+                }
+
+                $mappedRow['dimension_key'] = $asin;
+                $mappedRow['dimension_label'] = (string) ($row['advertisedSku'] ?? $row['sku'] ?? $asin);
+            } elseif ($stream === 'ad_type_daily') {
+                $adType = (string) ($row['ad_product'] ?? $row['adProduct'] ?? '');
+
+                if ($adType === '') {
+                    continue;
+                }
+
+                $mappedRow['dimension_key'] = $adType;
+                $mappedRow['dimension_label'] = $this->formatAdProductLabel($adType);
+            }
+
+            $mapped[] = $mappedRow;
+        }
+
+        return $mapped;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    protected function fetchAdTypeDaily(
+        string $accessToken,
+        string $accountId,
+        string $startDate,
+        string $endDate,
+    ): array {
+        $rows = [];
+
+        foreach ($this->adProducts() as $adProduct => $label) {
+            $configuration = $this->reportConfiguration('spend_daily', $adProduct);
+            $reportRows = $this->runAsyncReport($accessToken, $accountId, $startDate, $endDate, $configuration);
+
+            foreach ($reportRows as $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+
+                $date = $this->mapDate($row);
+
+                if ($date === '') {
+                    continue;
+                }
+
+                $rows[] = array_merge(
+                    ['date' => $date, 'ad_product' => $adProduct],
+                    $this->mapStandardMetrics($row),
+                );
+            }
+        }
+
+        return $this->mapAmazonRows($rows, 'ad_type_daily');
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $reports
+     * @return list<array<string, mixed>>
+     */
+    protected function fetchAdProductReports(
+        string $accessToken,
+        string $accountId,
+        string $startDate,
+        string $endDate,
+        string $stream,
+    ): array {
+        $reports = [];
+
+        foreach (array_keys($this->adProducts()) as $adProduct) {
+            $configuration = $this->reportConfiguration($stream, $adProduct);
+            $reports[] = $this->runAsyncReport($accessToken, $accountId, $startDate, $endDate, $configuration);
+        }
+
+        return $reports;
+    }
+
+    /**
+     * @param  list<list<array<string, mixed>>>  $reports
+     * @return list<array<string, mixed>>
+     */
+    protected function aggregateDailySpend(array $reports): array
+    {
+        $byDate = [];
+
+        foreach ($reports as $reportRows) {
+            foreach ($reportRows as $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+
+                $date = $this->mapDate($row);
+
+                if ($date === '') {
+                    continue;
+                }
+
+                $metrics = $this->mapStandardMetrics($row);
+
+                if (! isset($byDate[$date])) {
+                    $byDate[$date] = array_merge(['date' => $date], $metrics);
+
+                    continue;
+                }
+
+                foreach (['cost', 'impressions', 'clicks', 'conversions', 'conversions_value'] as $key) {
+                    $byDate[$date][$key] += $metrics[$key];
+                }
+
+                $impressions = $byDate[$date]['impressions'];
+                $clicks = $byDate[$date]['clicks'];
+                $byDate[$date]['ctr'] = $impressions > 0 ? round(($clicks / $impressions) * 100, 4) : 0.0;
+            }
+        }
+
+        ksort($byDate);
+
+        return array_values($byDate);
+    }
+
+    /**
+     * @param  array<string, mixed>  $configuration
+     * @return list<array<string, mixed>>
+     */
+    protected function runAsyncReport(
+        string $accessToken,
+        string $accountId,
+        string $startDate,
+        string $endDate,
+        array $configuration,
+    ): array {
+        $createResponse = $this->request(
+            $accessToken,
+            'POST',
+            '/reporting/reports',
+            profileId: $accountId,
+            body: [
+                'name' => 'titan-'.($configuration['reportTypeId'] ?? 'report').'-'.uniqid(),
+                'startDate' => str_replace('-', '', $startDate),
+                'endDate' => str_replace('-', '', $endDate),
+                'configuration' => $configuration,
+            ],
+            contentType: 'application/vnd.createasyncreportrequest.v3+json',
+            accept: 'application/vnd.createasyncreportresponse.v3+json',
+        );
+
+        $reportId = (string) ($createResponse['reportId'] ?? $createResponse['id'] ?? '');
+
+        if ($reportId === '') {
+            throw new RuntimeException('Amazon Ads report creation did not return a report ID.');
+        }
+
+        $status = $this->poller->waitUntilReady(
+            fn () => $this->request(
+                $accessToken,
+                'GET',
+                "/reporting/reports/{$reportId}",
+                profileId: $accountId,
+                accept: 'application/vnd.getasyncreportresponse.v3+json',
+            ),
+            fn (array $payload) => in_array(strtoupper((string) ($payload['status'] ?? '')), ['COMPLETED', 'SUCCESS'], true),
+            fn (array $payload) => in_array(strtoupper((string) ($payload['status'] ?? '')), ['FAILED', 'CANCELLED', 'FATAL'], true),
+        );
+
+        $downloadUrl = (string) ($status['url'] ?? $status['location'] ?? '');
+
+        if ($downloadUrl === '') {
+            throw new RuntimeException('Amazon Ads report completed without a download URL.');
+        }
+
+        return $this->poller->downloadJsonRows($downloadUrl, $accessToken);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function adProducts(): array
+    {
+        return [
+            'SPONSORED_PRODUCTS' => 'Sponsored Products',
+            'SPONSORED_BRANDS' => 'Sponsored Brands',
+            'SPONSORED_DISPLAY' => 'Sponsored Display',
+        ];
+    }
+
+    protected function formatAdProductLabel(string $adProduct): string
+    {
+        return $this->adProducts()[$adProduct] ?? ucwords(strtolower(str_replace('_', ' ', $adProduct)));
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    protected function reportConfiguration(string $stream, ?string $adProduct = null): ?array
+    {
+        $columns = [
+            'date',
+            'impressions',
+            'clicks',
+            'cost',
+            'purchases14d',
+            'sales14d',
+        ];
+
+        return match ($stream) {
+            'spend_daily' => [
+                'adProduct' => $adProduct ?? 'SPONSORED_PRODUCTS',
+                'groupBy' => [],
+                'columns' => $columns,
+                'reportTypeId' => 'spCampaigns',
+                'timeUnit' => 'DAILY',
+                'format' => 'GZIP_JSON',
+            ],
+            'campaign_daily' => [
+                'adProduct' => 'SPONSORED_PRODUCTS',
+                'groupBy' => ['campaign'],
+                'columns' => array_merge($columns, ['campaignId', 'campaignName', 'campaignStatus']),
+                'reportTypeId' => 'spCampaigns',
+                'timeUnit' => 'DAILY',
+                'format' => 'GZIP_JSON',
+            ],
+            'keyword_daily' => [
+                'adProduct' => 'SPONSORED_PRODUCTS',
+                'groupBy' => ['searchTerm'],
+                'columns' => array_merge($columns, ['searchTerm']),
+                'reportTypeId' => 'spSearchTerm',
+                'timeUnit' => 'DAILY',
+                'format' => 'GZIP_JSON',
+            ],
+            'ad_product_daily' => [
+                'adProduct' => 'SPONSORED_PRODUCTS',
+                'groupBy' => ['advertisedAsin'],
+                'columns' => array_merge($columns, ['advertisedAsin', 'advertisedSku']),
+                'reportTypeId' => 'spAdvertisedProduct',
+                'timeUnit' => 'DAILY',
+                'format' => 'GZIP_JSON',
+            ],
+            default => null,
+        };
     }
 
     /**
@@ -133,15 +412,21 @@ class AmazonAdsApiClient implements PaidMediaAdsApiClient
         string $path,
         ?string $profileId = null,
         array $body = [],
+        ?string $contentType = null,
+        ?string $accept = null,
     ): array {
         $timeout = max(10, (int) config('titan.amazon_ads.http_timeout_seconds', 60));
-        $url = $this->baseUrl().'/'.trim($this->apiVersion(), '/').'/'.ltrim($path, '/');
+        $url = $this->baseUrl().'/'.ltrim($path, '/');
         $clientId = $this->clientId();
 
         $headers = [
-            'Accept' => 'application/json',
+            'Accept' => $accept ?? 'application/json',
             'Amazon-Advertising-API-ClientId' => $clientId !== '' ? $clientId : 'scaffold-client-id',
         ];
+
+        if ($contentType !== null) {
+            $headers['Content-Type'] = $contentType;
+        }
 
         if ($profileId !== null && $profileId !== '') {
             $headers['Amazon-Advertising-API-Scope'] = $profileId;
@@ -149,7 +434,6 @@ class AmazonAdsApiClient implements PaidMediaAdsApiClient
 
         $pending = Http::withToken($accessToken)
             ->withHeaders($headers)
-            ->acceptJson()
             ->timeout($timeout);
 
         $response = strtoupper($method) === 'POST'

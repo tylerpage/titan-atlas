@@ -2,26 +2,33 @@
 
 namespace App\Services\Analytics;
 
-use App\Enums\DateComparison;
-use App\Models\ClientDashboard;
 use App\Models\Connection;
+use Carbon\Carbon;
 
-class WalmartConnectDashboardService extends GoogleAdsDashboardService
+class WalmartConnectDashboardService extends RetailMediaDashboardService
 {
+    protected function retailMediaKind(): string
+    {
+        return 'walmart_connect';
+    }
+
+    protected function retailMediaConfigKey(): string
+    {
+        return 'walmart_connect';
+    }
+
     /**
-     * @param  array{start?: string, end?: string}|null  $customRange
      * @return array<string, mixed>
      */
-    public function dataFor(
-        ClientDashboard $dashboard,
-        Connection $connection,
-        ?string $dateRange = null,
-        ?array $customRange = null,
-        DateComparison|string|null $comparison = null,
-    ): array {
-        $data = parent::dataFor($dashboard, $connection, $dateRange, $customRange, $comparison);
-        $data['kind'] = 'walmart_connect';
-
-        return $data;
+    protected function extraBreakdowns(Connection $connection, Carbon $start, Carbon $end): array
+    {
+        return [
+            'keywords' => $this->dimensionBreakdown($connection, $start, $end, 'keyword_daily'),
+            'page_types' => $this->dimensionBreakdown($connection, $start, $end, 'page_type_daily'),
+            'tactics' => $this->dimensionBreakdown($connection, $start, $end, 'tactic_daily'),
+            'objectives' => [],
+            'placements' => [],
+            'devices' => [],
+        ];
     }
 }

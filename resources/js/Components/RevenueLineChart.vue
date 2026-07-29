@@ -35,6 +35,10 @@ const props = defineProps({
         type: String,
         default: 'Previous period',
     },
+    comparisonOverlay: {
+        type: Boolean,
+        default: false,
+    },
 });
 
 function formatValue(value) {
@@ -63,6 +67,38 @@ function valuesForSeries(series) {
 }
 
 const datasets = computed(() => {
+    if (props.comparisonOverlay && props.comparing && props.comparisonSeries.length > 0) {
+        return [
+            {
+                label: props.comparisonSeriesLabel,
+                data: valuesForSeries(props.comparisonSeries),
+                borderColor: '#64748b',
+                backgroundColor: 'rgba(100, 116, 139, 0.08)',
+                borderDash: [5, 4],
+                borderWidth: 2,
+                fill: false,
+                tension: 0.3,
+                pointRadius: 3,
+                pointHoverRadius: 5,
+                pointBackgroundColor: '#64748b',
+                order: 2,
+            },
+            {
+                label: props.seriesLabel,
+                data: valuesForSeries(props.series),
+                borderColor: props.color,
+                backgroundColor: `${props.color}33`,
+                borderWidth: 2.5,
+                fill: '-1',
+                tension: 0.3,
+                pointRadius: 3,
+                pointHoverRadius: 5,
+                pointBackgroundColor: props.color,
+                order: 1,
+            },
+        ];
+    }
+
     const items = [
         {
             label: props.seriesLabel,
@@ -92,6 +128,17 @@ const datasets = computed(() => {
     return items;
 });
 
+function formatPercentChange(current, prior) {
+    if (prior === null || prior === undefined || prior === 0 || current === null || current === undefined) {
+        return null;
+    }
+
+    const change = ((current - prior) / prior) * 100;
+    const prefix = change > 0 ? '+' : '';
+
+    return `${prefix}${change.toFixed(1)}% vs ${props.comparisonSeriesLabel.toLowerCase()}`;
+}
+
 function buildChartConfig() {
     return {
         type: 'line',
@@ -114,6 +161,17 @@ function buildChartConfig() {
                     callbacks: {
                         label(context) {
                             return `${context.dataset.label}: ${formatValue(context.parsed.y)}`;
+                        },
+                        afterBody(tooltipItems) {
+                            if (!props.comparisonOverlay || tooltipItems.length < 2) {
+                                return [];
+                            }
+
+                            const current = tooltipItems.find((item) => item.dataset.label === props.seriesLabel)?.parsed.y;
+                            const prior = tooltipItems.find((item) => item.dataset.label === props.comparisonSeriesLabel)?.parsed.y;
+                            const changeLabel = formatPercentChange(current, prior);
+
+                            return changeLabel ? [changeLabel] : [];
                         },
                     },
                 },
@@ -160,7 +218,7 @@ function syncChart() {
 onMounted(syncChart);
 
 watch(
-    () => [props.series, props.comparisonSeries, props.comparing, props.color, props.valueFormat, props.seriesLabel],
+    () => [props.series, props.comparisonSeries, props.comparing, props.comparisonOverlay, props.color, props.valueFormat, props.seriesLabel, props.comparisonSeriesLabel],
     syncChart,
     { deep: true },
 );

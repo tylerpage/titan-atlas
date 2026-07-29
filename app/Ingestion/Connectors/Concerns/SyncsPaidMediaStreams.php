@@ -12,9 +12,6 @@ use Illuminate\Support\Arr;
 
 trait SyncsPaidMediaStreams
 {
-    /** @var list<string> */
-    protected array $streams = ['spend_daily', 'campaign_daily'];
-
     abstract protected function paidMediaConfigKey(): string;
 
     abstract protected function paidMediaCursorPrefix(): string;
@@ -74,7 +71,7 @@ trait SyncsPaidMediaStreams
 
     public function syncStreams(): array
     {
-        return $this->streams;
+        return ['spend_daily', 'campaign_daily'];
     }
 
     public function initialSyncCursor(Connection $connection, string $stream, bool $fanOut = false): string
@@ -116,7 +113,7 @@ trait SyncsPaidMediaStreams
         $walk = SyncDateChunkWalker::walkForConnection($connection);
 
         return SyncDateChunkWalker::initialState($start, $end, $walk, [
-            'stream' => $this->streams[0],
+            'stream' => $this->syncStreams()[0],
         ]);
     }
 
@@ -193,8 +190,18 @@ trait SyncsPaidMediaStreams
 
                 $payload['campaign_id'] = $campaignId;
                 $payload['campaign_name'] = (string) ($row['campaign_name'] ?? Arr::get($row, 'campaign.name', $campaignId));
-                $payload['objective'] = (string) ($row['objective'] ?? Arr::get($row, 'campaign_type', ''));
+                $payload['objective'] = (string) ($row['objective'] ?? Arr::get($row, 'campaign_type', Arr::get($row, 'ad_product', '')));
                 $externalId = "{$date}:{$campaignId}";
+            } elseif ($this->isPaidMediaDimensionStream($stream)) {
+                $dimensionKey = (string) ($row['dimension_key'] ?? Arr::get($row, 'keyword', Arr::get($row, 'listing_id', '')));
+
+                if ($dimensionKey === '' || ($cost <= 0 && $payload['conversions_value'] <= 0)) {
+                    continue;
+                }
+
+                $payload['dimension_key'] = $dimensionKey;
+                $payload['dimension_label'] = (string) ($row['dimension_label'] ?? Arr::get($row, 'keyword_text', Arr::get($row, 'listing_title', $dimensionKey)));
+                $externalId = "{$date}:{$dimensionKey}";
             } else {
                 if ($cost <= 0 && $payload['conversions_value'] <= 0) {
                     continue;
@@ -252,12 +259,25 @@ trait SyncsPaidMediaStreams
 
     protected function nextPaidMediaStream(string $current): ?string
     {
-        $index = array_search($current, $this->streams, true);
+        $streams = $this->syncStreams();
+        $index = array_search($current, $streams, true);
 
-        if ($index === false || ! isset($this->streams[$index + 1])) {
+        if ($index === false || ! isset($streams[$index + 1])) {
             return null;
         }
 
-        return $this->streams[$index + 1];
+        return $streams[$index + 1];
+    }
+
+    protected function isPaidMediaDimensionStream(string $stream): bool
+    {
+        return in_array($stream, [
+            'ad_type_daily',
+            'keyword_daily',
+            'listing_daily',
+            'ad_product_daily',
+            'page_type_daily',
+            'tactic_daily',
+        ], true);
     }
 }

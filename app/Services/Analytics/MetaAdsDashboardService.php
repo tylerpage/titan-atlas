@@ -15,6 +15,16 @@ class MetaAdsDashboardService
 {
     public function __construct(protected WidgetDataService $widgets) {}
 
+    protected function paidMediaDashboardKind(): string
+    {
+        return 'meta_ads';
+    }
+
+    protected function paidMediaDashboardConfigKey(): string
+    {
+        return 'meta_ads';
+    }
+
     /**
      * @param  array{start?: string, end?: string}|null  $customRange
      * @return array<string, mixed>
@@ -63,7 +73,7 @@ class MetaAdsDashboardService
         $bottomCampaigns = $this->bottomCampaignsByRoas($campaigns, 10);
 
         return [
-            'kind' => 'meta_ads',
+            'kind' => $this->paidMediaDashboardKind(),
             'currency' => $this->resolveAccountCurrency($connection),
             'summary' => [
                 'cost' => $daily['cost'],
@@ -242,7 +252,7 @@ class MetaAdsDashboardService
      */
     protected function campaignBreakdown(Connection $connection, Carbon $start, Carbon $end): array
     {
-        $limit = max(1, (int) config('titan.meta_ads.top_campaigns_limit', 100));
+        $limit = max(1, (int) config('titan.'.$this->paidMediaDashboardConfigKey().'.top_campaigns_limit', 100));
 
         $rows = DedupedRawPayloadQuery::applyToQueryBuilder(
             DB::table('raw_connector_payloads'),
@@ -334,7 +344,7 @@ class MetaAdsDashboardService
      */
     protected function objectiveBreakdown(Connection $connection, Carbon $start, Carbon $end): array
     {
-        $limit = max(1, (int) config('titan.meta_ads.top_breakdown_limit', 15));
+        $limit = max(1, (int) config('titan.'.$this->paidMediaDashboardConfigKey().'.top_breakdown_limit', 15));
 
         $rows = DedupedRawPayloadQuery::applyToQueryBuilder(
             DB::table('raw_connector_payloads'),
@@ -374,7 +384,7 @@ class MetaAdsDashboardService
         Carbon $end,
         string $resourceType,
     ): array {
-        $limit = max(1, (int) config('titan.meta_ads.top_breakdown_limit', 15));
+        $limit = max(1, (int) config('titan.'.$this->paidMediaDashboardConfigKey().'.top_breakdown_limit', 15));
 
         $rows = DedupedRawPayloadQuery::applyToQueryBuilder(
             DB::table('raw_connector_payloads'),

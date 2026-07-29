@@ -2,13 +2,19 @@
 
 namespace App\Ingestion\Connectors\EbayAds;
 
+use App\Ingestion\Connectors\Concerns\MapsMarketplaceReportRows;
 use App\Ingestion\Connectors\Contracts\PaidMediaAdsApiClient;
+use App\Support\AsyncReportPoller;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
 class EbayAdsApiClient implements PaidMediaAdsApiClient
 {
+    use MapsMarketplaceReportRows;
+
+    public function __construct(protected AsyncReportPoller $poller) {}
+
     protected function baseUrl(): string
     {
         return rtrim((string) config('titan.ebay_ads.base_url', 'https://api.ebay.com/sell/marketing/v1'), '/');
@@ -90,28 +96,147 @@ class EbayAdsApiClient implements PaidMediaAdsApiClient
         string $stream,
     ): array {
         $accountId = $this->normalizeAccountId($accountId);
+        $configuration = $this->reportConfiguration($stream);
 
-        $response = $this->request(
-            $accessToken,
-            'POST',
-            "/ad_account/{$accountId}/report",
-            body: [
-                'marketplaceId' => $this->marketplaceId(),
-                'startDate' => $startDate,
-                'endDate' => $endDate,
-                'stream' => $stream,
-                'dimensions' => $stream === 'campaign_daily' ? ['DAY', 'CAMPAIGN'] : ['DAY'],
-                'metrics' => ['IMPRESSIONS', 'CLICKS', 'AD_FEES', 'SALES', 'SALE_AMOUNT'],
-            ],
-        );
-
-        $rows = Arr::get($response, 'records', Arr::get($response, 'rows', Arr::get($response, 'data', [])));
-
-        if (! is_array($rows)) {
+        if ($configuration === null) {
             return [];
         }
 
-        return array_values(array_filter($rows, fn ($row) => is_array($row)));
+        return $this->mapEbayRows(
+            $this->runAsyncReport($accessToken, $accountId, $startDate, $endDate, $configuration),
+            $stream,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $configuration
+     * @return list<array<string, mixed>>
+     */
+    protected function runAsyncReport(
+        string $accessToken,
+        string $accountId,
+        string $startDate,
+        string $endDate,
+        array $configuration,
+    ): array {
+        $createResponse = $this->request(
+            $accessToken,
+            'POST',
+            '/ad_report',
+            body: array_merge($configuration, [
+                'marketplaceId' => $this->marketplaceId(),
+                'dateFrom' => $startDate,
+                'dateTo' => $endDate,
+                'reportFormat' => 'JSON',
+            ]),
+        );
+
+        $reportId = (string) ($createResponse['reportId'] ?? $createResponse['reportTaskId'] ?? $createResponse['id'] ?? '');
+
+        if ($reportId === '') {
+            throw new RuntimeException('eBay report task creation did not return a report ID.');
+        }
+
+        $status = $this->poller->waitUntilReady(
+            fn () => $this->request($accessToken, 'GET', "/ad_report/{$reportId}"),
+            fn (array $payload) => in_array(strtoupper((string) ($payload['reportTaskStatus'] ?? $payload['status'] ?? '')), ['SUCCESS', 'COMPLETED'], true),
+            fn (array $payload) => in_array(strtoupper((string) ($payload['reportTaskStatus'] ?? $payload['status'] ?? '')), ['FAILED', 'CANCELLED'], true),
+        );
+
+        $downloadUrl = (string) ($status['reportHref'] ?? $status['url'] ?? '');
+
+        if ($downloadUrl === '') {
+            throw new RuntimeException('eBay report completed without a download URL.');
+        }
+
+        return $this->poller->downloadJsonRows($downloadUrl, $accessToken);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    protected function reportConfiguration(string $stream): ?array
+    {
+        return match ($stream) {
+            'spend_daily' => [
+                'reportType' => 'ACCOUNT_PERFORMANCE_REPORT',
+                'dimensions' => ['DAY'],
+                'metricKeys' => ['IMPRESSIONS', 'CLICKS', 'AD_FEES', 'SALES', 'SALE_AMOUNT'],
+            ],
+            'campaign_daily' => [
+                'reportType' => 'CAMPAIGN_PERFORMANCE_REPORT',
+                'dimensions' => ['DAY', 'CAMPAIGN'],
+                'metricKeys' => ['IMPRESSIONS', 'CLICKS', 'AD_FEES', 'SALES', 'SALE_AMOUNT'],
+            ],
+            'listing_daily' => [
+                'reportType' => 'LISTING_PERFORMANCE_REPORT',
+                'dimensions' => ['DAY', 'LISTING'],
+                'metricKeys' => ['IMPRESSIONS', 'CLICKS', 'AD_FEES', 'SALES', 'SALE_AMOUNT'],
+            ],
+            'keyword_daily' => [
+                'reportType' => 'KEYWORD_PERFORMANCE_REPORT',
+                'dimensions' => ['DAY', 'KEYWORD'],
+                'metricKeys' => ['IMPRESSIONS', 'CLICKS', 'AD_FEES', 'SALES', 'SALE_AMOUNT'],
+            ],
+            default => null,
+        };
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     * @return list<array<string, mixed>>
+     */
+    protected function mapEbayRows(array $rows, string $stream): array
+    {
+        $mapped = [];
+
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $date = $this->mapDate($row);
+
+            if ($date === '') {
+                continue;
+            }
+
+            $metrics = $this->mapStandardMetrics($row);
+            $mappedRow = array_merge(['date' => $date], $metrics);
+
+            if ($stream === 'campaign_daily') {
+                $campaignId = (string) ($row['campaignId'] ?? $row['campaign_id'] ?? '');
+
+                if ($campaignId === '') {
+                    continue;
+                }
+
+                $mappedRow['campaign_id'] = $campaignId;
+                $mappedRow['campaign_name'] = (string) ($row['campaignName'] ?? $row['campaign_name'] ?? $campaignId);
+            } elseif ($stream === 'listing_daily') {
+                $listingId = (string) ($row['listingId'] ?? $row['listing_id'] ?? '');
+
+                if ($listingId === '') {
+                    continue;
+                }
+
+                $mappedRow['dimension_key'] = $listingId;
+                $mappedRow['dimension_label'] = (string) ($row['listingTitle'] ?? $row['listing_title'] ?? $listingId);
+            } elseif ($stream === 'keyword_daily') {
+                $keyword = (string) ($row['keyword'] ?? $row['keywordText'] ?? '');
+
+                if ($keyword === '') {
+                    continue;
+                }
+
+                $mappedRow['dimension_key'] = md5(strtolower($keyword));
+                $mappedRow['dimension_label'] = $keyword;
+            }
+
+            $mapped[] = $mappedRow;
+        }
+
+        return $mapped;
     }
 
     /**

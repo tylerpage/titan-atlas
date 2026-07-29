@@ -18,6 +18,17 @@ class AmazonAdsConnector extends AbstractConnector implements FanOutSyncConnecto
 
     public function __construct(protected AmazonAdsApiClient $client) {}
 
+    public function syncStreams(): array
+    {
+        return [
+            'spend_daily',
+            'campaign_daily',
+            'ad_type_daily',
+            'keyword_daily',
+            'ad_product_daily',
+        ];
+    }
+
     public function type(): string
     {
         return ConnectorType::AmazonAds->value;

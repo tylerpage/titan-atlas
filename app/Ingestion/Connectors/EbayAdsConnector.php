@@ -18,6 +18,16 @@ class EbayAdsConnector extends AbstractConnector implements FanOutSyncConnector
 
     public function __construct(protected EbayAdsApiClient $client) {}
 
+    public function syncStreams(): array
+    {
+        return [
+            'spend_daily',
+            'campaign_daily',
+            'listing_daily',
+            'keyword_daily',
+        ];
+    }
+
     public function type(): string
     {
         return ConnectorType::EbayAds->value;

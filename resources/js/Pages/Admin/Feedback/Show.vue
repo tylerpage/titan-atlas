@@ -1,6 +1,7 @@
 <script setup>
 import { Link, useForm } from '@inertiajs/vue3';
 import AppLayout from '../../../Layouts/AppLayout.vue';
+import FeedbackAttachmentPreview from '../../../Components/FeedbackAttachmentPreview.vue';
 
 const props = defineProps({
     submission: {
@@ -40,25 +41,7 @@ function submit(action = 'save') {
                     <p class="mt-3 whitespace-pre-wrap text-sm text-slate-700">{{ submission.message }}</p>
                 </div>
 
-                <div
-                    v-if="submission.attachments.length"
-                    class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
-                >
-                    <h2 class="text-lg font-semibold">Attachments</h2>
-                    <ul class="mt-3 space-y-2 text-sm">
-                        <li v-for="attachment in submission.attachments" :key="attachment.id">
-                            <a
-                                :href="attachment.download_url"
-                                class="text-primary hover:underline"
-                            >
-                                {{ attachment.original_filename }}
-                            </a>
-                            <span class="text-slate-500">
-                                ({{ Math.round(attachment.size_bytes / 1024) }} KB)
-                            </span>
-                        </li>
-                    </ul>
-                </div>
+                <FeedbackAttachmentPreview :attachments="submission.attachments" />
 
                 <form
                     class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm"

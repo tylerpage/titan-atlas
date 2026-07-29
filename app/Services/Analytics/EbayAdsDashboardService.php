@@ -2,26 +2,32 @@
 
 namespace App\Services\Analytics;
 
-use App\Enums\DateComparison;
-use App\Models\ClientDashboard;
 use App\Models\Connection;
+use Carbon\Carbon;
 
-class EbayAdsDashboardService extends GoogleAdsDashboardService
+class EbayAdsDashboardService extends RetailMediaDashboardService
 {
+    protected function retailMediaKind(): string
+    {
+        return 'ebay_ads';
+    }
+
+    protected function retailMediaConfigKey(): string
+    {
+        return 'ebay_ads';
+    }
+
     /**
-     * @param  array{start?: string, end?: string}|null  $customRange
      * @return array<string, mixed>
      */
-    public function dataFor(
-        ClientDashboard $dashboard,
-        Connection $connection,
-        ?string $dateRange = null,
-        ?array $customRange = null,
-        DateComparison|string|null $comparison = null,
-    ): array {
-        $data = parent::dataFor($dashboard, $connection, $dateRange, $customRange, $comparison);
-        $data['kind'] = 'ebay_ads';
-
-        return $data;
+    protected function extraBreakdowns(Connection $connection, Carbon $start, Carbon $end): array
+    {
+        return [
+            'listings' => $this->dimensionBreakdown($connection, $start, $end, 'listing_daily'),
+            'keywords' => $this->dimensionBreakdown($connection, $start, $end, 'keyword_daily'),
+            'objectives' => [],
+            'placements' => [],
+            'devices' => [],
+        ];
     }
 }

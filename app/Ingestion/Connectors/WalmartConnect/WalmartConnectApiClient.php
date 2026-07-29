@@ -2,13 +2,19 @@
 
 namespace App\Ingestion\Connectors\WalmartConnect;
 
+use App\Ingestion\Connectors\Concerns\MapsMarketplaceReportRows;
 use App\Ingestion\Connectors\Contracts\PaidMediaAdsApiClient;
+use App\Support\AsyncReportPoller;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
 class WalmartConnectApiClient implements PaidMediaAdsApiClient
 {
+    use MapsMarketplaceReportRows;
+
+    public function __construct(protected AsyncReportPoller $poller) {}
+
     protected function baseUrl(): string
     {
         return rtrim((string) config('titan.walmart_connect.base_url', 'https://developer.api.walmart.com/api-proxy/service/WPA/AdsApi/v1'), '/');
@@ -77,27 +83,141 @@ class WalmartConnectApiClient implements PaidMediaAdsApiClient
         string $stream,
     ): array {
         $accountId = $this->normalizeAdvertiserId($accountId);
+        $configuration = $this->reportConfiguration($stream);
 
-        $response = $this->request(
-            $accessToken,
-            'POST',
-            "/advertisers/{$accountId}/reports",
-            body: [
-                'startDate' => $startDate,
-                'endDate' => $endDate,
-                'stream' => $stream,
-                'groupBy' => $stream === 'campaign_daily' ? ['DATE', 'CAMPAIGN'] : ['DATE'],
-                'metrics' => ['impressions', 'clicks', 'adSpend', 'attributedSales', 'attributedOrders'],
-            ],
-        );
-
-        $rows = Arr::get($response, 'rows', Arr::get($response, 'data', []));
-
-        if (! is_array($rows)) {
+        if ($configuration === null) {
             return [];
         }
 
-        return array_values(array_filter($rows, fn ($row) => is_array($row)));
+        return $this->mapWalmartRows(
+            $this->runAsyncSnapshot($accessToken, $accountId, $startDate, $endDate, $configuration),
+            $stream,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $configuration
+     * @return list<array<string, mixed>>
+     */
+    protected function runAsyncSnapshot(
+        string $accessToken,
+        string $accountId,
+        string $startDate,
+        string $endDate,
+        array $configuration,
+    ): array {
+        $createResponse = $this->request(
+            $accessToken,
+            'POST',
+            "/advertisers/{$accountId}/snapshot",
+            body: array_merge($configuration, [
+                'startDate' => $startDate,
+                'endDate' => $endDate,
+            ]),
+        );
+
+        $snapshotId = (string) ($createResponse['snapshotId'] ?? $createResponse['requestId'] ?? $createResponse['id'] ?? '');
+
+        if ($snapshotId === '') {
+            throw new RuntimeException('Walmart snapshot request did not return a snapshot ID.');
+        }
+
+        $status = $this->poller->waitUntilReady(
+            fn () => $this->request($accessToken, 'GET', "/advertisers/{$accountId}/snapshot/{$snapshotId}"),
+            fn (array $payload) => in_array(strtoupper((string) ($payload['status'] ?? $payload['jobStatus'] ?? '')), ['DONE', 'COMPLETED', 'READY'], true),
+            fn (array $payload) => in_array(strtoupper((string) ($payload['status'] ?? $payload['jobStatus'] ?? '')), ['FAILED', 'ERROR', 'CANCELLED'], true),
+        );
+
+        $downloadUrl = (string) ($status['downloadUrl'] ?? $status['url'] ?? '');
+
+        if ($downloadUrl === '') {
+            throw new RuntimeException('Walmart snapshot completed without a download URL.');
+        }
+
+        return $this->poller->downloadJsonRows($downloadUrl, $accessToken);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    protected function reportConfiguration(string $stream): ?array
+    {
+        return match ($stream) {
+            'spend_daily' => [
+                'reportType' => 'accountPerformance',
+                'groupBy' => ['DATE'],
+                'metrics' => ['impressions', 'clicks', 'adSpend', 'attributedSales', 'attributedOrders'],
+            ],
+            'campaign_daily' => [
+                'reportType' => 'campaignPerformance',
+                'groupBy' => ['DATE', 'CAMPAIGN'],
+                'metrics' => ['impressions', 'clicks', 'adSpend', 'attributedSales', 'attributedOrders'],
+            ],
+            'keyword_daily' => [
+                'reportType' => 'keywordPerformance',
+                'groupBy' => ['DATE', 'KEYWORD'],
+                'metrics' => ['impressions', 'clicks', 'adSpend', 'attributedSales', 'attributedOrders'],
+            ],
+            'page_type_daily' => [
+                'reportType' => 'pageTypePerformance',
+                'groupBy' => ['DATE', 'PAGE_TYPE'],
+                'metrics' => ['impressions', 'clicks', 'adSpend', 'attributedSales', 'attributedOrders'],
+            ],
+            'tactic_daily' => [
+                'reportType' => 'tacticPerformance',
+                'groupBy' => ['DATE', 'TACTIC'],
+                'metrics' => ['impressions', 'clicks', 'adSpend', 'attributedSales', 'attributedOrders'],
+            ],
+            default => null,
+        };
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     * @return list<array<string, mixed>>
+     */
+    protected function mapWalmartRows(array $rows, string $stream): array
+    {
+        $mapped = [];
+
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $date = $this->mapDate($row);
+
+            if ($date === '') {
+                continue;
+            }
+
+            $metrics = $this->mapStandardMetrics($row);
+            $mappedRow = array_merge(['date' => $date], $metrics);
+
+            if ($stream === 'campaign_daily') {
+                $campaignId = (string) ($row['campaignId'] ?? $row['campaign_id'] ?? '');
+
+                if ($campaignId === '') {
+                    continue;
+                }
+
+                $mappedRow['campaign_id'] = $campaignId;
+                $mappedRow['campaign_name'] = (string) ($row['campaignName'] ?? $row['campaign_name'] ?? $campaignId);
+            } elseif (in_array($stream, ['keyword_daily', 'page_type_daily', 'tactic_daily'], true)) {
+                $dimensionKey = (string) ($row['keyword'] ?? $row['pageType'] ?? $row['tactic'] ?? $row['dimension'] ?? '');
+
+                if ($dimensionKey === '') {
+                    continue;
+                }
+
+                $mappedRow['dimension_key'] = md5(strtolower($dimensionKey));
+                $mappedRow['dimension_label'] = $dimensionKey;
+            }
+
+            $mapped[] = $mappedRow;
+        }
+
+        return $mapped;
     }
 
     /**

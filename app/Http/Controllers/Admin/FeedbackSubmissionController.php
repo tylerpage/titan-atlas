@@ -12,6 +12,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FeedbackSubmissionController extends Controller
@@ -86,6 +87,20 @@ class FeedbackSubmissionController extends Controller
         );
     }
 
+    public function showAttachment(FeedbackAttachment $attachment): BinaryFileResponse
+    {
+        abort_unless(Storage::disk('local')->exists($attachment->storage_path), 404);
+        abort_unless(str_starts_with((string) $attachment->mime_type, 'image/'), 404);
+
+        return response()->file(
+            Storage::disk('local')->path($attachment->storage_path),
+            [
+                'Content-Type' => $attachment->mime_type,
+                'Content-Disposition' => 'inline; filename="'.addslashes($attachment->original_filename).'"',
+            ],
+        );
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -154,15 +169,27 @@ class FeedbackSubmissionController extends Controller
                 'name' => $submission->completedBy->name,
             ] : null,
             'attachments' => $submission->attachments
-                ->map(fn (FeedbackAttachment $attachment) => [
-                    'id' => $attachment->id,
-                    'original_filename' => $attachment->original_filename,
-                    'mime_type' => $attachment->mime_type,
-                    'size_bytes' => $attachment->size_bytes,
-                    'download_url' => route('admin.feedback.attachments.download', $attachment),
-                ])
+                ->map(fn (FeedbackAttachment $attachment) => $this->serializeAttachment($attachment))
                 ->values()
                 ->all(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function serializeAttachment(FeedbackAttachment $attachment): array
+    {
+        $isImage = str_starts_with((string) $attachment->mime_type, 'image/');
+
+        return [
+            'id' => $attachment->id,
+            'original_filename' => $attachment->original_filename,
+            'mime_type' => $attachment->mime_type,
+            'size_bytes' => $attachment->size_bytes,
+            'is_image' => $isImage,
+            'preview_url' => $isImage ? route('admin.feedback.attachments.show', $attachment) : null,
+            'download_url' => route('admin.feedback.attachments.download', $attachment),
         ];
     }
 }

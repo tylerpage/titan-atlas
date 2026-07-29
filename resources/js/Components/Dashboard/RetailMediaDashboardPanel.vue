@@ -92,10 +92,22 @@ const summary = computed(() => props.connectorData.summary ?? {
 });
 
 const campaigns = computed(() => props.connectorData.campaigns ?? []);
-const objectives = computed(() => props.connectorData.objectives ?? []);
-const placements = computed(() => props.connectorData.placements ?? []);
-const devices = computed(() => props.connectorData.devices ?? []);
+const showReach = computed(() => Number(summary.value.reach ?? 0) > 0);
 const showPriorYearSpend = computed(() => (props.connectorData.prior_year_spend_series ?? []).length > 0);
+
+const breakdownSections = computed(() => {
+    const sections = [
+        { key: 'ad_types', title: 'Spend by ad type', rows: props.connectorData.ad_types ?? [] },
+        { key: 'keywords', title: 'Spend by keyword', rows: props.connectorData.keywords ?? [] },
+        { key: 'listings', title: 'Spend by listing', rows: props.connectorData.listings ?? [] },
+        { key: 'ad_products', title: 'Spend by ASIN', rows: props.connectorData.ad_products ?? [] },
+        { key: 'page_types', title: 'Spend by page type', rows: props.connectorData.page_types ?? [] },
+        { key: 'tactics', title: 'Spend by tactic', rows: props.connectorData.tactics ?? [] },
+        { key: 'objectives', title: 'Spend by objective', rows: props.connectorData.objectives ?? [] },
+    ];
+
+    return sections.filter((section) => section.rows.length > 0);
+});
 
 const rankedTopCampaigns = computed(() => {
     const sorted = [...campaigns.value];
@@ -188,14 +200,14 @@ function exportCampaignCsv() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'meta-campaign-performance.csv';
+    link.download = 'retail-media-campaign-performance.csv';
     link.click();
     URL.revokeObjectURL(url);
 }
 
-const maxObjectiveCost = computed(() => Math.max(...objectives.value.map((row) => row.cost ?? 0), 1));
-const maxPlacementCost = computed(() => Math.max(...placements.value.map((row) => row.cost ?? 0), 1));
-const maxDeviceCost = computed(() => Math.max(...devices.value.map((row) => row.cost ?? 0), 1));
+function maxBreakdownCost(rows) {
+    return Math.max(...rows.map((row) => row.cost ?? 0), 1);
+}
 </script>
 
 <template>
@@ -273,7 +285,7 @@ const maxDeviceCost = computed(() => Math.max(...devices.value.map((row) => row.
                 <p class="text-sm text-slate-500">Impressions</p>
                 <p class="mt-1 text-2xl font-semibold">{{ formatNumber(summary.impressions) }}</p>
             </div>
-            <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div v-if="showReach" class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <p class="text-sm text-slate-500">Reach</p>
                 <p class="mt-1 text-2xl font-semibold">{{ formatNumber(summary.reach) }}</p>
             </div>
@@ -294,7 +306,7 @@ const maxDeviceCost = computed(() => Math.max(...devices.value.map((row) => row.
         <div class="mb-8 grid gap-6 lg:grid-cols-2">
             <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <h2 class="mb-1 text-lg font-semibold">Spend over time</h2>
-                <p class="mb-4 text-sm text-slate-500">Daily Meta ad spend for {{ connectionName }}.</p>
+                <p class="mb-4 text-sm text-slate-500">Daily ad spend for {{ connectionName }}.</p>
                 <RevenueLineChart
                     :series="connectorData.spend_series ?? []"
                     :comparison-series="connectorData.prior_year_spend_series ?? []"
@@ -492,11 +504,15 @@ const maxDeviceCost = computed(() => Math.max(...devices.value.map((row) => row.
             </div>
         </section>
 
-        <div class="grid gap-6 lg:grid-cols-3">
-            <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h2 class="mb-1 text-lg font-semibold">Spend by objective</h2>
-                <div v-if="objectives.length" class="space-y-3">
-                    <div v-for="row in objectives" :key="row.dimension_key" class="space-y-1">
+        <div v-if="breakdownSections.length" class="grid gap-6 lg:grid-cols-3">
+            <section
+                v-for="section in breakdownSections"
+                :key="section.key"
+                class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
+            >
+                <h2 class="mb-1 text-lg font-semibold">{{ section.title }}</h2>
+                <div class="space-y-3">
+                    <div v-for="row in section.rows" :key="`${section.key}-${row.dimension_key}`" class="space-y-1">
                         <div class="flex items-center justify-between text-sm">
                             <span class="font-medium">{{ row.dimension_label }}</span>
                             <span class="text-slate-600">{{ formatCurrency(row.cost) }}</span>
@@ -505,58 +521,13 @@ const maxDeviceCost = computed(() => Math.max(...devices.value.map((row) => row.
                             <div
                                 class="h-full rounded-full"
                                 :style="{
-                                    width: `${Math.max(4, (row.cost / maxObjectiveCost) * 100)}%`,
+                                    width: `${Math.max(4, (row.cost / maxBreakdownCost(section.rows)) * 100)}%`,
                                     backgroundColor: primaryColor,
                                 }"
                             />
                         </div>
                     </div>
                 </div>
-                <p v-else class="py-8 text-center text-sm text-slate-500">No objective breakdown yet.</p>
-            </section>
-
-            <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h2 class="mb-1 text-lg font-semibold">Spend by placement</h2>
-                <div v-if="placements.length" class="space-y-3">
-                    <div v-for="row in placements" :key="row.dimension_key" class="space-y-1">
-                        <div class="flex items-center justify-between text-sm">
-                            <span class="font-medium">{{ row.dimension_label }}</span>
-                            <span class="text-slate-600">{{ formatCurrency(row.cost) }}</span>
-                        </div>
-                        <div class="h-2 overflow-hidden rounded-full bg-slate-100">
-                            <div
-                                class="h-full rounded-full"
-                                :style="{
-                                    width: `${Math.max(4, (row.cost / maxPlacementCost) * 100)}%`,
-                                    backgroundColor: primaryColor,
-                                }"
-                            />
-                        </div>
-                    </div>
-                </div>
-                <p v-else class="py-8 text-center text-sm text-slate-500">No placement breakdown yet.</p>
-            </section>
-
-            <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h2 class="mb-1 text-lg font-semibold">Spend by device</h2>
-                <div v-if="devices.length" class="space-y-3">
-                    <div v-for="row in devices" :key="row.dimension_key" class="space-y-1">
-                        <div class="flex items-center justify-between text-sm">
-                            <span class="font-medium">{{ row.dimension_label }}</span>
-                            <span class="text-slate-600">{{ formatCurrency(row.cost) }}</span>
-                        </div>
-                        <div class="h-2 overflow-hidden rounded-full bg-slate-100">
-                            <div
-                                class="h-full rounded-full"
-                                :style="{
-                                    width: `${Math.max(4, (row.cost / maxDeviceCost) * 100)}%`,
-                                    backgroundColor: primaryColor,
-                                }"
-                            />
-                        </div>
-                    </div>
-                </div>
-                <p v-else class="py-8 text-center text-sm text-slate-500">No device breakdown yet.</p>
             </section>
         </div>
     </div>

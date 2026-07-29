@@ -2,26 +2,33 @@
 
 namespace App\Services\Analytics;
 
-use App\Enums\DateComparison;
-use App\Models\ClientDashboard;
 use App\Models\Connection;
+use Carbon\Carbon;
 
-class AmazonAdsDashboardService extends GoogleAdsDashboardService
+class AmazonAdsDashboardService extends RetailMediaDashboardService
 {
+    protected function retailMediaKind(): string
+    {
+        return 'amazon_ads';
+    }
+
+    protected function retailMediaConfigKey(): string
+    {
+        return 'amazon_ads';
+    }
+
     /**
-     * @param  array{start?: string, end?: string}|null  $customRange
      * @return array<string, mixed>
      */
-    public function dataFor(
-        ClientDashboard $dashboard,
-        Connection $connection,
-        ?string $dateRange = null,
-        ?array $customRange = null,
-        DateComparison|string|null $comparison = null,
-    ): array {
-        $data = parent::dataFor($dashboard, $connection, $dateRange, $customRange, $comparison);
-        $data['kind'] = 'amazon_ads';
-
-        return $data;
+    protected function extraBreakdowns(Connection $connection, Carbon $start, Carbon $end): array
+    {
+        return [
+            'ad_types' => $this->dimensionBreakdown($connection, $start, $end, 'ad_type_daily'),
+            'keywords' => $this->dimensionBreakdown($connection, $start, $end, 'keyword_daily'),
+            'ad_products' => $this->dimensionBreakdown($connection, $start, $end, 'ad_product_daily'),
+            'objectives' => $this->dimensionBreakdown($connection, $start, $end, 'ad_type_daily'),
+            'placements' => [],
+            'devices' => [],
+        ];
     }
 }

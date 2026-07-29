@@ -18,6 +18,17 @@ class WalmartConnectConnector extends AbstractConnector implements FanOutSyncCon
 
     public function __construct(protected WalmartConnectApiClient $client) {}
 
+    public function syncStreams(): array
+    {
+        return [
+            'spend_daily',
+            'campaign_daily',
+            'keyword_daily',
+            'page_type_daily',
+            'tactic_daily',
+        ];
+    }
+
     public function type(): string
     {
         return ConnectorType::WalmartConnect->value;

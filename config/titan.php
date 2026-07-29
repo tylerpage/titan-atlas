@@ -10,6 +10,11 @@ return [
 
     'currency' => 'USD',
 
+    'reports' => [
+        'poll_max_attempts' => (int) env('TITAN_REPORT_POLL_MAX_ATTEMPTS', 30),
+        'poll_sleep_ms' => (int) env('TITAN_REPORT_POLL_SLEEP_MS', 2000),
+    ],
+
     'branding' => [
         'powered_by_text' => 'Powered by Irish Titan',
         'powered_by_required' => true,
@@ -105,6 +110,12 @@ return [
             'ad_spend',
             'spend_daily',
             'campaign_daily',
+            'ad_type_daily',
+            'keyword_daily',
+            'listing_daily',
+            'ad_product_daily',
+            'page_type_daily',
+            'tactic_daily',
             'channel_daily',
             'placement_daily',
             'device_daily',
@@ -196,6 +207,7 @@ return [
         'chunk_days' => (int) env('TITAN_AMAZON_ADS_CHUNK_DAYS', 7),
         'http_timeout_seconds' => (int) env('TITAN_AMAZON_ADS_HTTP_TIMEOUT', 60),
         'top_campaigns_limit' => (int) env('TITAN_AMAZON_ADS_TOP_CAMPAIGNS_LIMIT', 100),
+        'top_breakdown_limit' => (int) env('TITAN_AMAZON_ADS_TOP_BREAKDOWN_LIMIT', 15),
     ],
 
     'walmart_connect' => [
@@ -206,6 +218,7 @@ return [
         'chunk_days' => (int) env('TITAN_WALMART_CONNECT_CHUNK_DAYS', 7),
         'http_timeout_seconds' => (int) env('TITAN_WALMART_CONNECT_HTTP_TIMEOUT', 60),
         'top_campaigns_limit' => (int) env('TITAN_WALMART_CONNECT_TOP_CAMPAIGNS_LIMIT', 100),
+        'top_breakdown_limit' => (int) env('TITAN_WALMART_CONNECT_TOP_BREAKDOWN_LIMIT', 15),
     ],
 
     'ebay_ads' => [
@@ -217,6 +230,7 @@ return [
         'chunk_days' => (int) env('TITAN_EBAY_ADS_CHUNK_DAYS', 7),
         'http_timeout_seconds' => (int) env('TITAN_EBAY_ADS_HTTP_TIMEOUT', 60),
         'top_campaigns_limit' => (int) env('TITAN_EBAY_ADS_TOP_CAMPAIGNS_LIMIT', 100),
+        'top_breakdown_limit' => (int) env('TITAN_EBAY_ADS_TOP_BREAKDOWN_LIMIT', 15),
     ],
 
     'google_analytics' => [

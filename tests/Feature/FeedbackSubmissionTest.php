@@ -115,6 +115,21 @@ class FeedbackSubmissionTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.feedback.attachments.download', $attachment))
             ->assertOk();
+
+        $imagePath = 'feedback/'.$submission->id.'/screenshot.png';
+        Storage::disk('local')->put($imagePath, 'fake-image');
+
+        $imageAttachment = $submission->attachments()->create([
+            'original_filename' => 'screenshot.png',
+            'storage_path' => $imagePath,
+            'mime_type' => 'image/png',
+            'size_bytes' => 11,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.feedback.attachments.show', $imageAttachment))
+            ->assertOk()
+            ->assertHeader('Content-Disposition', 'inline; filename="screenshot.png"');
     }
 
     public function test_admin_can_mark_feedback_completed_and_notify_user(): void

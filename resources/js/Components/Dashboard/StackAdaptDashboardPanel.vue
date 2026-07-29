@@ -173,10 +173,11 @@ const maxChannelCost = computed(() => {
                 :series="connectorData.spend_series ?? []"
                 :comparison-series="connectorData.prior_year_spend_series ?? []"
                 :comparing="showPriorYearSpend"
+                comparison-overlay
                 comparison-series-label="Prior year"
                 :color="primaryColor"
                 value-format="currency"
-                series-label="Daily spend"
+                series-label="This period"
             />
         </section>
 

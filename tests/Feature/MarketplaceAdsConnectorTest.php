@@ -26,31 +26,41 @@ class MarketplaceAdsConnectorTest extends TestCase
     public function test_amazon_ads_connector_validates_and_normalizes_reports(): void
     {
         Http::fake([
-            'https://advertising-api.amazon.com/*' => function ($request) {
-                if (str_contains($request->url(), '/profiles')) {
+            'https://advertising-api.amazon.com/*' => function ($request) use (&$pollCounts) {
+                if (str_contains($request->url(), '/v2/profiles')) {
+                    return Http::response([[
+                        'profileId' => '1234567890',
+                        'accountInfo' => ['name' => 'Acme Amazon'],
+                        'currencyCode' => 'USD',
+                    ]], 200);
+                }
+
+                if ($request->method() === 'POST' && str_contains($request->url(), '/reporting/reports')) {
+                    return Http::response(['reportId' => 'amazon-report'], 200);
+                }
+
+                if ($request->method() === 'GET' && str_contains($request->url(), '/reporting/reports/amazon-report')) {
                     return Http::response([
-                        'profiles' => [[
-                            'profileId' => '1234567890',
-                            'accountInfo' => ['name' => 'Acme Amazon'],
-                            'currencyCode' => 'USD',
-                        ]],
+                        'status' => 'COMPLETED',
+                        'url' => 'https://reports.test/amazon.json',
                     ], 200);
                 }
 
-                return Http::response([
-                    'rows' => [[
-                        'date' => '2026-06-01',
-                        'cost' => 125,
-                        'impressions' => 1000,
-                        'clicks' => 50,
-                        'purchases' => 3,
-                        'sales' => 450,
-                        'campaign_id' => 'cmp-1',
-                        'campaign_name' => 'Sponsored Products',
-                        'campaign_type' => 'SP',
-                    ]],
-                ], 200);
+                return Http::response([], 404);
             },
+            'https://reports.test/*' => Http::response([[
+                'date' => '20260601',
+                'cost' => 41.67,
+                'impressions' => 1000,
+                'clicks' => 50,
+                'purchases14d' => 3,
+                'sales14d' => 150,
+                'campaignId' => 'cmp-1',
+                'campaignName' => 'Sponsored Products',
+                'searchTerm' => 'running shoes',
+                'advertisedAsin' => 'B012345678',
+                'advertisedSku' => 'SKU-1',
+            ]], 200),
         ]);
 
         [$dashboard, $connection] = $this->makeConnection(
@@ -67,6 +77,7 @@ class MarketplaceAdsConnectorTest extends TestCase
 
         $records = $this->fetchAllRecords($connector, $connection);
         $this->assertGreaterThanOrEqual(2, count($records));
+        $this->assertContains('ad_type_daily', array_column($records, 'resource_type'));
         $this->persistAndTransform($connection, $records);
 
         $data = app(AmazonAdsDashboardService::class)->dataFor(
@@ -77,14 +88,26 @@ class MarketplaceAdsConnectorTest extends TestCase
         );
 
         $this->assertSame('amazon_ads', $data['kind']);
-        $this->assertSame(125.0, $data['summary']['cost']);
+        $this->assertEqualsWithDelta(125.0, $data['summary']['cost'], 0.05);
+        $this->assertNotNull($data['summary']['roas']);
     }
 
     public function test_walmart_connect_connector_validates_and_normalizes_reports(): void
     {
         Http::fake([
             'https://developer.api.walmart.com/*' => function ($request) {
-                if (str_contains($request->url(), '/advertisers') && $request->method() === 'GET') {
+                if ($request->method() === 'POST' && str_contains($request->url(), '/snapshot')) {
+                    return Http::response(['snapshotId' => 'wm-snapshot'], 200);
+                }
+
+                if ($request->method() === 'GET' && str_contains($request->url(), '/snapshot/')) {
+                    return Http::response([
+                        'status' => 'DONE',
+                        'downloadUrl' => 'https://reports.test/walmart.json',
+                    ], 200);
+                }
+
+                if ($request->method() === 'GET' && str_ends_with($request->url(), '/advertisers')) {
                     return Http::response([
                         'advertisers' => [[
                             'advertiserId' => 'wm-123',
@@ -94,19 +117,21 @@ class MarketplaceAdsConnectorTest extends TestCase
                     ], 200);
                 }
 
-                return Http::response([
-                    'rows' => [[
-                        'date' => '2026-06-01',
-                        'adSpend' => 80,
-                        'impressions' => 500,
-                        'clicks' => 25,
-                        'attributedOrders' => 2,
-                        'attributedSales' => 240,
-                        'campaign_id' => 'wm-cmp-1',
-                        'campaign_name' => 'Search',
-                    ]],
-                ], 200);
+                return Http::response([], 404);
             },
+            'https://reports.test/walmart.json' => Http::response([[
+                'date' => '2026-06-01',
+                'adSpend' => 80,
+                'impressions' => 500,
+                'clicks' => 25,
+                'attributedOrders' => 2,
+                'attributedSales' => 240,
+                'campaignId' => 'wm-cmp-1',
+                'campaignName' => 'Search',
+                'keyword' => 'shoes',
+                'pageType' => 'search',
+                'tactic' => 'manual',
+            ]], 200),
         ]);
 
         [$dashboard, $connection] = $this->makeConnection(
@@ -122,6 +147,7 @@ class MarketplaceAdsConnectorTest extends TestCase
 
         $records = $this->fetchAllRecords($connector, $connection);
         $this->assertNotEmpty($records);
+        $this->persistAndTransform($connection, $records);
 
         $data = app(WalmartConnectDashboardService::class)->dataFor(
             $dashboard,
@@ -131,12 +157,15 @@ class MarketplaceAdsConnectorTest extends TestCase
         );
 
         $this->assertSame('walmart_connect', $data['kind']);
+        $this->assertSame(80.0, $data['summary']['cost']);
     }
 
     public function test_ebay_ads_connector_validates_and_normalizes_reports(): void
     {
+        $pollCounts = [];
+
         Http::fake([
-            'https://api.ebay.com/*' => function ($request) {
+            'https://api.ebay.com/*' => function ($request) use (&$pollCounts) {
                 if (str_contains($request->url(), '/ad_account') && $request->method() === 'GET') {
                     return Http::response([
                         'accounts' => [[
@@ -147,19 +176,32 @@ class MarketplaceAdsConnectorTest extends TestCase
                     ], 200);
                 }
 
-                return Http::response([
-                    'records' => [[
-                        'date' => '2026-06-01',
-                        'cost' => 55,
-                        'impressions' => 300,
-                        'clicks' => 15,
-                        'conversions' => 1,
-                        'conversions_value' => 120,
-                        'campaign_id' => 'ebay-cmp-1',
-                        'campaign_name' => 'Promoted Listings',
-                    ]],
-                ], 200);
+                if ($request->method() === 'POST' && str_contains($request->url(), '/ad_report')) {
+                    return Http::response(['reportId' => 'ebay-report'], 200);
+                }
+
+                if ($request->method() === 'GET' && str_contains($request->url(), '/ad_report/')) {
+                    return Http::response([
+                        'reportTaskStatus' => 'SUCCESS',
+                        'reportHref' => 'https://reports.test/ebay.json',
+                    ], 200);
+                }
+
+                return Http::response([], 404);
             },
+            'https://reports.test/ebay.json' => Http::response([[
+                'date' => '2026-06-01',
+                'AD_FEES' => 55,
+                'impressions' => 300,
+                'clicks' => 15,
+                'SALES' => 1,
+                'SALE_AMOUNT' => 120,
+                'campaignId' => 'ebay-cmp-1',
+                'campaignName' => 'Promoted Listings',
+                'listingId' => 'listing-1',
+                'listingTitle' => 'Vintage Sneakers',
+                'keyword' => 'sneakers',
+            ]], 200),
         ]);
 
         [$dashboard, $connection] = $this->makeConnection(
@@ -175,7 +217,6 @@ class MarketplaceAdsConnectorTest extends TestCase
 
         $records = $this->fetchAllRecords($connector, $connection);
         $this->assertNotEmpty($records);
-
         $this->persistAndTransform($connection, $records);
 
         $data = app(EbayAdsDashboardService::class)->dataFor(
@@ -220,6 +261,8 @@ class MarketplaceAdsConnectorTest extends TestCase
             "titan.{$configKey}.incremental_days" => 1,
             "titan.{$configKey}.chunk_days" => 7,
             "titan.{$configKey}.data_lag_days" => 1,
+            'titan.reports.poll_max_attempts' => 3,
+            'titan.reports.poll_sleep_ms' => 0,
         ]);
     }
 
@@ -237,7 +280,7 @@ class MarketplaceAdsConnectorTest extends TestCase
             $allRecords = array_merge($allRecords, $result->records);
             $cursor = $result->nextCursor;
             $iterations++;
-        } while ($result->hasMore && $cursor !== null && $iterations < 20);
+        } while ($result->hasMore && $cursor !== null && $iterations < 50);
 
         return $allRecords;
     }

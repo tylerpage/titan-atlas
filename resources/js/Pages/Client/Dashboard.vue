@@ -13,6 +13,7 @@ import GoogleAnalyticsDashboardPanel from '../../Components/Dashboard/GoogleAnal
 import GoogleAdsDashboardPanel from '../../Components/Dashboard/GoogleAdsDashboardPanel.vue';
 import StackAdaptDashboardPanel from '../../Components/Dashboard/StackAdaptDashboardPanel.vue';
 import MetaAdsDashboardPanel from '../../Components/Dashboard/MetaAdsDashboardPanel.vue';
+import RetailMediaDashboardPanel from '../../Components/Dashboard/RetailMediaDashboardPanel.vue';
 import DynamicConnectorDashboardPanel from '../../Components/Dashboard/DynamicConnectorDashboardPanel.vue';
 import RevenueLineChart from '../../Components/RevenueLineChart.vue';
 import { formatCurrency, formatNumber } from '../../lib/formatters';
@@ -261,11 +262,12 @@ const canEditCoverPage = computed(() => isAdmin.value && isCoverTab.value && pro
 const showCommerceView = computed(() => isDataTab.value && props.connectorData?.kind === 'commerce');
 const showSearchConsoleView = computed(() => isDataTab.value && props.connectorData?.kind === 'search_console');
 const showGoogleAnalyticsView = computed(() => isDataTab.value && props.connectorData?.kind === 'google_analytics');
-const showGoogleAdsView = computed(() => isDataTab.value && ['google_ads', 'reddit_ads', 'amazon_ads', 'walmart_connect', 'ebay_ads'].includes(props.connectorData?.kind));
+const showGoogleAdsView = computed(() => isDataTab.value && ['google_ads', 'reddit_ads'].includes(props.connectorData?.kind));
+const showRetailMediaView = computed(() => isDataTab.value && ['amazon_ads', 'walmart_connect', 'ebay_ads'].includes(props.connectorData?.kind));
 const showStackAdaptView = computed(() => isDataTab.value && props.connectorData?.kind === 'stackadapt');
 const showMetaAdsView = computed(() => isDataTab.value && props.connectorData?.kind === 'meta_ads');
 const showDynamicView = computed(() => isDataTab.value && props.connectorData?.kind === 'dynamic');
-const showConnectorView = computed(() => showCommerceView.value || showSearchConsoleView.value || showGoogleAnalyticsView.value || showGoogleAdsView.value || showStackAdaptView.value || showMetaAdsView.value || showDynamicView.value);
+const showConnectorView = computed(() => showCommerceView.value || showSearchConsoleView.value || showGoogleAnalyticsView.value || showGoogleAdsView.value || showRetailMediaView.value || showStackAdaptView.value || showMetaAdsView.value || showDynamicView.value);
 const showLegacyWidgets = computed(() => isDataTab.value && (!hasConnections.value || (!showConnectorView.value && hasConnections.value)));
 const showTabFilters = computed(() => isDataTab.value);
 const shareStatus = ref(null);
@@ -971,6 +973,14 @@ function sourceMediumLabel(order) {
 
         <GoogleAdsDashboardPanel
             v-else-if="showGoogleAdsView"
+            :connector-data="connectorData"
+            :connection-name="activeConnection?.name ?? ''"
+            :primary-color="dashboard.primary_color"
+            :comparing="comparing"
+        />
+
+        <RetailMediaDashboardPanel
+            v-else-if="showRetailMediaView"
             :connector-data="connectorData"
             :connection-name="activeConnection?.name ?? ''"
             :primary-color="dashboard.primary_color"
