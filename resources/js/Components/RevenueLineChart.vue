@@ -52,7 +52,19 @@ const useComparisonOverlay = computed(() => (
     props.comparing && props.comparisonSeries.length > 0 && props.comparisonOverlay
 ));
 
+const sortedPrimarySeries = computed(() => (
+    [...props.series].sort((left, right) => left.date.localeCompare(right.date))
+));
+
+const sortedComparisonSeries = computed(() => (
+    [...props.comparisonSeries].sort((left, right) => left.date.localeCompare(right.date))
+));
+
 const labels = computed(() => {
+    if (useComparisonOverlay.value && sortedPrimarySeries.value.length > 0) {
+        return sortedPrimarySeries.value.map((point) => point.date);
+    }
+
     const dates = new Set();
 
     props.series.forEach((point) => dates.add(point.date));
@@ -70,12 +82,28 @@ function valuesForSeries(series) {
     return labels.value.map((date) => byDate[date] ?? null);
 }
 
+function primaryValues() {
+    if (useComparisonOverlay.value) {
+        return sortedPrimarySeries.value.map((point) => point.value);
+    }
+
+    return valuesForSeries(props.series);
+}
+
+function comparisonValues() {
+    if (useComparisonOverlay.value) {
+        return sortedPrimarySeries.value.map((_, index) => sortedComparisonSeries.value[index]?.value ?? null);
+    }
+
+    return valuesForSeries(props.comparisonSeries);
+}
+
 const datasets = computed(() => {
     if (useComparisonOverlay.value) {
         return [
             {
                 label: props.comparisonSeriesLabel,
-                data: valuesForSeries(props.comparisonSeries),
+                data: comparisonValues(),
                 borderColor: '#64748b',
                 backgroundColor: 'rgba(100, 116, 139, 0.08)',
                 borderDash: [5, 4],
@@ -89,7 +117,7 @@ const datasets = computed(() => {
             },
             {
                 label: props.seriesLabel,
-                data: valuesForSeries(props.series),
+                data: primaryValues(),
                 borderColor: props.color,
                 backgroundColor: `${props.color}33`,
                 borderWidth: 2.5,
@@ -207,16 +235,12 @@ function syncChart() {
         return;
     }
 
-    if (!chart) {
-        chart = new Chart(canvasRef.value, buildChartConfig());
-
-        return;
+    if (chart) {
+        chart.destroy();
+        chart = null;
     }
 
-    chart.data.labels = labels.value;
-    chart.data.datasets = datasets.value;
-    chart.options.plugins.legend.display = props.comparing && props.comparisonSeries.length > 0;
-    chart.update('none');
+    chart = new Chart(canvasRef.value, buildChartConfig());
 }
 
 onMounted(syncChart);

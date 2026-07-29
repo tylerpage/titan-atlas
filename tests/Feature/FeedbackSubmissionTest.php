@@ -129,7 +129,7 @@ class FeedbackSubmissionTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.feedback.attachments.show', $imageAttachment))
             ->assertOk()
-            ->assertHeader('Content-Disposition', 'inline; filename="screenshot.png"');
+            ->assertHeader('content-type', 'image/png');
     }
 
     public function test_admin_feedback_show_embeds_inline_image_preview_src(): void

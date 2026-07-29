@@ -13,7 +13,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FeedbackSubmissionController extends Controller
@@ -81,8 +80,8 @@ class FeedbackSubmissionController extends Controller
 
     public function downloadAttachment(FeedbackAttachment $attachment): StreamedResponse
     {
-        $disk = $this->attachments->disk();
-        abort_unless(Storage::disk($disk)->exists($attachment->storage_path), 404);
+        $disk = $this->attachments->resolveReadableDisk($attachment);
+        abort_unless($disk !== null, 404);
 
         return Storage::disk($disk)->download(
             $attachment->storage_path,
@@ -90,19 +89,16 @@ class FeedbackSubmissionController extends Controller
         );
     }
 
-    public function showAttachment(FeedbackAttachment $attachment): BinaryFileResponse|RedirectResponse
+    public function showAttachment(FeedbackAttachment $attachment): StreamedResponse
     {
         abort_unless($this->attachments->isImage($attachment), 404);
 
-        $disk = $this->attachments->disk();
-        abort_unless(Storage::disk($disk)->exists($attachment->storage_path), 404);
+        $disk = $this->attachments->resolveReadableDisk($attachment);
+        abort_unless($disk !== null, 404);
 
-        if (config("filesystems.disks.{$disk}.driver") === 's3') {
-            return redirect()->away($this->attachments->previewUrl($attachment));
-        }
-
-        return response()->file(
-            Storage::disk($disk)->path($attachment->storage_path),
+        return Storage::disk($disk)->response(
+            $attachment->storage_path,
+            $attachment->original_filename,
             [
                 'Content-Type' => $this->attachments->imageMimeType($attachment),
                 'Content-Disposition' => 'inline; filename="'.addslashes($attachment->original_filename).'"',

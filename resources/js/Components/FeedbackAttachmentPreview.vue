@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const props = defineProps({
     attachments: {
@@ -8,18 +8,99 @@ const props = defineProps({
     },
 });
 
-const imageAttachments = computed(() => props.attachments.filter((attachment) => attachment.is_image && attachmentPreviewSrc(attachment)));
+const imageAttachments = computed(() => props.attachments.filter((attachment) => attachment.is_image));
 const nonImageAttachments = computed(() => props.attachments.filter((attachment) => !attachment.is_image));
 
-function attachmentPreviewSrc(attachment) {
-    return attachment.preview_src || attachment.preview_url || null;
+const resolvedSrcById = ref({});
+const failedIds = ref(new Set());
+const blobUrls = [];
+
+function resolveKey(attachment) {
+    return String(attachment.id);
 }
+
+function setResolvedSrc(attachment, src) {
+    resolvedSrcById.value = {
+        ...resolvedSrcById.value,
+        [resolveKey(attachment)]: src,
+    };
+}
+
+function markFailed(attachment) {
+    failedIds.value = new Set([...failedIds.value, resolveKey(attachment)]);
+}
+
+function attachmentPreviewSrc(attachment) {
+    return resolvedSrcById.value[resolveKey(attachment)] ?? attachment.preview_src ?? null;
+}
+
+async function loadAttachmentPreview(attachment) {
+    const key = resolveKey(attachment);
+
+    if (attachment.preview_src) {
+        setResolvedSrc(attachment, attachment.preview_src);
+
+        return;
+    }
+
+    if (!attachment.preview_url || attachment.missing) {
+        if (attachment.missing) {
+            markFailed(attachment);
+        }
+
+        return;
+    }
+
+    try {
+        const response = await fetch(attachment.preview_url, {
+            credentials: 'same-origin',
+            headers: {
+                Accept: 'image/*',
+            },
+        });
+
+        if (!response.ok) {
+            markFailed(attachment);
+
+            return;
+        }
+
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        blobUrls.push(objectUrl);
+        setResolvedSrc(attachment, objectUrl);
+    } catch {
+        markFailed(attachment);
+    }
+}
+
+async function loadAllPreviews() {
+    await Promise.all(imageAttachments.value.map((attachment) => loadAttachmentPreview(attachment)));
+}
+
+onMounted(loadAllPreviews);
+
+watch(
+    () => props.attachments,
+    () => {
+        loadAllPreviews();
+    },
+    { deep: true },
+);
+
+onBeforeUnmount(() => {
+    blobUrls.forEach((url) => URL.revokeObjectURL(url));
+});
 
 const lightboxOpen = ref(false);
 const activeAttachment = ref(null);
 const zoom = ref(1);
 
 function openLightbox(attachment) {
+    if (!attachmentPreviewSrc(attachment)) {
+        return;
+    }
+
     activeAttachment.value = attachment;
     zoom.value = 1;
     lightboxOpen.value = true;
@@ -92,16 +173,29 @@ onBeforeUnmount(() => {
                 :key="attachment.id"
                 type="button"
                 class="group overflow-hidden rounded-lg border border-slate-200 bg-slate-50 text-left transition hover:border-slate-300 hover:shadow-sm"
+                :class="attachmentPreviewSrc(attachment) ? 'cursor-zoom-in' : 'cursor-default'"
                 @click="openLightbox(attachment)"
             >
-                <img
-                    :src="attachmentPreviewSrc(attachment)"
-                    :alt="attachment.original_filename"
-                    class="max-h-72 w-full object-contain transition group-hover:scale-[1.01]"
-                />
+                <div class="flex min-h-48 items-center justify-center bg-slate-100">
+                    <img
+                        v-if="attachmentPreviewSrc(attachment)"
+                        :src="attachmentPreviewSrc(attachment)"
+                        :alt="attachment.original_filename"
+                        class="max-h-72 w-full object-contain transition group-hover:scale-[1.01]"
+                    />
+                    <p v-else-if="failedIds.has(resolveKey(attachment)) || attachment.missing" class="px-4 text-center text-sm text-slate-500">
+                        Image file unavailable on server storage.
+                    </p>
+                    <p v-else class="px-4 text-center text-sm text-slate-500">
+                        Loading preview…
+                    </p>
+                </div>
                 <div class="border-t border-slate-200 px-3 py-2 text-sm">
                     <p class="truncate font-medium text-slate-800">{{ attachment.original_filename }}</p>
-                    <p class="text-slate-500">Click to zoom · {{ Math.round(attachment.size_bytes / 1024) }} KB</p>
+                    <p class="text-slate-500">
+                        <span v-if="attachmentPreviewSrc(attachment)">Click to zoom · </span>
+                        {{ Math.round(attachment.size_bytes / 1024) }} KB
+                    </p>
                 </div>
             </button>
         </div>

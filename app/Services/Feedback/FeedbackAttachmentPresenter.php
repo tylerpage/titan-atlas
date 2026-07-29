@@ -23,13 +23,25 @@ class FeedbackAttachmentPresenter
         return in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'], true);
     }
 
+    public function resolveReadableDisk(FeedbackAttachment $attachment): ?string
+    {
+        foreach ($this->diskCandidates() as $disk) {
+            if (Storage::disk($disk)->exists($attachment->storage_path)) {
+                return $disk;
+            }
+        }
+
+        return null;
+    }
+
     /**
      * @return array<string, mixed>
      */
     public function serialize(FeedbackAttachment $attachment): array
     {
         $isImage = $this->isImage($attachment);
-        $previewSrc = $isImage ? $this->inlinePreviewSrc($attachment) : null;
+        $readableDisk = $this->resolveReadableDisk($attachment);
+        $previewSrc = $isImage ? $this->inlinePreviewSrc($attachment, $readableDisk) : null;
 
         return [
             'id' => $attachment->id,
@@ -38,30 +50,15 @@ class FeedbackAttachmentPresenter
             'size_bytes' => $attachment->size_bytes,
             'is_image' => $isImage,
             'preview_src' => $previewSrc,
-            'preview_url' => $isImage && $previewSrc === null ? $this->previewUrl($attachment) : null,
+            'preview_url' => $isImage && $readableDisk !== null && $previewSrc === null
+                ? route('admin.feedback.attachments.show', $attachment, absolute: true)
+                : null,
             'download_url' => route('admin.feedback.attachments.download', $attachment, absolute: true),
+            'missing' => $readableDisk === null,
         ];
     }
 
-    public function previewUrl(FeedbackAttachment $attachment): string
-    {
-        $disk = $this->disk();
-
-        if ($this->diskDriver($disk) === 's3' && Storage::disk($disk)->exists($attachment->storage_path)) {
-            return Storage::disk($disk)->temporaryUrl(
-                $attachment->storage_path,
-                now()->addHour(),
-                [
-                    'ResponseContentType' => $this->imageMimeType($attachment),
-                    'ResponseContentDisposition' => 'inline; filename="'.addslashes($attachment->original_filename).'"',
-                ],
-            );
-        }
-
-        return route('admin.feedback.attachments.show', $attachment, absolute: true);
-    }
-
-    public function inlinePreviewSrc(FeedbackAttachment $attachment): ?string
+    public function inlinePreviewSrc(FeedbackAttachment $attachment, ?string $disk = null): ?string
     {
         $maxBytes = max(1, (int) config('titan.feedback.inline_preview_max_bytes', 5_242_880));
 
@@ -69,9 +66,9 @@ class FeedbackAttachmentPresenter
             return null;
         }
 
-        $disk = $this->disk();
+        $disk = $disk ?? $this->resolveReadableDisk($attachment);
 
-        if (! Storage::disk($disk)->exists($attachment->storage_path)) {
+        if ($disk === null) {
             return null;
         }
 
@@ -98,6 +95,21 @@ class FeedbackAttachmentPresenter
             'bmp' => 'image/bmp',
             default => 'image/jpeg',
         };
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function diskCandidates(): array
+    {
+        $configured = $this->disk();
+
+        return array_values(array_unique(array_filter([
+            $configured,
+            'local',
+            'public',
+            config('filesystems.default'),
+        ])));
     }
 
     protected function diskDriver(string $disk): string
